@@ -39,12 +39,23 @@ private:
 			};
 		};
 
-		std::cout << "moves : \n";
-		for (auto& v : _moves)
+		auto _board = chess::Board();
+		chess::reset_board(_board);
+		std::cout << _board << '\n';
+
+		for (auto& _move : _moves)
 		{
-			std::cout << ' ' << v << '\n';
+			std::cout << _move << '\n';
+			_board.move_piece(_move.from(), _move.to(), _move.promotion());
+			std::cout << _board << '\n';
 		};
-		std::cout << '\n';
+
+		//std::cout << "moves : \n";
+		//for (auto& v : _moves)
+		//{
+		//	std::cout << ' ' << v << '\n';
+		//};
+		//std::cout << '\n';
 
 	};
 
@@ -129,6 +140,14 @@ public:
 	};
 	std::string_view game_id() && = delete;
 
+	bool keep_open() const
+	{
+		return this->keep_open_;
+	};
+	void set_close()
+	{
+		this->keep_open_ = false;
+	};
 
 	GameStream(const char* _token, const std::string& _gameID, const std::string& _playerID) :
 		stream_(_token, "/api/bot/game/stream/" + _gameID),
@@ -155,6 +174,8 @@ private:
 
 	std::optional<chess::Color> my_color_{ std::nullopt };
 	std::optional<bool> my_turn_{ std::nullopt };
+
+	bool keep_open_ = true;
 };
 
 
@@ -182,11 +203,14 @@ private:
 	void game_finish_callback(const lichess::GameFinishEvent& _event)
 	{
 		const auto lck = std::unique_lock(this->mtx_);
-		std::erase_if(this->game_streams_, [&_event](const GameStream& v)
+		auto it = std::ranges::find_if(this->game_streams_, [&_event](const GameStream& v)
 			{
 				return v.game_id() == _event.id;
 			});
-
+		if (it != this->game_streams_.end())
+		{
+			it->set_close();
+		};
 		std::cout << "Finished game " << _event.id << '\n';
 	};
 
@@ -215,8 +239,7 @@ public:
 				{
 					_hasAIGame = true;
 				};
-				const auto _endpoint = "/api/bot/game/stream/" + v.gameId;
-				this->game_streams_.emplace_back(this->env_.token.c_str(), _endpoint, this->account_info_.id);
+				this->game_streams_.emplace_back(this->env_.token.c_str(), v.gameId, this->account_info_.id);
 			};
 
 			if (!_hasAIGame)
@@ -242,6 +265,15 @@ public:
 				};
 			};
 		};
+	};
+	
+	void update()
+	{
+		const auto lck = std::unique_lock(this->mtx_);
+		std::erase_if(this->game_streams_, [](auto& v)
+			{
+				return !v.keep_open();
+			});
 	};
 
 	AccountManager(sch::EnvInfo _env) :
@@ -280,6 +312,7 @@ int main(int _nargs, const char* _vargs[])
 	while (true)
 	{
 		std::this_thread::sleep_for(std::chrono::seconds(1));
+		_accountManager.update();
 	};
 
 	return 0;
