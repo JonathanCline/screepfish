@@ -338,6 +338,96 @@ namespace lichess
 		);
 	};
 
+	template <>
+	struct class_named_member_table<GameStartEvent>
+	{
+		using type = GameStartEvent;
+		constexpr static auto value = std::make_tuple
+		(
+			_LICHESS_MEMBER(id),
+			_LICHESS_MEMBER(source)
+		);
+	};
+
+	template <>
+	struct class_named_member_table<GameFinishEvent>
+	{
+		using type = GameFinishEvent;
+		constexpr static auto value = std::make_tuple
+		(
+			_LICHESS_MEMBER(id),
+			_LICHESS_MEMBER(source)
+		);
+	};
+
+	template <>
+	struct class_named_member_table<GameStateEvent>
+	{
+		using type = GameStateEvent;
+		constexpr static auto value = std::make_tuple
+		(		
+			_LICHESS_MEMBER(moves),
+			_LICHESS_MEMBER(wtime),
+			_LICHESS_MEMBER(btime),
+			_LICHESS_MEMBER(winc),
+			_LICHESS_MEMBER(binc),
+			_LICHESS_MEMBER(status),
+			_LICHESS_MEMBER(winner),
+			_LICHESS_MEMBER(wdraw),
+			_LICHESS_MEMBER(bdraw),
+			_LICHESS_MEMBER(wtakeback),
+			_LICHESS_MEMBER(btakeback)
+		);
+	};
+
+	template <>
+	struct class_named_member_table<GameFullEvent::Player>
+	{
+		using type = GameFullEvent::Player;
+		constexpr static auto value = std::make_tuple
+		(		
+			_LICHESS_MEMBER(aiLevel),
+			_LICHESS_MEMBER(id),
+			_LICHESS_MEMBER(name),
+			_LICHESS_MEMBER(title),
+			_LICHESS_MEMBER(rating),
+			_LICHESS_MEMBER(provisional)
+		);
+	};
+
+	template <>
+	struct class_named_member_table<GameFullEvent::Clock>
+	{
+		using type = GameFullEvent::Clock;
+		constexpr static auto value = std::make_tuple
+		(		
+			_LICHESS_MEMBER(limit),
+			_LICHESS_MEMBER(increment)
+		);
+	};
+
+	template <>
+	struct class_named_member_table<GameFullEvent>
+	{
+		using type = GameFullEvent;
+		constexpr static auto value = std::make_tuple
+		(		
+			_LICHESS_MEMBER(id),
+			_LICHESS_MEMBER(clock),
+			_LICHESS_MEMBER(speed),
+			_LICHESS_MEMBER(rated),
+			_LICHESS_MEMBER(createdAt),
+			_LICHESS_MEMBER(white),
+			_LICHESS_MEMBER(black),
+			_LICHESS_MEMBER(initialFen),
+			_LICHESS_MEMBER(state)
+		);
+	};
+
+
+
+
+
 
 
 	template <typename T>
@@ -485,4 +575,93 @@ namespace lichess
 			return false;
 		};
 	};
-}
+};
+
+
+namespace lichess
+{
+	void AccountEventProcessor::push(const GameStartEvent& _event) const
+	{
+		const auto lck = std::unique_lock(this->mtx_);	
+		if (auto& _cb = this->game_start_callback_; _cb)
+		{
+			_cb(_event);
+		};
+	};
+	void AccountEventProcessor::push(const GameFinishEvent& _event) const
+	{
+		const auto lck = std::unique_lock(this->mtx_);	
+		if (auto& _cb = this->game_finish_callback_; _cb)
+		{
+			_cb(_event);
+		};
+	};
+	
+	void AccountEventProcessor::process(const json& _json)
+	{
+		if (_json.contains("type"))
+		{
+			const std::string _type = _json.at("type");
+			if (_type == "gameStart")
+			{
+				GameStartEvent _event;
+				_event = _json.at("game");
+				this->push(_event);
+			}
+			else if (_type == "gameFinish")
+			{
+				GameFinishEvent _event;
+				_event = _json.at("game");
+				this->push(_event);
+			}
+			else
+			{
+				// Unhandled case
+			};
+		};
+	};
+};
+
+namespace lichess
+{
+	void GameEventProcessor::push(const GameFullEvent& _event) const
+	{
+		const auto lck = std::unique_lock(this->mtx_);	
+		if (auto& _cb = this->game_full_callback_; _cb)
+		{
+			_cb(_event);
+		};
+	};
+	void GameEventProcessor::push(const GameStateEvent& _event) const
+	{
+		const auto lck = std::unique_lock(this->mtx_);	
+		if (auto& _cb = this->game_state_callback_; _cb)
+		{
+			_cb(_event);
+		};
+	};
+	
+	void GameEventProcessor::process(const json& _json)
+	{
+		if (_json.contains("type"))
+		{
+			const std::string _type = _json.at("type");
+			if (_type == "gameFull")
+			{
+				GameFullEvent _event;
+				_event = _json;
+				this->push(_event);
+			}
+			else if (_type == "gameState")
+			{
+				GameStateEvent _event;
+				_event = _json;
+				this->push(_event);
+			}
+			else
+			{
+				// Unhandled case
+			};
+		};
+	};
+};

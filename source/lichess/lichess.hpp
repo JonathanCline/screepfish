@@ -66,7 +66,7 @@ namespace lichess
 			std::string id;
 			std::string name;
 			std::optional<std::string> title;
-			uint32_t rating;
+			int32_t rating;
 			bool online;
 
 			Challenger() = default;
@@ -76,8 +76,8 @@ namespace lichess
 		{
 			std::string type;
 			std::optional<std::string> show;
-			std::optional<uint64_t> limit;
-			std::optional<uint64_t> increment;
+			std::optional<int64_t> limit;
+			std::optional<int64_t> increment;
 
 			TimeControl() = default;
 		};
@@ -141,13 +141,31 @@ namespace lichess
 		std::string variant;
 		std::string speed;
 		std::string perf;
-		uint64_t createdAt;
-		uint64_t lastMoveAt;
+		int64_t createdAt;
+		int64_t lastMoveAt;
 		std::string status;
 		
 		ChallengeAI() = default;
 	};
 
+
+
+
+	struct GameStartEvent
+	{
+		std::string id;
+		std::string source;
+
+		GameStartEvent() = default;
+	};
+
+	struct GameFinishEvent
+	{
+		std::string id;
+		std::string source;
+
+		GameFinishEvent() = default;
+	};
 
 	struct AcceptChallengeParams
 	{
@@ -161,6 +179,131 @@ namespace lichess
 
 		AcceptChallenge() = default;
 	};
+
+
+
+
+
+	struct AccountEventProcessor
+	{
+	public:
+
+		using GameStartCallback = std::function<void(const GameStartEvent&)>;
+		using GameFinishCallback = std::function<void(const GameFinishEvent&)>;
+
+		void set_callback(GameStartCallback _callback)
+		{
+			const auto lck = std::unique_lock(this->mtx_);
+			this->game_start_callback_ = std::move(_callback);
+		};
+		void set_callback(GameFinishCallback _callback)
+		{
+			const auto lck = std::unique_lock(this->mtx_);
+			this->game_finish_callback_ = std::move(_callback);
+		};
+
+		void push(const GameStartEvent& _event) const;
+		void push(const GameFinishEvent& _event) const;
+
+		void process(const json& _json);
+
+		AccountEventProcessor() = default;
+
+	private:
+		mutable std::mutex mtx_;
+		GameStartCallback game_start_callback_;
+		GameFinishCallback game_finish_callback_;
+
+	};
+
+
+
+	struct GameStateEvent
+	{
+		std::string moves;
+		int64_t wtime;
+		int64_t btime;
+		int64_t winc;
+		int64_t binc;
+		std::string status;
+		std::optional<std::string> winner;
+
+		std::optional<bool> wdraw;
+		std::optional<bool> bdraw;
+		std::optional<bool> wtakeback;
+		std::optional<bool> btakeback;
+
+		GameStateEvent() = default;
+	};
+
+	struct GameFullEvent
+	{
+		struct Player
+		{
+			std::optional<uint8_t> aiLevel;
+			std::optional<std::string> id;
+			std::optional<std::string> name;
+			std::optional<std::string> title;
+			std::optional<int32_t> rating;
+			std::optional<bool> provisional;
+
+			Player() = default;
+		};
+		
+		struct Clock
+		{
+			int64_t limit;
+			int64_t increment;
+
+			Clock() = default;
+		};
+
+		std::string id;
+		std::optional<Clock> clock;
+		std::string speed;
+		bool rated;
+		int64_t createdAt;
+		Player white;
+		Player black;
+
+		std::string initialFen;
+		GameStateEvent state;
+
+		GameFullEvent() = default;
+	};
+
+
+
+	struct GameEventProcessor
+	{
+	public:
+		using GameFullCallback = std::function<void(const GameFullEvent&)>;
+		using GameStateCallback = std::function<void(const GameStateEvent&)>;
+
+		void set_callback(GameFullCallback _callback)
+		{
+			const auto lck = std::unique_lock(this->mtx_);
+			this->game_full_callback_ = std::move(_callback);
+		};
+		void set_callback(GameStateCallback _callback)
+		{
+			const auto lck = std::unique_lock(this->mtx_);
+			this->game_state_callback_ = std::move(_callback);
+		};
+
+		void push(const GameFullEvent& _event) const;
+		void push(const GameStateEvent& _event) const;
+
+		void process(const json& _json);
+
+		GameEventProcessor() = default;
+		
+	private:		
+		mutable std::mutex mtx_;
+		GameFullCallback game_full_callback_;
+		GameStateCallback game_state_callback_;
+	};
+
 
 
 	template <typename T>
