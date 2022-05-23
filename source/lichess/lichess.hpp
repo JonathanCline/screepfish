@@ -4,7 +4,10 @@
 
 #include "json.hpp"
 
-#define CPPHTTPLIB_OPENSSL_SUPPORT
+#ifndef CPPHTTPLIB_OPENSSL_SUPPORT
+	#define CPPHTTPLIB_OPENSSL_SUPPORT
+#endif
+
 #include <httplib.h>
 
 #include <string>

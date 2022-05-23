@@ -1,6 +1,10 @@
+#include "chess/chess.hpp"
+
 #include "env.hpp"
 
 #include "lichess/lichess.hpp"
+
+#include "utility/string.hpp"
 
 #include <list>
 #include <chrono>
@@ -13,16 +17,35 @@
 
 
 
-
 struct GameStream
 {
 private:
 
-	void on_my_turn(const lichess::GameStateEvent& _event)
+	void on_move_played(const lichess::GameStateEvent& _event)
 	{
+		std::vector<chess::Move> _moves{};
 
+		{
+			auto _movesString = std::string_view(_event.moves);
+			while (!_movesString.empty())
+			{
+				auto _move = chess::Move();
+				_movesString = chess::fromstr(_movesString, _move);
+				if (!_movesString.empty())
+				{
+					_movesString = str::lstrip(_movesString);
+				};
+				_moves.push_back(_move);
+			};
+		};
 
-		std::cout << "my turn " << _event.moves << '\n';
+		std::cout << "moves : \n";
+		for (auto& v : _moves)
+		{
+			std::cout << ' ' << v << '\n';
+		};
+		std::cout << '\n';
+
 	};
 
 	void on_game_full(const lichess::GameFullEvent& _event)
@@ -30,12 +53,12 @@ private:
 		if (auto& _blackID = _event.black.id; _blackID && _blackID.value() == this->player_id_)
 		{
 			this->my_turn_ = false;
-			this->my_color_ = "black";
+			this->my_color_ = chess::Color::black;
 		}
 		else if (auto& _whiteID = _event.white.id; _whiteID && _whiteID.value() == this->player_id_)
 		{
 			this->my_turn_ = true;
-			this->my_color_ = "white";
+			this->my_color_ = chess::Color::white;
 		};
 
 		// Count played moves
@@ -52,11 +75,11 @@ private:
 			_whiteToPlay = true;
 		};
 
-		if (this->my_color_.value() == "white" && _whiteToPlay)
+		if (this->my_color_.value() == chess::Color::white && _whiteToPlay)
 		{
 			this->my_turn_ = true;
 		}
-		else if (this->my_color_.value() == "black" && !_whiteToPlay)
+		else if (this->my_color_.value() == chess::Color::black && !_whiteToPlay)
 		{
 			this->my_turn_ = true;
 		}
@@ -65,10 +88,7 @@ private:
 			this->my_turn_ = false;
 		};
 
-		if (this->my_turn_)
-		{
-			this->on_my_turn(_event.state);
-		};
+		this->on_move_played(_event.state);
 	};
 	void on_game_state(const lichess::GameStateEvent& _event)
 	{
@@ -85,11 +105,11 @@ private:
 			_whitesTurn = true;
 		};
 
-		if (this->my_color_.value() == "white" && _whitesTurn)
+		if (this->my_color_.value() == chess::Color::white && _whitesTurn)
 		{
 			this->my_turn_ = true;
 		}
-		else if (this->my_color_.value() == "black" && !_whitesTurn)
+		else if (this->my_color_.value() == chess::Color::black && !_whitesTurn)
 		{
 			this->my_turn_ = true;
 		}
@@ -98,18 +118,23 @@ private:
 			this->my_turn_ = false;
 		};
 
-		if (this->my_turn_.value())
-		{
-			this->on_my_turn(_event);
-		};
+		this->on_move_played(_event);
 	};
 
 public:
 
-	GameStream(const char* _token, const std::string& _endpoint, const std::string& _playerID) :
-		stream_(_token, _endpoint),
+	std::string_view game_id() const & noexcept
+	{
+		return this->game_id_;
+	};
+	std::string_view game_id() && = delete;
+
+
+	GameStream(const char* _token, const std::string& _gameID, const std::string& _playerID) :
+		stream_(_token, "/api/bot/game/stream/" + _gameID),
 		proc_(),
-		player_id_(_playerID)
+		player_id_(_playerID),
+		game_id_(_gameID)
 	{
 		this->proc_.set_callback(jc::functor(&GameStream::on_game_full, this));
 		this->proc_.set_callback(jc::functor(&GameStream::on_game_state, this));
@@ -124,11 +149,119 @@ public:
 private:
 	lichess::StreamClient stream_;
 	lichess::GameEventProcessor proc_;
+	
+	std::string game_id_;
 	std::string player_id_;
 
+	std::optional<chess::Color> my_color_{ std::nullopt };
 	std::optional<bool> my_turn_{ std::nullopt };
-	std::optional<std::string> my_color_{ std::nullopt };
+};
 
+
+struct AccountManager
+{
+private:
+
+	void game_start_callback(const lichess::GameStartEvent& _event)
+	{
+		const auto lck = std::unique_lock(this->mtx_);
+		for (auto& v : this->game_streams_)
+		{
+			if (v.game_id() == _event.id)
+			{
+				std::cout << "[WARNING] Got game start event for a game we are already managing\n";
+				return;
+			};
+		};
+		
+		std::cout << "Started game " << _event.id << '\n';
+
+		// Create the new stream
+		this->game_streams_.emplace_back(this->env_.token.c_str(), _event.id, this->account_info_.id);
+	};
+	void game_finish_callback(const lichess::GameFinishEvent& _event)
+	{
+		const auto lck = std::unique_lock(this->mtx_);
+		std::erase_if(this->game_streams_, [&_event](const GameStream& v)
+			{
+				return v.game_id() == _event.id;
+			});
+
+		std::cout << "Finished game " << _event.id << '\n';
+	};
+
+public:
+
+	void start()
+	{
+		this->account_info_ = *this->account_client_.get_account_info();
+		
+		// Lock while we perform setup
+		const auto lck = std::unique_lock(this->mtx_);
+
+		// Setup account event stream
+		this->account_event_stream_.set_callback(jc::functor(&lichess::AccountEventProcessor::process, &this->account_event_proc_));
+		this->account_event_proc_.set_callback(jc::functor(&AccountManager::game_start_callback, this));
+		this->account_event_proc_.set_callback(jc::functor(&AccountManager::game_finish_callback, this));
+		this->account_event_stream_.start();
+
+
+		{
+			bool _hasAIGame = false;
+			auto _games = this->account_client_.get_ongoing_games();
+			for (auto& v : _games->nowPlaying)
+			{
+				if (v.opponent.ai)
+				{
+					_hasAIGame = true;
+				};
+				const auto _endpoint = "/api/bot/game/stream/" + v.gameId;
+				this->game_streams_.emplace_back(this->env_.token.c_str(), _endpoint, this->account_info_.id);
+			};
+
+			if (!_hasAIGame)
+			{
+				auto _params = lichess::ChallengeAIParams{};
+				auto _result = this->account_client_.challenge_ai(_params);
+			};
+		};
+
+		{
+			auto _challenges = this->account_client_.get_challenges();
+			for (auto& v : _challenges->in)
+			{
+				if (v.status == "created")
+				{
+					auto _params = lichess::AcceptChallengeParams();
+					_params.challengeId = v.id;
+					if (!this->account_client_.accept_challenge(_params))
+					{
+						std::cout << "[ERROR] Failed to accept challenge with ID " <<
+							v.id << '\n';
+					};
+				};
+			};
+		};
+	};
+
+	AccountManager(sch::EnvInfo _env) :
+		env_(std::move(_env)),
+		account_client_(this->env_.token.c_str()),
+		account_event_stream_(this->env_.token.c_str(), "/api/stream/event"),
+		account_event_proc_()
+	{};
+
+private:
+	mutable std::mutex mtx_;
+
+	sch::EnvInfo env_;
+	lichess::Client account_client_;
+	lichess::AccountInfo account_info_;
+
+	lichess::StreamClient account_event_stream_;
+	std::list<GameStream> game_streams_{};
+
+	lichess::AccountEventProcessor account_event_proc_;
 };
 
 
@@ -141,78 +274,8 @@ int main(int _nargs, const char* _vargs[])
 	};
 
 	const auto _env = sch::load_env(_vargs[0]);
-	auto _client = lichess::Client(_env.token.c_str());
-
-	auto _accountInfo = _client.get_account_info();
-
-
-	auto _eventStream = lichess::StreamClient(_env.token.c_str(),
-		"/api/stream/event");
-	_eventStream.set_callback([](const lichess::json& _json)
-		{
-			if (_json.contains("still-alive"))
-			{
-				return;
-			};
-
-			const std::string _type = _json.at("type");
-			if (_type == "gameStart")
-			{
-				std::cout << "Game start " << _json.at("game").at("gameId") << '\n';
-			}
-			else if (_type == "gameFinish")
-			{
-				std::cout << "Game finish " << _json.at("game").at("gameId") << '\n';
-			};
-		});
-	_eventStream.start();
-
-
-	auto _gameStreams = std::list<GameStream>();
-
-	bool _hasAIGame = false;
-
-	{
-		auto _games = _client.get_ongoing_games();
-		for (auto& v : _games->nowPlaying)
-		{
-			std::cout << v.gameId << '\n';
-			std::cout << v.opponent.username << '\n';
-
-			if (v.opponent.ai)
-			{
-				_hasAIGame = true;
-			};
-
-			const auto _endpoint = "/api/bot/game/stream/" + v.gameId;
-			_gameStreams.emplace_back(_env.token.c_str(), _endpoint, _accountInfo->id);
-		};
-		std::cout << '\n';
-	};
-	
-	{
-		auto _challenges = _client.get_challenges();
-		for (auto& v : _challenges->in)
-		{
-			if (v.status == "created")
-			{
-				auto _params = lichess::AcceptChallengeParams();
-				_params.challengeId = v.id;
-				if (!_client.accept_challenge(_params))
-				{
-					std::cout << "[ERROR] Failed to accept challenge with ID " <<
-						v.id << '\n';
-				};
-			};
-		};
-	};
-
-	if (!_hasAIGame)
-	{
-		auto _params = lichess::ChallengeAIParams{};
-		auto _result = _client.challenge_ai(_params);
-		std::cout << "Created game against AI at " << _result->id << '\n';
-	};
+	auto _accountManager = AccountManager(_env);
+	_accountManager.start();
 
 	while (true)
 	{
