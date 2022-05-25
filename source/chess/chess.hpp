@@ -577,17 +577,18 @@ namespace chess
 			return this->erase(_pos, this->pfind(_pos));
 		};
 
+
 		void just_move_piece(Position _from, Position _to, piterator pIt)
 		{
 			assert(pIt != this->pend());
 
 			auto& f = this->pieces_by_pos_.at(this->toindex(_from));
 			auto& t = this->pieces_by_pos_.at(this->toindex(_to));
-			t = f;
-			f = Piece{};
-
-			if (const auto toIt = this->pfind(_to); toIt != this->pend())
+				
+			// Check if destination position has a piece
+			if (t)
 			{
+				const auto toIt = this->pfind(_to);
 				pIt->set_position(_to);
 				this->perase(toIt);
 			}
@@ -595,6 +596,9 @@ namespace chess
 			{
 				pIt->set_position(_to);
 			};
+
+			t = f;
+			f = Piece{};
 		};
 		void just_move_piece(Position _from, Position _to)
 		{
@@ -660,6 +664,42 @@ namespace chess
 		{
 			return this->get((_file, _rank));
 		};
+
+		/**
+		 * @brief Gets the pieces that are on a particular file.
+		 * @param _file File to get pieces on.
+		 * @return Array of pieces, null piece means nothing is present.
+		*/
+		std::array<Piece, 8> pieces_on_file(File _file) const
+		{
+			auto o = std::array<Piece, 8>{};
+			auto it = o.begin();
+			for (auto& _rank : ranks_v)
+			{
+				*it = this->pieces_by_pos_.at(this->toindex(_file, _rank));
+				++it;
+			};
+			return o;
+		};
+
+		/**
+		 * @brief Gets the pieces that are on a particular rank.
+		 * @param _rank Rank to get pieces on.
+		 * @return Array of pieces, null piece means nothing is present.
+		*/
+		std::array<Piece, 8> pieces_on_rank(Rank _rank) const
+		{
+			auto o = std::array<Piece, 8>{};
+			auto it = o.begin();
+			for (auto& _file : files_v)
+			{
+				*it = this->pieces_by_pos_.at(this->toindex(_file, _rank));
+				++it;
+			};
+			return o;
+		};
+		
+
 
 		bool has_enemy_piece(Position _pos, Color _myColor) const
 		{
@@ -831,7 +871,6 @@ namespace chess
 		uint16_t move_count_ = 0;
 	};
 	
-
 	
 
 

@@ -650,16 +650,16 @@ namespace lichess
 		client_("https://lichess.org")
 	{
 		this->client_.set_bearer_token_auth(_authToken);
-		this->client_.set_logger([](const httplib::Request& _req, const httplib::Response& _res)
-			{
-				if (_res.has_header("Content-Type") && _res.get_header_value("Content-Type") == "application/json")
-				{
-					if (!_res.body.empty())
-					{
-						std::cout << "[DEBUG] " << json::parse(_res.body).dump(1, '\t') << '\n';
-					};
-				};
-			});
+		//this->client_.set_logger([](const httplib::Request& _req, const httplib::Response& _res)
+		//	{
+		//		if (_res.has_header("Content-Type") && _res.get_header_value("Content-Type") == "application/json")
+		//		{
+		//			if (!_res.body.empty())
+		//			{
+		//				std::cout << "[DEBUG] " << json::parse(_res.body).dump(1, '\t') << '\n';
+		//			};
+		//		};
+		//	});
 	};
 };
 

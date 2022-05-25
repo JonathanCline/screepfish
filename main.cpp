@@ -297,18 +297,18 @@ public:
 				this->game_streams_.emplace_back(this->env_.token.c_str(), v.gameId, this->account_info_.id);
 			};
 
-			if (!_hasAIGame && _games->nowPlaying.empty())
-			{
-				using namespace std::chrono_literals;
-
-				auto _params = lichess::ChallengeAIParams{};
-				_params.level = 3;
-				_params.days.reset();
-				_params.clock.emplace();
-				_params.clock->set_initial(1min);
-				_params.clock->set_increment(1min);
-				auto _result = this->account_client_.challenge_ai(_params);
-			};
+			//if (!_hasAIGame && _games->nowPlaying.empty())
+			//{
+			//	using namespace std::chrono_literals;
+			//
+			//	auto _params = lichess::ChallengeAIParams{};
+			//	_params.level = 3;
+			//	_params.days.reset();
+			//	_params.clock.emplace();
+			//	_params.clock->set_initial(1min);
+			//	_params.clock->set_increment(1min);
+			//	auto _result = this->account_client_.challenge_ai(_params);
+			//};
 		};
 
 		{

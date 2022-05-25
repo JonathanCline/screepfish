@@ -88,22 +88,223 @@ namespace sch
 
 		return false;
 	};
+	bool ScreepFish::is_piece_attacked_by_knight(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
+	{
+		using namespace chess;
+
+		const auto _position = _byPiece.position();
+		auto _nextPosition = Position();
+		bool _possible = true;
+
+		constexpr auto _deltaPairs = std::array
+		{
+			std::pair{ 1, 2 },
+			std::pair{ 1, -2 },
+
+			std::pair{ 2, 1 },
+			std::pair{ 2, -1 },
+
+			std::pair{ -1, 2 },
+			std::pair{ -1, -2 },
+
+			std::pair{ -2, -1 },
+			std::pair{ -2, 1 },
+		};
+
+		for (const auto& [df, dr] : _deltaPairs)
+		{
+			_nextPosition = trynext(_position, df, dr, _possible);
+			if (_possible && _nextPosition == _piece.position())
+			{
+				return true;
+			};
+		};
+
+		return false;
+	};
+	bool ScreepFish::is_piece_attacked_by_bishop(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
+	{
+		using namespace chess;
+
+		const auto _position = _byPiece.position();
+		constexpr auto _directionPairs = std::array
+		{
+			std::pair{  1,  1 },
+			std::pair{ -1,  1 },
+			std::pair{  1, -1 },
+			std::pair{ -1, -1 },
+		};
+
+		for (const auto& _direction : _directionPairs)
+		{
+			auto [df, dr] = _direction;
+			auto f = _byPiece.file();
+			auto r = _byPiece.rank();
+
+			while (true)
+			{
+				f += df;
+				r += dr;
+				if (f > File::h || r > Rank::r8)
+				{
+					break;
+				};
+
+				const auto _nextPosition = Position(f, r);
+				if (_nextPosition == _piece.position())
+				{
+					return true;
+				}
+				else if (!_board.is_empty(_nextPosition))
+				{
+					break;
+				};
+			};
+		};
+		return false;
+	};
+	bool ScreepFish::is_piece_attacked_by_rook(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
+	{
+		using namespace chess;
+
+		const auto _position = _byPiece.position();
+		constexpr auto _directionPairs = std::array
+		{
+			std::pair{  0,  1 },
+			std::pair{  0, -1 },
+			std::pair{  1,  0 },
+			std::pair{ -1,  0 },
+		};
+
+		for (const auto& _direction : _directionPairs)
+		{
+			auto [df, dr] = _direction;
+			auto f = _byPiece.file();
+			auto r = _byPiece.rank();
+
+			while (true)
+			{
+				f += df;
+				r += dr;
+				if (f > File::h || r > Rank::r8)
+				{
+					break;
+				};
+
+				const auto _nextPosition = Position(f, r);
+				if (_nextPosition == _piece.position())
+				{
+					return true;
+				}
+				else if (!_board.is_empty(_nextPosition))
+				{
+					break;
+				};
+			};
+		};
+		return false;
+	};
+	bool ScreepFish::is_piece_attacked_by_queen(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
+	{
+		using namespace chess;
+
+		const auto _position = _byPiece.position();
+		auto _nextPosition = Position();
+		bool _possible = true;
+
+		constexpr auto _directionPairs = std::array
+		{
+			std::pair{  1,  0 },
+			std::pair{ -1,  0 },
+			std::pair{  0,  1 },
+			std::pair{  0, -1 },
+
+			std::pair{  1,  1 },
+			std::pair{ -1,  1 },
+			std::pair{  1, -1 },
+			std::pair{ -1, -1 },
+		};
+
+		for (const auto& _direction : _directionPairs)
+		{
+			int n = 1;
+			while (true)
+			{
+				auto [df, dr] = _direction;
+				df *= n;
+				dr *= n;
+
+				_nextPosition = trynext(_position, df, dr, _possible);
+				if (_possible)
+				{
+					if (_nextPosition == _piece.position())
+					{
+						return true;
+					};
+
+					if (_board.has_friendy_piece(_nextPosition, _byPiece.color()))
+					{
+						break;
+					}
+					else
+					{	
+						if (_board.has_enemy_piece(_nextPosition, _byPiece.color()))
+						{
+							break;
+						};
+					};
+				}
+				else
+				{
+					break;
+				};
+
+				++n;
+			};
+		};
+		return false;
+	};
+
+
 
 	bool ScreepFish::is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece)
 	{
 		using namespace chess;
 
-		static thread_local auto _bufferData = std::array<chess::Move, 256>{};
-		auto _buffer = MoveBuffer(_bufferData.data(), _bufferData.data() + _bufferData.size());
-
-		for (auto& p : _board.pieces())
+		const auto _end = _board.pend();
+		for (auto it = _board.pbegin(); it != _end; ++it)
 		{
+			auto& p = *it;
 			if (p.color() != _piece.color())
 			{
 				switch (p.type())
 				{
 				case PieceType::pawn:
 					if (this->is_piece_attacked_by_pawn(_board, _piece, p))
+					{
+						return true;
+					};
+					break;
+				case PieceType::knight:
+					if (this->is_piece_attacked_by_knight(_board, _piece, p))
+					{
+						return true;
+					};
+					break;
+				case PieceType::bishop:
+					if (this->is_piece_attacked_by_bishop(_board, _piece, p))
+					{
+						return true;
+					};
+					break;
+				case PieceType::rook:
+					if (this->is_piece_attacked_by_rook(_board, _piece, p))
+					{
+						return true;
+					};
+					break;
+				case PieceType::queen:
+					if (this->is_piece_attacked_by_queen(_board, _piece, p))
 					{
 						return true;
 					};
@@ -115,30 +316,73 @@ namespace sch
 					};
 					[[fallthrough]];
 				default:
-				{
-					auto _movesStart = _buffer.head();
-					get_piece_moves(_board, p, _buffer);
-					auto _movesEnd = _buffer.head();
-
-					for (auto mp = _movesStart; mp != _movesEnd; ++mp)
-					{
-						if (mp->to() == _piece.position())
-						{
-							return true;
-						};
-					};
-				};
-				break;
+					break;
 				};
 			};
 		};
 		return false;
 	};
 
+	inline chess::Position find_next_piece_in_direction(const chess::Board& _board, const chess::Position& _startPos,
+		const int df, const int dr)
+	{
+		using namespace chess;
+
+		auto f = _startPos.file() + df;
+		auto r = _startPos.rank() + dr;
+
+		while (f <= File::h && r <= Rank::r8)
+		{
+			const auto p = (f, r);
+			if (!_board.is_empty(p))
+			{
+				return p;
+			};
+
+			f += df;
+			r += dr;
+		};
+
+		return _startPos;
+	};
+
+	inline void find_legal_positions_in_direction(const chess::Board& _board, const chess::Position& _startPos,
+		chess::Color _myColor, const int df, const int dr, MoveBuffer& _buffer)
+	{
+		using namespace chess;
+
+		auto f = _startPos.file() + df;
+		auto r = _startPos.rank() + dr;
+
+		while (f <= File::h && r <= Rank::r8)
+		{
+			const auto pos = (f, r);
+			if (const auto p = _board.get(pos); p)
+			{
+				if (p.color() == _myColor)
+				{
+					break;
+				}
+				else
+				{
+					_buffer.write(_startPos, pos);
+					break;
+				};
+			}
+			else
+			{
+				_buffer.write(_startPos, pos);
+			};
+
+			f += df;
+			r += dr;
+		};
+	};
+
 
 
 	void ScreepFish::get_pawn_moves(const chess::Board& _board, const chess::BoardPiece& _piece,
-		MoveBuffer& _buffer)
+		MoveBuffer& _buffer, const bool _isCheck)
 	{
 		using namespace chess;
 
@@ -221,7 +465,7 @@ namespace sch
 			};
 		};
 	};
-	void ScreepFish::get_rook_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer)
+	void ScreepFish::get_rook_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer, const bool _isCheck)
 	{
 		using namespace chess;
 
@@ -310,7 +554,7 @@ namespace sch
 			_buffer.write(_position, Position(f, _rank));
 		};
 	};
-	void ScreepFish::get_knight_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer)
+	void ScreepFish::get_knight_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer, const bool _isCheck)
 	{
 		using namespace chess;
 
@@ -342,7 +586,7 @@ namespace sch
 			};
 		};
 	};
-	void ScreepFish::get_king_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer)
+	void ScreepFish::get_king_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer, const bool _isCheck)
 	{
 		using namespace chess;
 
@@ -371,7 +615,7 @@ namespace sch
 			};
 		};
 	};
-	void ScreepFish::get_bishop_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer)
+	void ScreepFish::get_bishop_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer, const bool _isCheck)
 	{
 		using namespace chess;
 
@@ -421,7 +665,7 @@ namespace sch
 			};
 		};
 	};
-	void ScreepFish::get_queen_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer)
+	void ScreepFish::get_queen_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer, const bool _isCheck)
 	{
 		using namespace chess;
 
@@ -435,7 +679,6 @@ namespace sch
 			std::pair{ -1,  0 },
 			std::pair{  0,  1 },
 			std::pair{  0, -1 },
-
 			std::pair{  1,  1 },
 			std::pair{ -1,  1 },
 			std::pair{  1, -1 },
@@ -444,41 +687,12 @@ namespace sch
 
 		for (const auto& _direction : _directionPairs)
 		{
-			int n = 1;
-			while (true)
-			{
-				auto [df, dr] = _direction;
-				df *= n;
-				dr *= n;
-
-				_nextPosition = trynext(_position, df, dr, _possible);
-				if (_possible)
-				{
-					if (_board.has_friendy_piece(_nextPosition, _piece.color()))
-					{
-						break;
-					}
-					else
-					{
-						_buffer.write(_position, _nextPosition);
-						if (_board.has_enemy_piece(_nextPosition, _piece.color()))
-						{
-							break;
-						};
-					};
-				}
-				else
-				{
-					break;
-				};
-
-				++n;
-			};
+			find_legal_positions_in_direction(_board, _piece.position(), _piece.color(), _direction.first, _direction.second, _buffer);
 		};
 	};
 
 	void ScreepFish::get_piece_moves(const chess::Board& _board, const chess::BoardPiece& _piece,
-		MoveBuffer& _buffer)
+		MoveBuffer& _buffer, const bool _isCheck)
 	{
 		using namespace chess;
 
@@ -487,32 +701,32 @@ namespace sch
 		{
 		case PieceType::pawn:
 		{
-			get_pawn_moves(_board, _piece, _buffer);
+			get_pawn_moves(_board, _piece, _buffer, _isCheck);
 		};
 		break;
 		case PieceType::rook:
 		{
-			get_rook_moves(_board, _piece, _buffer);
+			get_rook_moves(_board, _piece, _buffer, _isCheck);
 		};
 		break;
 		case PieceType::knight:
 		{
-			get_knight_moves(_board, _piece, _buffer);
+			get_knight_moves(_board, _piece, _buffer, _isCheck);
 		};
 		break;
 		case PieceType::king:
 		{
-			get_king_moves(_board, _piece, _buffer);
+			get_king_moves(_board, _piece, _buffer, _isCheck);
 		};
 		break;
 		case PieceType::bishop:
 		{
-			get_bishop_moves(_board, _piece, _buffer);
+			get_bishop_moves(_board, _piece, _buffer, _isCheck);
 		};
 		break;
 		case PieceType::queen:
 		{
-			get_queen_moves(_board, _piece, _buffer);
+			get_queen_moves(_board, _piece, _buffer, _isCheck);
 		};
 		break;
 		};
@@ -538,12 +752,19 @@ namespace sch
 
 		using namespace chess;
 		
+		const auto _isCheck = is_check(_board, _forPlayer);
+
+
+
 		const auto _bufferStart = _buffer.head();
-		for (auto& pc : _board.pieces())
 		{
-			if (pc.color() == _forPlayer)
+			const auto _end = _board.pend();
+			for (auto it = _board.pbegin(); it != _end; ++it)
 			{
-				get_piece_moves(_board, pc, _buffer);
+				if (it->color() == _forPlayer)
+				{
+					get_piece_moves(_board, *it, _buffer);
+				};
 			};
 		};
 		const auto _bufferEnd = _buffer.head();
@@ -552,9 +773,9 @@ namespace sch
 		auto it = _moves.begin();
 		for (auto p = _bufferStart; p != _bufferEnd; ++p)
 		{
-			auto _futureBoard = _board;
-			_futureBoard.move_piece(p->from(), p->to(), p->promotion());
-			if (!is_check(_futureBoard, _forPlayer))
+			auto nb = _board;
+			nb.move(*p);
+			if (!is_check(nb, _forPlayer))
 			{
 				*it = *p;
 				++it;
@@ -648,13 +869,30 @@ namespace sch
 	};
 	chess::Rating ScreepFish::rate_move(const chess::Board& _board, const chess::Move& _move, chess::Color _forPlayer)
 	{
+		using namespace chess;
+
 		auto _futureBoard = _board;
 		_futureBoard.move(_move);
-		auto _rating = rate_board(_futureBoard, _forPlayer);
-		if (_rating > 10000)
+
+		auto _rating = Rating(0);
+		if (is_checkmate(_board, !_forPlayer))
 		{
-			std::cout << "Found checkmate " << _move << '\n';
+			_rating += 100000;
+			return _rating;
 		};
+
+		for (auto& v : _board.pieces())
+		{
+			if (v.color() == _forPlayer)
+			{
+				_rating += material_value(v.type());
+			}
+			else
+			{
+				_rating -= material_value(v.type());
+			};
+		};
+
 		return _rating;
 	};
 
@@ -734,11 +972,17 @@ namespace sch
 		std::cout << _board << '\n';
 		
 
-		//std::chrono::steady_clock;
+		const auto _clock = std::chrono::steady_clock{};
+		const auto t0 = _clock.now();
+
 		const auto _move = best_move(_board, _myColor, 4);
+		
+		const auto t1 = _clock.now();
+		const auto td = t1 - t0;
+		std::cout << "Delta time : " << std::chrono::duration_cast<std::chrono::duration<double>>(td) << '\n';
+
 		auto _newBoard = _board;
 		_newBoard.move(_move);
-		std::cout << _newBoard << '\n';
 
 		return _move;
 	};
