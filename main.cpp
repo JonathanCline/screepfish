@@ -6,6 +6,7 @@
 #include "lichess/lichess.hpp"
 
 #include "utility/string.hpp"
+#include "utility/system.hpp"
 
 #include <list>
 #include <chrono>
@@ -15,9 +16,6 @@
 
 #include <jclib/functor.h>
 #include <sstream>
-
-
-
 
 
 struct GameStream
@@ -241,6 +239,11 @@ private:
 			};
 		};
 		
+		{
+			const auto _url = "https://lichess.org/" + _event.id;
+			sch::open_browser(_url.c_str());
+		};
+
 		std::cout << "Started game " << _event.id << '\n';
 
 		// Create the new stream
@@ -299,10 +302,11 @@ public:
 				using namespace std::chrono_literals;
 
 				auto _params = lichess::ChallengeAIParams{};
+				_params.level = 3;
 				_params.days.reset();
 				_params.clock.emplace();
 				_params.clock->set_initial(1min);
-				_params.clock->set_increment(5s);
+				_params.clock->set_increment(1min);
 				auto _result = this->account_client_.challenge_ai(_params);
 			};
 		};

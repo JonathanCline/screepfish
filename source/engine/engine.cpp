@@ -36,26 +36,6 @@ namespace sch
 	};
 
 
-	constexpr auto files = std::array{
-		chess::File::a,
-		chess::File::b,
-		chess::File::c,
-		chess::File::d,
-		chess::File::e,
-		chess::File::f,
-		chess::File::g,
-	};
-	constexpr auto ranks = std::array{
-		chess::Rank::r1,
-		chess::Rank::r2,
-		chess::Rank::r3,
-		chess::Rank::r4,
-		chess::Rank::r5,
-		chess::Rank::r6,
-		chess::Rank::r7,
-	};
-
-
 	struct MoveBuffer
 	{
 	public:
@@ -85,184 +65,96 @@ namespace sch
 	};
 
 
-	struct PieceMovementCX
-	{
-		chess::BitBoardCX move;
-		chess::BitBoardCX capture;
-		chess::BoardPiece piece;
-
-		constexpr PieceMovementCX() = default;
-		constexpr PieceMovementCX(chess::BoardPiece _piece) :
-			piece(_piece)
-		{};
-	};
-
-	constexpr PieceMovementCX generate_move_bitboard_pawn(chess::BoardPiece _piece)
+	bool ScreepFish::is_piece_attacked_by_pawn(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
 	{
 		using namespace chess;
 
-		const auto _position = _piece.position();
-		const auto _file = _position.file();
-		const auto _rank = _position.rank();
+		const auto _file = _piece.file();
+		const auto _rank = _piece.rank();
+		const auto _fromFile = _byPiece.file();
+		const auto _fromRank = _byPiece.rank();
 
-		// Change in rank, depends on piece color
-		int _deltaRank = 1;
-
-		// 2X delta rank for initial pawn move
-		bool _doubleDeltaRank = false;
-
-		if (_piece.color() == Color::white)
+		if (_file == _fromFile + 1 || _file == _fromFile - 1)
 		{
-			// Can move x2 on initial move if not blocked
-			if (_rank == Rank::r2)
+			if (_byPiece.color() == Color::white)
 			{
-				_doubleDeltaRank = true;
-			};
-			_deltaRank = 1;
-		}
-		else
-		{
-			// Can move x2 on initial move
-			if (_rank == Rank::r7)
-			{
-				_doubleDeltaRank = true;
-			};
-			_deltaRank = -1;
-		};
-
-		// Bit board to write move positions into
-		auto _moveBitboard = BitBoardCX();
-
-		// Can move x2
-		if (_doubleDeltaRank)
-		{
-			bool _possible = false;
-			const auto _newPos = (_file, trynext(_rank, _deltaRank * 2, _possible));
-			const auto _newPosMiddle = (_file, trynext(_rank, _deltaRank, _possible));
-			if (_possible)
-			{
-				_moveBitboard.set(_newPos.file(), _newPos.rank());
-			};
-		}
-		
-		// Can move x1
-		{
-			bool _possible = false;
-			const auto _newPos = (_file, trynext(_rank, _deltaRank, _possible));
-			if (_possible)
-			{
-				_moveBitboard.set(_newPos.file(), _newPos.rank());
-			};
-		};
-
-		auto _captureBitboard = chess::BitBoardCX();
-
-		// Can capture diagonally
-		{
-			bool _possible = false;
-			const auto _newPos = trynext(_position, 1, _deltaRank, _possible);
-			if (_possible)
-			{
-				_captureBitboard.set(_newPos.file(), _newPos.rank());
-			};
-		};
-		{
-			bool _possible = false;
-			const auto _newPos = trynext(_position, -1, _deltaRank, _possible);
-			if (_possible)
-			{
-				// Check for piece to capture
-				_captureBitboard.set(_newPos.file(), _newPos.rank());
-			};
-		};
-
-		auto o = PieceMovementCX(_piece);
-		o.capture = _captureBitboard;
-		o.move = _moveBitboard;
-		return o;
-	};
-
-	consteval auto generate_move_bitboards_pawn(chess::Color _color)
-	{
-		using namespace chess;
-		auto _boards = std::array<PieceMovementCX, 48>{};
-		auto it = _boards.begin();
-
-		for (File f = File::a; f != File::h; f += 1)
-		{
-			for (Rank r = Rank::r2; r != Rank::r8; r += 1)
-			{
-				*(it++) = generate_move_bitboard_pawn(BoardPiece(PieceType::pawn, _color, (f, r)));
-			};
-		};
-
-		return _boards;
-	};
-
-	constexpr static auto white_pawn_move_bitboards_v = generate_move_bitboards_pawn(chess::Color::white);
-	constexpr static auto black_pawn_move_bitboards_v = generate_move_bitboards_pawn(chess::Color::black);
-
-	inline auto* find_pawn_movement_bitboards(chess::Position _position, chess::Color _color)
-	{
-		using namespace chess;
-		auto& _boards = ((_color == Color::white) ? white_pawn_move_bitboards_v : black_pawn_move_bitboards_v);
-		for (auto& v : _boards)
-		{
-			if (v.piece.color() == _color && v.piece.position() == _position)
-			{
-				return &v;
-			};
-		};
-		return (const sch::PieceMovementCX*)(nullptr);
-	};
-
-
-
-	struct PieceBitboards
-	{
-		chess::BitBoard friendly;
-		chess::BitBoard enemy;
-		chess::BitBoard all;
-	};
-
-	inline PieceBitboards get_piece_bitboards(const chess::Board& _board, chess::Color _myColor)
-	{
-		using namespace chess;
-
-		auto _friendlyPieceBits = BitBoard();
-		auto _enemyPieceBits = BitBoard();
-
-		for (auto& v : _board.pieces())
-		{
-			if (v.color() == _myColor)
-			{
-				_friendlyPieceBits.set(v.file(), v.rank());
+				return _rank == _fromRank + 1;
 			}
 			else
 			{
-				_enemyPieceBits.set(v.file(), v.rank());
+				return _rank == _fromRank - 1;
 			};
 		};
 
-		return { _friendlyPieceBits, _enemyPieceBits, _friendlyPieceBits | _enemyPieceBits };
+		return false;
+	};
+
+	bool ScreepFish::is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece)
+	{
+		using namespace chess;
+
+		static thread_local auto _bufferData = std::array<chess::Move, 256>{};
+		auto _buffer = MoveBuffer(_bufferData.data(), _bufferData.data() + _bufferData.size());
+
+		for (auto& p : _board.pieces())
+		{
+			if (p.color() != _piece.color())
+			{
+				switch (p.type())
+				{
+				case PieceType::pawn:
+					if (this->is_piece_attacked_by_pawn(_board, _piece, p))
+					{
+						return true;
+					};
+					break;
+				case PieceType::king:
+					if (_piece.type() == PieceType::king)
+					{
+						return false;
+					};
+					[[fallthrough]];
+				default:
+				{
+					auto _movesStart = _buffer.head();
+					get_piece_moves(_board, p, _buffer);
+					auto _movesEnd = _buffer.head();
+
+					for (auto mp = _movesStart; mp != _movesEnd; ++mp)
+					{
+						if (mp->to() == _piece.position())
+						{
+							return true;
+						};
+					};
+				};
+				break;
+				};
+			};
+		};
+		return false;
 	};
 
 
 
-
-
-	inline auto get_pawn_moves(const chess::Board& _board, const chess::BoardPiece& _piece,
+	void ScreepFish::get_pawn_moves(const chess::Board& _board, const chess::BoardPiece& _piece,
 		MoveBuffer& _buffer)
 	{
 		using namespace chess;
-		
+
 		const auto _position = _piece.position();
 		const auto _rank = _position.rank();
 		const auto _file = _position.file();
 
+		// Exit early if at end of board
+		if (_rank == Rank::r1 || _rank == Rank::r8)
+		{
+			return;
+		};
+
 		// Change in rank, depends on piece color
 		int _deltaRank = 1;
-		
+
 		// 2X delta rank for initial pawn move
 		bool _doubleDeltaRank = false;
 
@@ -283,70 +175,53 @@ namespace sch
 			_deltaRank = -1;
 		};
 
-		// Can move x2 if not blocked
-		if (_doubleDeltaRank)
 		{
 			bool _possible = false;
-			const auto _newPos = (_file, trynext(_rank, _deltaRank * 2, _possible));
-			const auto _newPosMiddle = (_file, trynext(_rank, _deltaRank, _possible));
-			if (_possible && !_board.get(_newPos) && !_board.get(_newPosMiddle))
-			{
-				_buffer.write(Move(_position, _newPos));
-			};
-		};
+			const auto _newPosOne = (_file, trynext(_rank, _deltaRank, _possible));
 
-		// Can move x1 if not blocked
-		{
-			bool _possible = false;
-			const auto _newPos = (_file, trynext(_rank, _deltaRank, _possible));
-			if (_possible && !_board.get(_newPos))
+			if (_possible && _board.is_empty(_newPosOne))
 			{
-				_buffer.write(Move(_position, _newPos));
+				_buffer.write(Move(_position, _newPosOne,
+					(_newPosOne.rank() == Rank::r8 || _newPosOne.rank() == Rank::r1)? 
+					PieceType::queen :
+					PieceType::none
+				));
+
+				// Can move x2 if not blocked
+				if (_doubleDeltaRank)
+				{
+					const auto _newPosTwo = (_file, trynext(_rank, _deltaRank * 2, _possible));
+					if (_possible && _board.is_empty(_newPosTwo))
+					{
+						_buffer.write(Move(_position, _newPosTwo));
+					};
+				};
 			};
 		};
 
 		// Can capture diagonally
-
-
+		if (_file != File::h)
 		{
-			bool _possible = false;
-			const auto _newPos = trynext(_position, 1, _deltaRank, _possible);
-			if (_possible)
+			// Check for piece to capture
+			const auto _newPos = next(_position, 1, _deltaRank);
+			if ((_board.has_enpassant_target() && _board.enpassant_target() == _newPos)
+				|| _board.has_enemy_piece(_newPos, _piece.color()))
 			{
-				// Check for piece to capture
-				const auto _destPiece = _board.get(_newPos);
-				if (_board.has_enemy_piece(_newPos, _piece.color()))
-				{
-					_buffer.write(Move(_position, _newPos));
-				};
+				_buffer.write(Move(_position, _newPos));
 			};
 		};
+		if (_file != File::a)
 		{
-			bool _possible = false;
-			const auto _newPos = trynext(_position, -1, _deltaRank, _possible);
-			if (_possible)
+			// Check for piece to capture
+			const auto _newPos = next(_position, -1, _deltaRank);
+			if ((_board.has_enpassant_target() && _board.enpassant_target() == _newPos)
+				|| _board.has_enemy_piece(_newPos, _piece.color()))
 			{
-				// Check for piece to capture
-				if (_board.has_enemy_piece(_newPos, _piece.color()))
-				{
-					_buffer.write(Move(_position, _newPos));
-				};
-			};
-		};
-		
-		// Add enpassant if flag set, this will never be set for our move
-		if (_board.has_enpassant_target())
-		{
-			bool _possible = false;
-			const auto _enpassantTarget = _board.enpassant_target();
-			if (_enpassantTarget == trynext(_position, -1, _deltaRank, _possible) ||
-				_enpassantTarget == trynext(_position, 1, _deltaRank, _possible))
-			{
-				_buffer.write(Move(_position, _enpassantTarget));
+				_buffer.write(Move(_position, _newPos));
 			};
 		};
 	};
-	inline auto get_rook_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer)
+	void ScreepFish::get_rook_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer)
 	{
 		using namespace chess;
 
@@ -435,7 +310,7 @@ namespace sch
 			_buffer.write(_position, Position(f, _rank));
 		};
 	};
-	inline auto get_knight_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer)
+	void ScreepFish::get_knight_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer)
 	{
 		using namespace chess;
 
@@ -467,7 +342,7 @@ namespace sch
 			};
 		};
 	};
-	inline auto get_king_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer)
+	void ScreepFish::get_king_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer)
 	{
 		using namespace chess;
 
@@ -496,7 +371,7 @@ namespace sch
 			};
 		};
 	};
-	inline auto get_bishop_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer)
+	void ScreepFish::get_bishop_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer)
 	{
 		using namespace chess;
 
@@ -546,7 +421,7 @@ namespace sch
 			};
 		};
 	};
-	inline auto get_queen_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer)
+	void ScreepFish::get_queen_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer)
 	{
 		using namespace chess;
 
@@ -602,7 +477,7 @@ namespace sch
 		};
 	};
 
-	inline auto get_piece_moves(const chess::Board& _board, const chess::BoardPiece& _piece,
+	void ScreepFish::get_piece_moves(const chess::Board& _board, const chess::BoardPiece& _piece,
 		MoveBuffer& _buffer)
 	{
 		using namespace chess;
@@ -644,52 +519,31 @@ namespace sch
 	};
 
 
-	inline bool is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece)
-	{
-		static thread_local auto _bufferData = std::array<chess::Move, 256>{};
-		auto _buffer = MoveBuffer(_bufferData.data(), _bufferData.data() + _bufferData.size());
-
-		for (auto& p : _board.pieces())
-		{
-			if (p.color() != _piece.color())
-			{
-				auto _movesStart = _buffer.head();
-				get_piece_moves(_board, p, _buffer);
-				auto _movesEnd = _buffer.head();
-				
-				for (auto mp = _movesStart; mp != _movesEnd; ++mp)
-				{
-					if (mp->to() == _piece.position())
-					{
-						return true;
-					};
-				};
-			};
-		};
-		return false;
-	};
-
-	inline bool is_check(const chess::Board& _board, const chess::Color _forPlayer)
+	bool ScreepFish::is_check(const chess::Board& _board, const chess::Color _forPlayer)
 	{
 		using namespace chess;
-		const auto _kingIt = _board.find(chess::Piece(chess::PieceType::king, _forPlayer));
-		return is_piece_attacked(_board, *_kingIt);
+		auto p = _board.pfind(chess::PieceType::king, _forPlayer);
+		if (p != _board.pend())
+		{
+			return is_piece_attacked(_board, *p);
+		};
+		return true;
 	};
 
 
-	inline auto get_moves(const chess::Board& _board, const chess::Color _forPlayer)
+	std::vector<chess::Move> ScreepFish::get_moves(const chess::Board& _board, const chess::Color _forPlayer)
 	{
 		static thread_local auto _bufferData = std::array<chess::Move, 256>{};
 		auto _buffer = MoveBuffer(_bufferData.data(), _bufferData.data() + _bufferData.size());
-		
+
 		using namespace chess;
 		
 		const auto _bufferStart = _buffer.head();
-		for (auto& _piece : _board.pieces())
+		for (auto& pc : _board.pieces())
 		{
-			if (_piece.color() == _forPlayer)
+			if (pc.color() == _forPlayer)
 			{
-				get_piece_moves(_board, _piece, _buffer);
+				get_piece_moves(_board, pc, _buffer);
 			};
 		};
 		const auto _bufferEnd = _buffer.head();
@@ -711,10 +565,17 @@ namespace sch
 		return _moves;
 	};
 
-	inline bool is_checkmate(const chess::Board& _board, const chess::Color _forPlayer)
+	bool ScreepFish::is_checkmate(const chess::Board& _board, const chess::Color _forPlayer)
 	{
 		using namespace chess;
-		
+
+		//auto it = this->get_cached(hash(_board, false));
+		//if (it)
+		//{
+		//	return (_forPlayer == chess::Color::white) ? it->is_wcheckmate : it->is_bcheckmate;
+		//};
+
+
 		if (!is_check(_board, _forPlayer))
 		{
 			return false;
@@ -755,7 +616,7 @@ namespace sch
 		};
 	};
 
-	inline chess::Rating rate_board(const chess::Board& _board, chess::Color _forPlayer)
+	chess::Rating ScreepFish::rate_board(const chess::Board& _board, chess::Color _forPlayer)
 	{
 		using namespace chess;
 		auto _rating = Rating(0);
@@ -785,7 +646,7 @@ namespace sch
 		
 		return _rating;
 	};
-	inline chess::Rating rate_move(const chess::Board& _board, const chess::Move& _move, chess::Color _forPlayer)
+	chess::Rating ScreepFish::rate_move(const chess::Board& _board, const chess::Move& _move, chess::Color _forPlayer)
 	{
 		auto _futureBoard = _board;
 		_futureBoard.move(_move);
@@ -797,17 +658,7 @@ namespace sch
 		return _rating;
 	};
 
-	struct RatedMove
-	{
-		constexpr auto operator<=>(const RatedMove& rhs) const
-		{
-			return this->rating <=> rhs.rating;
-		};
-		chess::Move move;
-		chess::Rating rating;
-	};
-
-	inline RatedMove best_move_search(const chess::Board& _board, chess::Color _forPlayer, int _depth2)
+	RatedMove ScreepFish::best_move_search(const chess::Board& _board, chess::Color _forPlayer, int _depth2)
 	{
 		using namespace chess;
 
@@ -821,7 +672,11 @@ namespace sch
 			{
 				auto _futureBoard = _board;
 				_futureBoard.move(v);
+
+				// Cache board
+				this->cache(_futureBoard);
 				
+				// Calculation time
 				auto _rating = rate_board(_futureBoard, _forPlayer);
 				if (_rating < 10000 && _rating > -10000 && _depth2 != 0)
 				{
@@ -841,15 +696,32 @@ namespace sch
 		}
 		else
 		{
-			return _ratedMoves.front();
+			auto _bestRating = _ratedMoves.front().rating;
+			for (auto it = _ratedMoves.begin(); it != _ratedMoves.end(); ++it)
+			{
+				if (it->rating != _bestRating)
+				{
+					_ratedMoves.erase(it, _ratedMoves.end());
+					break;
+				};
+			};
+
+			return *random_iter(_ratedMoves);
 		};
 	};
-	inline chess::Move best_move(const chess::Board& _board, chess::Color _forPlayer, int _depth)
+	chess::Move ScreepFish::best_move(const chess::Board& _board, chess::Color _forPlayer, int _depth)
 	{
-		const auto _rated = best_move_search(_board, _forPlayer, _depth * 2);
+		const auto _rated = best_move_search(_board, _forPlayer, _depth);
 		return _rated.move;
 	};
 
+	void ScreepFish::cache(const chess::Board& _board)
+	{
+	};
+	const ScreepFish::BoardCache* ScreepFish::get_cached(size_t _hash)
+	{
+		return nullptr;
+	};
 
 
 	chess::Move ScreepFish::play_turn(chess::IGame& _game)
@@ -859,8 +731,15 @@ namespace sch
 		const auto& _board = _game.board();
 		const auto& _myColor = this->my_color_;
 		
+		std::cout << _board << '\n';
+		
+
 		//std::chrono::steady_clock;
-		const auto _move = best_move(_board, _myColor, 2);
+		const auto _move = best_move(_board, _myColor, 4);
+		auto _newBoard = _board;
+		_newBoard.move(_move);
+		std::cout << _newBoard << '\n';
+
 		return _move;
 	};
 	

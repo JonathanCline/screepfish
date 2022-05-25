@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <optional>
 #include <array>
+#include <span>
 
 
 namespace chess
@@ -35,6 +36,12 @@ namespace chess
 	{
 		black,
 		white
+	};
+
+	constexpr inline auto colors_v = std::array
+	{
+		Color::black,
+		Color::white
 	};
 
 
@@ -156,6 +163,17 @@ namespace chess
 		king = 6
 	};
 
+	constexpr inline auto piece_types_v = std::array
+	{
+		PieceType::none,
+		PieceType::pawn,
+		PieceType::knight,
+		PieceType::bishop,
+		PieceType::rook,
+		PieceType::queen,
+		PieceType::king,
+	};
+
 
 	class Move : public PieceMove
 	{
@@ -253,7 +271,7 @@ namespace chess
 		*/
 		constexpr Type type() const noexcept
 		{
-			return this->type_;
+			return Type((this->piece_ & 0b1111'1110) >> 1);
 		};
 
 		/**
@@ -271,7 +289,7 @@ namespace chess
 		*/
 		constexpr Color color() const noexcept
 		{
-			return this->color_;
+			return Color(this->piece_ & 0x1);
 		};
 
 
@@ -302,32 +320,39 @@ namespace chess
 			return lhs != rhs.type();
 		};
 
-		
 
 
 
-		constexpr Piece() noexcept = default;
-		constexpr Piece(Type _type, Color _color) noexcept :
-			type_(_type), color_(_color)
+
+		constexpr Piece() noexcept :
+			piece_(0)
 		{};
+		constexpr Piece(Type _type, Color _color) noexcept :
+			piece_((jc::to_underlying(_type) << 1) | ((_color == Color::white)? 0b1 : 0b0))
+		{
+			if (_type == Type::none) { abort(); };
+		};
 		
 		constexpr Piece& operator=(PieceType _type)
 		{
-			this->type_ = _type;
+			if (_type == PieceType::none)
+			{
+				this->piece_ = 0;
+			}
+			else
+			{
+				this->piece_ = (jc::to_underlying(_type) << 1) | (this->piece_ & 0x1);
+			};
 			return *this;
 		};
 
 	private:
 
 		/**
-		 * @brief The type of piece.
+		 * @brief The piece type with color value.
 		*/
-		Type type_;
+		uint8_t piece_;
 
-		/**
-		 * @brief The color of the piece.
-		*/
-		Color color_;
 	};
 
 
@@ -350,17 +375,52 @@ namespace chess
 		constexpr Rank rank() const noexcept { return this->position().rank(); };
 		constexpr File file() const noexcept { return this->position().file(); };
 
+		friend constexpr inline bool operator==(const BoardPiece& lhs, const Position& rhs) noexcept
+		{
+			return lhs.position() == rhs;
+		};
+		friend constexpr inline bool operator==(const Position& lhs, const BoardPiece& rhs) noexcept
+		{
+			return lhs == rhs.position();
+		};
+		friend constexpr inline bool operator!=(const BoardPiece& lhs, const Position& rhs) noexcept
+		{
+			return lhs.position() != rhs;
+		};
+		friend constexpr inline bool operator!=(const Position& lhs, const BoardPiece& rhs) noexcept
+		{
+			return lhs != rhs.position();
+		};
+
 		constexpr void promote(PieceType _type) noexcept
 		{
 			*this = BoardPiece(_type, this->color(), this->position());
 		};
 
-		constexpr BoardPiece() = default;
-		constexpr BoardPiece(Type _type, Color _color, Position _pos) :
-			Piece(_type, _color), pos_(_pos)
+		constexpr BoardPiece() :
+			Piece(),
+			pos_{}
+		{}
+		constexpr BoardPiece(Piece _piece, Position _pos) noexcept :
+			Piece(_piece), pos_(_pos)
 		{};
+		constexpr BoardPiece(Type _type, Color _color, Position _pos) noexcept :
+			BoardPiece(Piece(_type, _color), _pos)
+		{};
+
+		constexpr BoardPiece& operator=(Piece _piece) noexcept
+		{
+			Piece::operator=(_piece);
+			return *this;
+		};
+		constexpr BoardPiece& operator=(PieceType _piece) noexcept
+		{
+			Piece::operator=(_piece);
+			return *this;
+		};
+
 	private:
-		Position pos_;
+		Position pos_{};
 	};
 
 	/**
@@ -370,17 +430,16 @@ namespace chess
 	{
 	private:
 
-		auto end() const { return this->pieces_.end(); };
-
 		using size_type = uint64_t;
-		constexpr size_type toindex(File _file, Rank _rank) const
-		{
-			return (jc::to_underlying(_file) << 3) | jc::to_underlying(_rank);
-		};
 		constexpr size_type toindex(const Position& _pos) const
 		{
-			return this->toindex(_pos.file(), _pos.rank());
+			return static_cast<size_type>(_pos);
 		};
+		constexpr size_type toindex(File _file, Rank _rank) const
+		{
+			return this->toindex(Position(_file, _rank));
+		};
+
 		constexpr Position topos(size_type _index) const
 		{
 			const auto _rank = Rank(_index & 0b0000'0111);
@@ -388,53 +447,205 @@ namespace chess
 			return Position(_file, _rank);
 		};
 
-		using container_type = std::vector<BoardPiece>;
+		using container_type = std::array<Piece, 64>;
+
+	public:
 		using iterator = typename container_type::iterator;
 		using const_iterator = typename container_type::const_iterator;
 
-		void erase(const_iterator it)
+		iterator begin() noexcept
 		{
-			this->pieces_by_pos_.at(this->toindex(it->position())) =
-				PieceType::none;
-			this->pieces_.erase(it);
+			return this->pieces_by_pos_.begin();
+		};
+		const_iterator begin() const noexcept
+		{
+			return this->pieces_by_pos_.begin();
+		};
+		iterator end() noexcept
+		{
+			return this->pieces_by_pos_.end();
+		};
+		const_iterator end() const noexcept
+		{
+			return this->pieces_by_pos_.end();
+		};
+
+	private:
+
+		// Pieces vec iterator access
+
+		using pcontainer_type = std::array<BoardPiece, 32>;
+		
+	public:
+		using piterator = typename pcontainer_type::iterator;
+		using const_piterator = typename pcontainer_type::const_iterator;
+
+		piterator pbegin() noexcept
+		{
+			return this->pieces_.begin();
+		};
+		const_piterator pbegin() const noexcept
+		{
+			return this->pieces_.begin();
+		};
+		piterator pend() noexcept
+		{
+			return std::find(this->pbegin(), this->pieces_.end(), PieceType::none);
+		};
+		const_piterator pend() const noexcept
+		{
+			return std::find(this->pbegin(), this->pieces_.end(), PieceType::none);
+		};
+
+		auto& pback()
+		{
+			return *(this->pend() - 1);
+		};
+		const auto& pback() const
+		{
+			return *(this->pend() - 1);
+		};
+
+		// find for pieces container
+		piterator pfind(const Piece& _piece)
+		{
+			return std::find(this->pbegin(), this->pend(), _piece);
+		};
+		// find for pieces container
+		const_piterator pfind(const Piece& _piece) const
+		{
+			return std::find(this->pbegin(), this->pend(), _piece);
+		};
+
+		// find for pieces container
+		piterator pfind(PieceType _type, Color _color)
+		{
+			return this->pfind(Piece(_type, _color));
+		};
+		// find for pieces container
+		const_piterator pfind(PieceType _type, Color _color) const
+		{
+			return this->pfind(Piece(_type, _color));
+		};
+
+		// find for pieces container
+		piterator pfind(const Position& _pos)
+		{
+			return std::find(this->pbegin(), this->pend(), _pos);
+		};
+		// find for pieces container
+		const_piterator pfind(const Position& _pos) const
+		{
+			return std::find(this->pbegin(), this->pend(), _pos);
+		};
+
+	private:
+
+		void perase(piterator it)
+		{
+			const auto n = this->pend() - this->pbegin();
+
+			if (it == this->pend() - 1)
+			{
+				this->pback() = BoardPiece();
+			}
+			else
+			{
+				const auto b = this->pback();
+				this->pback() = BoardPiece();
+				*it = b;
+			};
+
+			const auto n2 = this->pend() - this->pbegin();
+			if (n2 != (n - 1))
+			{
+				abort();
+			};
+		};
+
+		void erase(const Position& _pos, piterator pIt)
+		{
+			this->pieces_by_pos_.at(this->toindex(_pos)) = Piece{};
+			if (pIt != this->pend())
+			{
+				this->perase(pIt);
+				
+			};
+		};
+		void erase(const Position& _pos)
+		{
+			return this->erase(_pos, this->pfind(_pos));
+		};
+
+		void just_move_piece(Position _from, Position _to, piterator pIt)
+		{
+			assert(pIt != this->pend());
+
+			auto& f = this->pieces_by_pos_.at(this->toindex(_from));
+			auto& t = this->pieces_by_pos_.at(this->toindex(_to));
+			t = f;
+			f = Piece{};
+
+			if (const auto toIt = this->pfind(_to); toIt != this->pend())
+			{
+				pIt->set_position(_to);
+				this->perase(toIt);
+			}
+			else
+			{
+				pIt->set_position(_to);
+			};
+		};
+		void just_move_piece(Position _from, Position _to)
+		{
+			const auto pIt = this->pfind(_from);
+			assert(pIt != this->pend());
+			return this->just_move_piece(_from, _to, pIt);
 		};
 
 	public:
 
 		auto find(Position _pos)
 		{
-			return std::ranges::find_if(this->pieces_, [_pos](BoardPiece& p)
-				{
-					return p.position() == _pos;
-				});
+			return this->pieces_by_pos_.begin() + this->toindex(_pos);
 		};
 		auto find(Position _pos) const
 		{
-			return std::ranges::find_if(this->pieces_, [_pos](const BoardPiece& p)
-				{
-					return p.position() == _pos;
-				});
+			return this->pieces_by_pos_.begin() + this->toindex(_pos);
 		};
 
-		auto find(Piece _piece)
+		iterator find(Piece _piece)
 		{
-			return std::ranges::find(this->pieces_, _piece);
+			return std::ranges::find(this->pieces_by_pos_, _piece);
 		};
-		auto find(Piece _piece) const
+		const_iterator find(Piece _piece) const
 		{
-			return std::ranges::find(this->pieces_, _piece);
+			return std::ranges::find(this->pieces_by_pos_, _piece);
 		};
+
+		iterator find(PieceType _piece, Color _color)
+		{
+			return this->find(Piece(_piece, _color));
+		};
+		const_iterator find(PieceType _piece, Color _color) const
+		{
+			return this->find(Piece(_piece, _color));
+		};
+
+
 
 		void clear() noexcept
 		{
-			this->pieces_.clear();
 			this->pieces_by_pos_.fill(Piece{});
+			this->pieces_.fill(BoardPiece{});
+			this->enpassant_target_.reset();
+			this->move_count_ = 0;
 		};
 
 		void new_piece(Piece _piece, Position _pos)
 		{
-			this->pieces_.push_back(BoardPiece(_piece.type(), _piece.color(), _pos));
 			this->pieces_by_pos_.at(this->toindex(_pos)) = _piece;
+			*this->pend() = BoardPiece(_piece, _pos);
 		};
 		void new_piece(PieceType _piece, Color _color, Position _pos)
 		{
@@ -487,17 +698,19 @@ namespace chess
 				return true;
 			};
 		};
+		bool is_empty(Position _pos) const
+		{
+			return !this->has_piece(_pos);
+		};
+
 
 		void erase_piece(Position _position)
 		{
-			auto it = this->find(_position);
-			if (it != this->end())
-			{
-				this->erase(it);
-			};
+			this->erase(_position);
 		};
 		void move_piece(Position _fromPos, Position _toPos, PieceType _promotion = PieceType::none)
 		{
+			const auto _oldEnpassantTarget = this->enpassant_target_;
 			this->enpassant_target_.reset();
 
 			{
@@ -510,22 +723,22 @@ namespace chess
 					{
 						if (_toPos == (File::c, Rank::r1))
 						{
-							this->find((File::a, Rank::r1))->set_position((File::d, Rank::r1));
+							this->just_move_piece((File::a, Rank::r1), (File::d, Rank::r1));
 						}
 						else if (_toPos == (File::g, Rank::r1))
 						{
-							this->find((File::h, Rank::r1))->set_position((File::f, Rank::r1));
+							this->just_move_piece((File::h, Rank::r1), (File::f, Rank::r1));
 						};
 					}
 					else if (_from.color() == Color::black && _fromPos == (File::e, Rank::r8))
 					{
 						if (_toPos == (File::c, Rank::r8))
 						{
-							this->find((File::a, Rank::r8))->set_position((File::d, Rank::r8));
+							this->just_move_piece((File::a, Rank::r8), (File::d, Rank::r8));
 						}
 						else if (_toPos == (File::g, Rank::r8))
 						{
-							this->find((File::h, Rank::r8))->set_position((File::f, Rank::r8));
+							this->just_move_piece((File::h, Rank::r8), (File::f, Rank::r8));
 						};
 					};
 				}
@@ -551,21 +764,32 @@ namespace chess
 
 			};
 
-			if (const auto it = this->find(_toPos); it != this->end())
-			{
-				this->erase(it);
-			};
-
 			auto it = this->find(_fromPos);
 			assert(it != this->end());
 
 			if (_promotion != PieceType::none && *it == PieceType::pawn)
 			{
-				it->promote(_promotion);
+				this->pieces_by_pos_.at(toindex(_fromPos)) = _promotion;
+				*this->pfind(_fromPos) = _promotion;
 			};
 
-			it->set_position(_toPos);
-			this->pieces_by_pos_.at(this->toindex(_toPos)) = *it;
+			if (_oldEnpassantTarget && *_oldEnpassantTarget == _toPos)
+			{
+				if (_toPos.rank() == Rank::r6)
+				{
+					this->erase((_toPos.file(), Rank::r5));
+				}
+				else
+				{
+					this->erase((_toPos.file(), Rank::r4));
+				};
+			};
+
+			// Set new piece position
+			this->just_move_piece(_fromPos, _toPos);
+
+			// Increment move counter
+			this->move_count_ = 0;
 		};
 
 		void move(const PieceMove& _move)
@@ -587,19 +811,124 @@ namespace chess
 			return this->enpassant_target_.value();
 		};
 
-		const auto& pieces() const { return this->pieces_; }
+
+
+		const std::span<const BoardPiece> pieces() const
+		{
+			return std::span<const BoardPiece>(this->pbegin(), this->pend());
+		};
+
 
 		friend std::ostream& operator<<(std::ostream& _ostr, const Board& _value);
 
 		Board() = default;
 
 	private:
-		container_type pieces_;
+		//container_type pieces_;
 		std::array<Piece, 64> pieces_by_pos_{};
-
+		std::array<BoardPiece, 32> pieces_{};
 		std::optional<Position> enpassant_target_;
-
+		uint16_t move_count_ = 0;
 	};
+	
+
+	
+
+
+	struct ZobristHashTable
+	{
+		std::array<std::array<size_t, 12>, 64> table{};
+		size_t black_to_move{};
+	};
+
+	constexpr auto zobrist_hash_subindex(PieceType p, Color c)
+	{
+		size_t _subindex = 0;
+		if (c == Color::white) { _subindex = 1; };
+		_subindex |= static_cast<size_t>(jc::to_underlying(p) - 1) << 1;
+		return _subindex;
+	};
+
+	template <typename T = uint64_t>
+	constexpr T pseudorand(T _value,
+		const T _largeA = 125361361361603, const T _largeB = 995995959582, 
+		const T _mod = 10000)
+	{
+		return (static_cast<T>(_largeA * _value) + _largeB) % _mod;
+	};
+
+	constexpr auto zobrist_hash_index(File f, Rank r)
+	{
+		size_t _hash = 0;
+		_hash |= ((jc::to_underlying(f) << 3) | jc::to_underlying(r));
+		return _hash;
+	};
+
+	consteval auto zobrist_hash_table()
+	{
+		auto _table = ZobristHashTable{};
+		size_t _pseudoRand = 13136;
+		for (auto& f : files_v)
+		{
+			for (auto& r : ranks_v)
+			{
+				const auto i = zobrist_hash_index(f, r);
+				for (auto& p : piece_types_v)
+				{
+					if (p == PieceType::none)
+						continue;
+					
+					for (auto& c : colors_v)
+					{
+						const auto j = zobrist_hash_subindex(p, c);
+						_pseudoRand = pseudorand(_pseudoRand);
+						const auto _hash = _pseudoRand;
+						_table.table[i][j] = _hash;
+					};
+				};
+			};
+		};
+
+		_table.black_to_move = pseudorand(_pseudoRand);
+		return _table;
+	};
+
+	constexpr inline auto zobrist_hash_lookup_table_v =
+		zobrist_hash_table();
+
+	/**
+	 * @brief Calculates a zobrist hash for a board.
+	 * @param _board Chess board.
+	 * @param _blackToMove Whether or not it is blacks turn to move.
+	 * @return Zobrist hash.
+	*/
+	inline auto hash(const Board& _board, bool _blackToMove)
+	{
+		size_t _hash = 0;
+		if (_blackToMove)
+		{
+			_hash ^= zobrist_hash_lookup_table_v.black_to_move;
+		};
+
+		for (auto& f : files_v)
+		{
+			for (auto& r : ranks_v)
+			{
+				const auto p = _board.get(f, r);
+				if (p)
+				{
+					const auto i = zobrist_hash_index(f, r);
+					const auto j = zobrist_hash_subindex(p.type(), p.color());
+					_hash ^= zobrist_hash_lookup_table_v.table[i][j];
+				};
+			};
+		};
+
+		return _hash;
+	};
+
+
+
 
 
 	/**

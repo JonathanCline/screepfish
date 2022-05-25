@@ -47,10 +47,13 @@ namespace chess
 		std::array<std::array<char, 8>, 8> _grid{};
 		for (auto& vx : _grid) { std::ranges::fill(vx, ' '); };
 
-		for (auto& _piece : _value.pieces_)
+		for (auto& _piece : _value.pieces())
 		{
-			auto x = jc::to_underlying(_piece.file());
-			auto y = jc::to_underlying(_piece.rank());
+			const auto f = _piece.file();
+			const auto r = _piece.rank();
+			
+			auto x = jc::to_underlying(f);
+			auto y = jc::to_underlying(r);
 			auto c = ' ';
 
 			switch (_piece.type())
@@ -62,7 +65,8 @@ namespace chess
 			case PieceType::queen: c = 'Q'; break;
 			case PieceType::king: c = 'K'; break;
 			default:
-				SCREEPFISH_UNREACHABLE; break;
+				continue;
+				break;
 			};
 
 			if (_piece.color() == Color::black)

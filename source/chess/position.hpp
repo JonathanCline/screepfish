@@ -12,6 +12,7 @@
 #include <iosfwd>
 #include <cstdint>
 #include <string_view>
+#include <array>
 
 namespace chess
 {
@@ -29,6 +30,18 @@ namespace chess
 		f = 5,
 		g = 6,
 		h = 7
+	};
+
+	constexpr auto files_v = std::array
+	{
+		chess::File::a,
+		chess::File::b,
+		chess::File::c,
+		chess::File::d,
+		chess::File::e,
+		chess::File::f,
+		chess::File::g,
+		chess::File::h,
 	};
 
 	// File math operators
@@ -198,6 +211,18 @@ namespace chess
 		r8 = 7
 	};
 
+	constexpr auto ranks_v = std::array
+	{
+		chess::Rank::r1,
+		chess::Rank::r2,
+		chess::Rank::r3,
+		chess::Rank::r4,
+		chess::Rank::r5,
+		chess::Rank::r6,
+		chess::Rank::r7,
+		chess::Rank::r8,
+	};
+
 	// Rank math operators
 	constexpr Rank operator+(Rank _rank, int8_t _count)
 	{
@@ -306,30 +331,84 @@ namespace chess
 	*/
 	class Position
 	{
+	private:
+
+		static constexpr uint8_t concat(File f, Rank r) noexcept
+		{
+			return (jc::to_underlying(f) << 3) | jc::to_underlying(r);
+		};
+
+
 	public:
+
+		constexpr explicit operator size_t() const noexcept { return this->pos_; };
 
 		/**
 		 * @brief Gets the rank of this position.
 		*/
-		constexpr Rank rank() const noexcept { return this->rank_; };
+		constexpr Rank rank() const noexcept
+		{
+			return Rank(this->pos_ & 0b111);
+		};
 
 		/**
 		 * @brief Gets the file of this position.
 		*/
-		constexpr File file() const noexcept { return this->file_; };
+		constexpr File file() const noexcept
+		{
+			return File((this->pos_ & 0b111000) >> 3);
+		};
 
 		constexpr bool operator==(const Position& rhs) const noexcept = default;
 		constexpr bool operator!=(const Position& rhs) const noexcept = default;
 
 		constexpr Position() noexcept = default;
 		constexpr Position(File _file, Rank _rank) noexcept :
-			file_(_file),
-			rank_(_rank)
+			pos_(concat(_file, _rank))
 		{};
 
+		constexpr Position& operator=(File _file) noexcept
+		{
+			this->pos_ = this->concat(_file, this->rank());
+			return *this;
+		};
+		constexpr Position& operator=(Rank _rank) noexcept
+		{
+			this->pos_ = this->concat(this->file(), _rank);
+			return *this;
+		};
+
 	private:
-		File file_;
-		Rank rank_;
+		uint8_t pos_;
+	};
+
+	constexpr inline auto positions_v = ([]()
+		{
+			auto _pos = std::array<Position, 64>{};
+			auto it = _pos.begin();
+			for (auto& f : files_v)
+			{
+				for (auto& r : ranks_v)
+				{
+					*it = Position(f, r);
+					++it;
+				};
+			};
+			return _pos;
+		})();
+
+
+
+	/**
+	 * @brief Increments the given position, does not check for validity!
+	 * @param _position Position to increment.
+	 * @param _dFile How much to increment the file.
+	 * @param _dRank How much to increment the rank.
+	 * @return Incremented position value.
+	*/
+	constexpr Position next(Position _position, int _dFile, int _dRank)
+	{
+		return Position(_position.file() + _dFile, _position.rank() + _dRank);
 	};
 
 	/**
@@ -424,5 +503,7 @@ namespace chess
 
 
 	std::ostream& operator<<(std::ostream& _ostr, const Position& _value);
+
+
 
 };
