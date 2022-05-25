@@ -294,7 +294,7 @@ public:
 				this->game_streams_.emplace_back(this->env_.token.c_str(), v.gameId, this->account_info_.id);
 			};
 
-			if (!_hasAIGame)
+			if (!_hasAIGame && _games->nowPlaying.empty())
 			{
 				using namespace std::chrono_literals;
 

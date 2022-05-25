@@ -2,6 +2,8 @@
 
 /** @file */
 
+#include "position.hpp"
+
 #include "utility/number.hpp"
 #include "utility/utility.hpp"
 
@@ -17,294 +19,12 @@
 #include <compare>
 #include <ranges>
 #include <algorithm>
+#include <optional>
+#include <array>
+
 
 namespace chess
 {
-	/**
-	 * @brief Named chess board files.
-	*/
-	enum class File : uint8_t
-	{
-		a = 0,
-		b = 1,
-		c = 2,
-		d = 3,
-		e = 4,
-		f = 5,
-		g = 6,
-		h = 7
-	};
-
-	// File math operators
-	constexpr File operator+(File _file, int8_t _count)
-	{
-		return File(jc::to_underlying(_file) + _count);
-	};
-	constexpr File operator+(int8_t _count, File _file)
-	{
-		return File(jc::to_underlying(_file) + _count);
-	};
-	constexpr File operator-(File _file, int8_t _count)
-	{
-		return File(jc::to_underlying(_file) - _count);
-	};
-	constexpr File& operator+=(File& _file, int8_t _count)
-	{
-		_file = _file + _count;
-		return _file;
-	};
-	constexpr File& operator-=(File& _file, int8_t _count)
-	{
-		_file = _file - _count;
-		return _file;
-	};
-
-
-	/**
-	 * @brief Increments the given file if possible.
-	 * @param _file File to increment.
-	 * @param _count How much to increment.
-	 * @return True if possible, false on not possible.
-	*/
-	constexpr bool trynext(File& _file, int _count = 1)
-	{
-		auto _newFile = File(jc::to_underlying(_file) + _count);
-		if (_newFile > File::h)
-		{
-			return false;
-		}
-		else
-		{
-			_file = _newFile;
-			return true;
-		};
-	};
-
-	/**
-	 * @brief Increments the given file if possible.
-	 * @param _file File to increment.
-	 * @param _count How much to increment.
-	 * @param _possible Try/Fail out variable.
-	 * @return Incremented file value if possible, or no change.
-	*/
-	constexpr File trynext(File _file, int _count, bool& _possible)
-	{
-		_possible = trynext(_file, _count);
-		return _file;
-	};
-
-
-
-
-	/**
-	 * @brief Gets the character representation for a file.
-	 * @param _file Chess board file.
-	 * @return Character rep for the given file.
-	*/
-	constexpr char tochar(File _file) noexcept
-	{
-		switch (_file)
-		{
-		case File::a:
-			return 'a';
-		case File::b:
-			return 'b';
-		case File::c:
-			return 'c';
-		case File::d:
-			return 'd';
-		case File::e:
-			return 'e';
-		case File::f:
-			return 'f';
-		case File::g:
-			return 'g';
-		case File::h:
-			return 'h';
-		default:
-			SCREEPFISH_UNREACHABLE;
-		};
-	};
-
-	/**
-	 * @brief Converts a character representation into a file value.
-	 * @param c Character to convert.
-	 * @param _file File out value.
-	*/
-	constexpr void fromchar(char c, File& _file) noexcept
-	{
-		_file = File(c - 'a');
-	};
-
-	// Writes the given file to the output stream.
-	std::ostream& operator<<(std::ostream& _ostr, const File& _value);
-	std::istream& operator>>(std::istream& _ostr, File& _value);
-
-
-	/**
-	 * @brief Iterates through chess board files.
-	*/
-	class FileIterator
-	{
-	public:
-		using value_type = File;
-
-		constexpr static FileIterator end() noexcept
-		{
-			return FileIterator(jc::to_underlying(File::h) + 1);
-		};
-		constexpr auto operator<=>(const FileIterator& rhs) const = default;
-
-		constexpr value_type operator*() const
-		{
-			const auto o = value_type(this->file_);
-			assert(o < this->end());
-			return o;
-		};
-		constexpr FileIterator& operator++()
-		{
-			assert(value_type(this->file_) <= File::h);
-			++this->file_;
-			return *this;
-		};
-
-		constexpr FileIterator() = default;
-		constexpr FileIterator(value_type _file) :
-			FileIterator(jc::to_underlying(_file))
-		{};
-
-	private:
-		constexpr explicit FileIterator(std::underlying_type_t<File> _fileVal) noexcept :
-			file_(_fileVal)
-		{
-			assert(_fileVal <= jc::to_underlying(File::h) + 1);
-		};
-		
-		uint8_t file_;
-	};
-
-
-
-
-
-	/**
-	 * @brief Named chess board ranks.
-	*/
-	enum class Rank : uint8_t
-	{
-		r1 = 0,
-		r2 = 1,
-		r3 = 2,
-		r4 = 3,
-		r5 = 4,
-		r6 = 5,
-		r7 = 6,
-		r8 = 7
-	};
-
-	// Rank math operators
-	constexpr Rank operator+(Rank _rank, int8_t _count)
-	{
-		return Rank(jc::to_underlying(_rank) + _count);
-	};
-	constexpr Rank operator+(int8_t _count, Rank _rank)
-	{
-		return Rank(jc::to_underlying(_rank) + _count);
-	};
-	constexpr Rank operator-(Rank _rank, int8_t _count)
-	{
-		return Rank(jc::to_underlying(_rank) - _count);
-	};
-	constexpr Rank& operator+=(Rank& _rank, int8_t _count)
-	{
-		_rank = _rank + _count;
-		return _rank;
-	};
-	constexpr Rank& operator-=(Rank& _rank, int8_t _count)
-	{
-		_rank = _rank - _count;
-		return _rank;
-	};
-
-
-	/**
-	 * @brief Increments the given rank if possible.
-	 * @param _rank Rank to increment.
-	 * @param _count How much to increment.
-	 * @return True if possible, false on not possible.
-	*/
-	constexpr bool trynext(Rank& _rank, int _count = 1)
-	{
-		auto _newRank = Rank(jc::to_underlying(_rank) + _count);
-		if (_newRank > Rank::r8)
-		{
-			return false;
-		}
-		else
-		{
-			_rank = _newRank;
-			return true;
-		};
-	};
-
-	/**
-	 * @brief Increments the given rank if possible.
-	 * @param _rank Rank to increment.
-	 * @param _count How much to increment.
-	 * @param _possible Try/Fail out variable.
-	 * @return Incremented rank value if possible, or no change.
-	*/
-	constexpr Rank trynext(Rank _rank, int _count, bool& _possible)
-	{
-		_possible = trynext(_rank, _count);
-		return _rank;
-	};
-
-
-
-	/**
-	 * @brief Gets the character representation for a rank.
-	 * @param _rank Chess board rank.
-	 * @return Character rep for the given rank.
-	*/
-	constexpr char tochar(Rank _rank) noexcept
-	{
-		switch (_rank)
-		{
-		case Rank::r1:
-			return '1';
-		case Rank::r2:
-			return '2';
-		case Rank::r3:
-			return '3';
-		case Rank::r4:
-			return '4';
-		case Rank::r5:
-			return '5';
-		case Rank::r6:
-			return '6';
-		case Rank::r7:
-			return '7';
-		case Rank::r8:
-			return '8';
-		default:
-			SCREEPFISH_UNREACHABLE;
-		};
-	};
-
-	/**
-	 * @brief Converts a character representation into a rank value.
-	 * @param c Character to convert.
-	 * @param _rank Rank out value.
-	*/
-	constexpr void fromchar(char c, Rank& _rank) noexcept
-	{
-		_rank = Rank(c - '1');
-	};
-
-	std::ostream& operator<<(std::ostream& _ostr, const Rank& _value);
-	std::istream& operator>>(std::istream& _ostr, Rank& _value);
-
 
 
 
@@ -338,129 +58,26 @@ namespace chess
 
 
 
-	/**
-	 * @brief Holds a position on a chess board as a file/rank pair
-	*/
-	class Position
+	enum class OutcomeType
 	{
-	public:
-
-		/**
-		 * @brief Gets the rank of this position.
-		*/
-		constexpr Rank rank() const noexcept { return this->rank_; };
-		
-		/**
-		 * @brief Gets the file of this position.
-		*/
-		constexpr File file() const noexcept { return this->file_; };
-
-		constexpr bool operator==(const Position& rhs) const noexcept = default;
-		constexpr bool operator!=(const Position& rhs) const noexcept = default;
-
-		constexpr Position() noexcept = default;
-		constexpr Position(File _file, Rank _rank) noexcept :
-			file_(_file),
-			rank_(_rank)
-		{};
-
-	private:
-		File file_;
-		Rank rank_;
+		none,
+		draw,
+		mate,
 	};
 
-	/**
-	 * @brief Increments the given position if possible.
-	 * @param _position Position to increment.
-	 * @param _dFile How much to increment the file.
-	 * @param _dRank How much to increment the rank.
-	 * @param _possible Try/Fail out variable.
-	 * @return Incremented position value if possible, or no change.
-	*/
-	constexpr Position trynext(Position _position, int _dFile, int _dRank, bool& _possible)
-	{
-		const auto _newFile = trynext(_position.file(), _dFile, _possible);
-		if (!_possible) { return _position; };
+	using Rating = int_fast32_t;
 
-		const auto _newRank = trynext(_position.rank(), _dRank, _possible);
-		if (!_possible) { return _position; };
-
-		return Position(_newFile, _newRank);
-	};
-
-	/**
-	 * @brief Increments the given position if possible.
-	 * @param _position Position to increment.
-	 * @param _dFile How much to increment the file.
-	 * @param _dRank How much to increment the rank.
-	 * @return True if possible, false otherwise.
-	*/
-	constexpr bool trynext(Position& _position, int _dFile, int _dRank)
-	{
-		auto _possible = true;
-		_position = trynext(_position, _dFile, _dRank, _possible);
-		return _possible;
-	};
-
-
-	/**
-	 * @brief Allows more natural construction of a position value from a file, rank pair.
-	 * 
-	 * Example of usage:
-	 *		Position p = (File::a, Rank::r4);
-	 * 
-	 * @param _file File of the position.
-	 * @param _rank Rank of the position.
-	 * @return Combined file, rank pair as a position.
-	*/
-	constexpr Position operator,(File _file, Rank _rank) noexcept
-	{
-		return Position(_file, _rank);
-	};
-
-	/**
-	 * @brief Parses a position value from a string.
-	 * 
-	 * @return String with parsed characters removed.
-	*/
-	constexpr std::string_view fromstr(std::string_view _str, Position& _value)
-	{
-		if (_str.size() < 2)
-		{
-			// fail
-			abort();
-		};
-
-		const auto _fileChar = _str.front();
-		if (!inbounds(_fileChar, 'a', 'h', inclusive))
-		{
-			// fail
-			abort();
-		};
-
-		const auto _rankChar = _str[1];
-		if (!inbounds(_rankChar, '1', '8', inclusive))
-		{
-			// fail
-			abort();
-		};
-
-		// Convert chars to rank and file
-		auto _file = File();
-		auto _rank = Rank();
-		fromchar(_fileChar, _file);
-		fromchar(_rankChar, _rank);
-
-		// Write parsed position
-		_value = Position(_file, _rank);
-
-		// Return string with parsed section remove
-		_str.remove_prefix(2);
-		return _str;
-	};
 	
 
-	std::ostream& operator<<(std::ostream& _ostr, const Position& _value);
+
+
+
+
+
+
+
+
+
 
 
 	/**
@@ -693,6 +310,12 @@ namespace chess
 		constexpr Piece(Type _type, Color _color) noexcept :
 			type_(_type), color_(_color)
 		{};
+		
+		constexpr Piece& operator=(PieceType _type)
+		{
+			this->type_ = _type;
+			return *this;
+		};
 
 	private:
 
@@ -732,6 +355,7 @@ namespace chess
 			*this = BoardPiece(_type, this->color(), this->position());
 		};
 
+		constexpr BoardPiece() = default;
 		constexpr BoardPiece(Type _type, Color _color, Position _pos) :
 			Piece(_type, _color), pos_(_pos)
 		{};
@@ -747,8 +371,34 @@ namespace chess
 	private:
 
 		auto end() const { return this->pieces_.end(); };
-		
-		
+
+		using size_type = uint64_t;
+		constexpr size_type toindex(File _file, Rank _rank) const
+		{
+			return (jc::to_underlying(_file) << 3) | jc::to_underlying(_rank);
+		};
+		constexpr size_type toindex(const Position& _pos) const
+		{
+			return this->toindex(_pos.file(), _pos.rank());
+		};
+		constexpr Position topos(size_type _index) const
+		{
+			const auto _rank = Rank(_index & 0b0000'0111);
+			const auto _file = File((_index & 0b0011'1000) >> 3);
+			return Position(_file, _rank);
+		};
+
+		using container_type = std::vector<BoardPiece>;
+		using iterator = typename container_type::iterator;
+		using const_iterator = typename container_type::const_iterator;
+
+		void erase(const_iterator it)
+		{
+			this->pieces_by_pos_.at(this->toindex(it->position())) =
+				PieceType::none;
+			this->pieces_.erase(it);
+		};
+
 	public:
 
 		auto find(Position _pos)
@@ -775,29 +425,27 @@ namespace chess
 			return std::ranges::find(this->pieces_, _piece);
 		};
 
-		void clear() noexcept { this->pieces_.clear(); };
+		void clear() noexcept
+		{
+			this->pieces_.clear();
+			this->pieces_by_pos_.fill(Piece{});
+		};
 
 		void new_piece(Piece _piece, Position _pos)
 		{
 			this->pieces_.push_back(BoardPiece(_piece.type(), _piece.color(), _pos));
+			this->pieces_by_pos_.at(this->toindex(_pos)) = _piece;
 		};
 		void new_piece(PieceType _piece, Color _color, Position _pos)
 		{
-			this->pieces_.push_back(BoardPiece(_piece, _color, _pos));
+			this->new_piece(Piece(_piece, _color), _pos);
 		};
 
-		const BoardPiece* get(Position _pos) const
+		Piece get(Position _pos) const
 		{
-			if (const auto it = this->find(_pos); it != this->end())
-			{
-				return &*it;
-			}
-			else
-			{
-				return nullptr;
-			};
+			return this->pieces_by_pos_.at(this->toindex(_pos));
 		};
-		const BoardPiece* get(File _file, Rank _rank) const
+		auto get(File _file, Rank _rank) const
 		{
 			return this->get((_file, _rank));
 		};
@@ -806,7 +454,7 @@ namespace chess
 		{
 			if (const auto p = this->get(_pos); p)
 			{
-				return p->color() != _myColor;
+				return p.color() != _myColor;
 			}
 			else
 			{
@@ -817,7 +465,7 @@ namespace chess
 		{
 			if (const auto p = this->get(_pos); p)
 			{
-				return p->color() == _myColor;
+				return p.color() == _myColor;
 			}
 			else
 			{
@@ -826,13 +474,13 @@ namespace chess
 		};
 		bool has_piece(Position _pos) const
 		{
-			return this->get(_pos) != nullptr;
+			return (bool)this->get(_pos);
 		};
 		bool has_enemy_piece_or_empty(Position _pos, Color _myColor) const
 		{
 			if (const auto p = this->get(_pos); p)
 			{
-				return p->color() != _myColor;
+				return p.color() != _myColor;
 			}
 			else
 			{
@@ -845,18 +493,20 @@ namespace chess
 			auto it = this->find(_position);
 			if (it != this->end())
 			{
-				this->pieces_.erase(it);
+				this->erase(it);
 			};
 		};
 		void move_piece(Position _fromPos, Position _toPos, PieceType _promotion = PieceType::none)
 		{
+			this->enpassant_target_.reset();
+
 			{
 				const auto _from = this->get(_fromPos);
 				const auto _to = this->get(_toPos);
 
-				if (_from && *_from == PieceType::king)
+				if (_from == PieceType::king)
 				{
-					if (_from->color() == Color::white && _fromPos == (File::e, Rank::r1))
+					if (_from.color() == Color::white && _fromPos == (File::e, Rank::r1))
 					{
 						if (_toPos == (File::c, Rank::r1))
 						{
@@ -867,7 +517,7 @@ namespace chess
 							this->find((File::h, Rank::r1))->set_position((File::f, Rank::r1));
 						};
 					}
-					else if (_from->color() == Color::black && _fromPos == (File::e, Rank::r8))
+					else if (_from.color() == Color::black && _fromPos == (File::e, Rank::r8))
 					{
 						if (_toPos == (File::c, Rank::r8))
 						{
@@ -878,12 +528,32 @@ namespace chess
 							this->find((File::h, Rank::r8))->set_position((File::f, Rank::r8));
 						};
 					};
+				}
+				else if (_from.type() == PieceType::pawn)
+				{
+					if (_from.color() == Color::white)
+					{
+						if (_fromPos.rank() == Rank::r2 &&
+							_toPos.rank() == Rank::r4)
+						{
+							this->enpassant_target_ = Position(_fromPos.file(), Rank::r3);
+						};
+					}
+					else
+					{
+						if (_fromPos.rank() == Rank::r7 &&
+							_toPos.rank() == Rank::r5)
+						{
+							this->enpassant_target_ = Position(_fromPos.file(), Rank::r6);
+						};
+					};
 				};
+
 			};
 
 			if (const auto it = this->find(_toPos); it != this->end())
 			{
-				this->pieces_.erase(it);
+				this->erase(it);
 			};
 
 			auto it = this->find(_fromPos);
@@ -895,8 +565,28 @@ namespace chess
 			};
 
 			it->set_position(_toPos);
+			this->pieces_by_pos_.at(this->toindex(_toPos)) = *it;
 		};
-		
+
+		void move(const PieceMove& _move)
+		{
+			this->move_piece(_move.from(), _move.to());
+		};
+		void move(const Move& _move)
+		{
+			this->move_piece(_move.from(), _move.to(), _move.promotion());
+		};
+
+
+		bool has_enpassant_target() const noexcept
+		{
+			return this->enpassant_target_.has_value();
+		};
+		Position enpassant_target() const noexcept
+		{
+			return this->enpassant_target_.value();
+		};
+
 		const auto& pieces() const { return this->pieces_; }
 
 		friend std::ostream& operator<<(std::ostream& _ostr, const Board& _value);
@@ -904,7 +594,11 @@ namespace chess
 		Board() = default;
 
 	private:
-		std::vector<BoardPiece> pieces_;
+		container_type pieces_;
+		std::array<Piece, 64> pieces_by_pos_{};
+
+		std::optional<Position> enpassant_target_;
+
 	};
 
 
