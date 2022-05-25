@@ -40,11 +40,12 @@ namespace sch
 		void get_queen_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer, const bool _isCheck = false);
 		void get_piece_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer, const bool _isCheck = false);
 
+		void get_moves(const chess::Board& _board, const chess::Color _forPlayer, MoveBuffer& _buffer, const bool _isCheck = false);
+
+
 		bool is_check(const chess::Board& _board, const chess::Color _forPlayer);
-		std::vector<chess::Move> get_moves(const chess::Board& _board, const chess::Color _forPlayer);
 		bool is_checkmate(const chess::Board& _board, const chess::Color _forPlayer);
 
-		chess::Rating rate_board(const chess::Board& _board, chess::Color _forPlayer);
 		chess::Rating rate_move(const chess::Board& _board, const chess::Move& _move, chess::Color _forPlayer);
 		
 		RatedMove best_move_search(const chess::Board& _board, chess::Color _forPlayer, int _depth2);

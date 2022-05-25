@@ -745,45 +745,35 @@ namespace sch
 	};
 
 
-	std::vector<chess::Move> ScreepFish::get_moves(const chess::Board& _board, const chess::Color _forPlayer)
+	void ScreepFish::get_moves(const chess::Board& _board, const chess::Color _forPlayer, MoveBuffer& _buffer, const bool _isCheck)
 	{
 		static thread_local auto _bufferData = std::array<chess::Move, 256>{};
-		auto _buffer = MoveBuffer(_bufferData.data(), _bufferData.data() + _bufferData.size());
+		auto _movesBuffer = MoveBuffer(_bufferData.data(), _bufferData.data() + _bufferData.size());
 
 		using namespace chess;
-		
-		const auto _isCheck = is_check(_board, _forPlayer);
 
-
-
-		const auto _bufferStart = _buffer.head();
+		const auto _bufferStart = _movesBuffer.head();
 		{
 			const auto _end = _board.pend();
 			for (auto it = _board.pbegin(); it != _end; ++it)
 			{
 				if (it->color() == _forPlayer)
 				{
-					get_piece_moves(_board, *it, _buffer);
+					get_piece_moves(_board, *it, _movesBuffer, _isCheck);
 				};
 			};
 		};
-		const auto _bufferEnd = _buffer.head();
+		const auto _bufferEnd = _movesBuffer.head();
 
-		auto _moves = std::vector<Move>(_bufferData.size(), Move());
-		auto it = _moves.begin();
 		for (auto p = _bufferStart; p != _bufferEnd; ++p)
 		{
 			auto nb = _board;
 			nb.move(*p);
 			if (!is_check(nb, _forPlayer))
 			{
-				*it = *p;
-				++it;
+				_buffer.write(*p);
 			};
 		};
-
-		_moves.erase(it, _moves.end());
-		return _moves;
 	};
 
 	bool ScreepFish::is_checkmate(const chess::Board& _board, const chess::Color _forPlayer)
@@ -802,11 +792,16 @@ namespace sch
 			return false;
 		};
 
-		auto _possibleMoves = get_moves(_board, _forPlayer);
-		for (auto& v : _possibleMoves)
+		static thread_local auto _bufferData = std::array<Move, 256>{};
+		auto _buffer = MoveBuffer(_bufferData.data(), _bufferData.data() + _bufferData.size());
+		const auto _bufferStart = _buffer.head();
+		this->get_moves(_board, _forPlayer, _buffer, true);
+		const auto _bufferEnd = _buffer.head();
+
+		for (auto p = _bufferStart; p != _bufferEnd; ++p)
 		{
 			auto _futureBoard = _board;
-			_futureBoard.move(v);
+			_futureBoard.move(*p);
 			if (!is_check(_futureBoard, _forPlayer))
 			{
 				return false;
@@ -837,42 +832,9 @@ namespace sch
 		};
 	};
 
-	chess::Rating ScreepFish::rate_board(const chess::Board& _board, chess::Color _forPlayer)
-	{
-		using namespace chess;
-		auto _rating = Rating(0);
-
-		if (is_checkmate(_board, _forPlayer))
-		{
-			_rating -= 100000;
-			return _rating;
-		}
-		else if (is_checkmate(_board, !_forPlayer))
-		{
-			_rating += 100000;
-			return _rating;
-		};
-
-		for (auto& v : _board.pieces())
-		{
-			if (v.color() == _forPlayer)
-			{
-				_rating += material_value(v.type());
-			}
-			else
-			{
-				_rating -= material_value(v.type());
-			};
-		};
-		
-		return _rating;
-	};
 	chess::Rating ScreepFish::rate_move(const chess::Board& _board, const chess::Move& _move, chess::Color _forPlayer)
 	{
 		using namespace chess;
-
-		auto _futureBoard = _board;
-		_futureBoard.move(_move);
 
 		auto _rating = Rating(0);
 		if (is_checkmate(_board, !_forPlayer))
@@ -903,26 +865,28 @@ namespace sch
 		std::vector<RatedMove> _ratedMoves{};
 
 		{
-			auto _moves = get_moves(_board, _forPlayer);
-			_ratedMoves.resize(_moves.size());
+			auto _bufferData = std::array<Move, 256>{};
+			auto _buffer = MoveBuffer(_bufferData.data(), _bufferData.data() + _bufferData.size());
+			const auto _bufferStart = _buffer.head();
+			this->get_moves(_board, _forPlayer, _buffer, false);
+			const auto _bufferEnd = _buffer.head();
+			
+			_ratedMoves.resize(_bufferEnd - _bufferStart);
 			auto o = _ratedMoves.begin();
-			for (auto& v : _moves)
+			for (auto p = _bufferStart; p != _bufferEnd; ++p)
 			{
 				auto _futureBoard = _board;
-				_futureBoard.move(v);
+				_futureBoard.move(*p);
 
-				// Cache board
-				this->cache(_futureBoard);
-				
 				// Calculation time
-				auto _rating = rate_board(_futureBoard, _forPlayer);
+				auto _rating = this->rate_move(_futureBoard, *p, _forPlayer);
 				if (_rating < 10000 && _rating > -10000 && _depth2 != 0)
 				{
 					const auto _bestResponse = best_move_search(_futureBoard, !_forPlayer, _depth2 - 1);
 					_rating = -_bestResponse.rating;
 				};
 
-				*o = RatedMove{ v, _rating };
+				*o = RatedMove{ *p, _rating };
 				++o;
 			};
 		};
@@ -969,9 +933,6 @@ namespace sch
 		const auto& _board = _game.board();
 		const auto& _myColor = this->my_color_;
 		
-		std::cout << _board << '\n';
-		
-
 		const auto _clock = std::chrono::steady_clock{};
 		const auto t0 = _clock.now();
 
