@@ -1,4 +1,5 @@
 #include "chess/chess.hpp"
+#include "engine/engine.hpp"
 
 #include "env.hpp"
 
@@ -13,6 +14,8 @@
 #include <iostream>
 
 #include <jclib/functor.h>
+#include <sstream>
+
 
 
 
@@ -39,28 +42,56 @@ private:
 			};
 		};
 
+		if (_event.status != "created" && _event.status != "started")
+		{
+			std::cout << "Result " << _event.status << '\n';
+			return;
+		};
+
 		auto _board = chess::Board();
 		chess::reset_board(_board);
-		std::cout << _board << '\n';
 
 		for (auto& _move : _moves)
 		{
-			std::cout << _move << '\n';
 			_board.move_piece(_move.from(), _move.to(), _move.promotion());
-			std::cout << _board << '\n';
 		};
 
-		//std::cout << "moves : \n";
-		//for (auto& v : _moves)
-		//{
-		//	std::cout << ' ' << v << '\n';
-		//};
-		//std::cout << '\n';
+		class LichessGame : public chess::IGame
+		{
+		public:
 
+			LichessGame() = default;
+		};
+
+		auto _game = LichessGame();
+		_game.board_ = _board;
+		this->engine_.set_board(_board);
+
+		if (*this->my_turn_)
+		{
+			const auto _response = this->engine_.play_turn(_game);
+
+			auto _params = lichess::MoveParams();
+			_params.gameID = this->game_id_;
+			std::stringstream sstr{};
+			sstr << _response;
+			_params.move = sstr.str();
+
+			if (!this->client_.bot_move(_params))
+			{
+				auto _resignParams = lichess::ResignParams();
+				_resignParams.gameID = this->game_id_;
+				
+				std::cout << "[ERROR] Failed to submit move : " << _response << '\n';
+				this->client_.bot_resign(_resignParams);
+			};
+		};
 	};
 
 	void on_game_full(const lichess::GameFullEvent& _event)
 	{
+		const auto lck = std::unique_lock(this->mtx_);
+
 		if (auto& _blackID = _event.black.id; _blackID && _blackID.value() == this->player_id_)
 		{
 			this->my_turn_ = false;
@@ -71,6 +102,9 @@ private:
 			this->my_turn_ = true;
 			this->my_color_ = chess::Color::white;
 		};
+
+		// Tell the engine which color it is playing as
+		this->engine_.set_color(*this->my_color_);
 
 		// Count played moves
 		auto _movesPlayedCount = std::ranges::count(_event.state.moves, ' ');
@@ -103,6 +137,8 @@ private:
 	};
 	void on_game_state(const lichess::GameStateEvent& _event)
 	{
+		const auto lck = std::unique_lock(this->mtx_);
+
 		// Count played moves
 		auto _movesPlayedCount = std::ranges::count(_event.moves, ' ');
 		if (!_event.moves.empty())
@@ -142,6 +178,7 @@ public:
 
 	bool keep_open() const
 	{
+		const auto lck = std::unique_lock(this->mtx_);
 		return this->keep_open_;
 	};
 	void set_close()
@@ -149,11 +186,14 @@ public:
 		this->keep_open_ = false;
 	};
 
-	GameStream(const char* _token, const std::string& _gameID, const std::string& _playerID) :
+	GameStream(const char* _token,
+		const std::string& _gameID,
+		const std::string& _playerID) :
 		stream_(_token, "/api/bot/game/stream/" + _gameID),
 		proc_(),
 		player_id_(_playerID),
-		game_id_(_gameID)
+		game_id_(_gameID),
+		client_(_token)
 	{
 		this->proc_.set_callback(jc::functor(&GameStream::on_game_full, this));
 		this->proc_.set_callback(jc::functor(&GameStream::on_game_state, this));
@@ -166,6 +206,10 @@ public:
 	};
 
 private:
+
+	mutable std::mutex mtx_;
+
+	lichess::Client client_;
 	lichess::StreamClient stream_;
 	lichess::GameEventProcessor proc_;
 	
@@ -174,6 +218,8 @@ private:
 
 	std::optional<chess::Color> my_color_{ std::nullopt };
 	std::optional<bool> my_turn_{ std::nullopt };
+
+	sch::ScreepFish engine_{};
 
 	bool keep_open_ = true;
 };
@@ -213,6 +259,12 @@ private:
 		};
 		std::cout << "Finished game " << _event.id << '\n';
 	};
+	void challenge_callback(const lichess::ChallengeEvent& _event)
+	{
+		auto _params = lichess::AcceptChallengeParams();
+		_params.challengeId = _event.id;
+		this->account_client_.accept_challenge(_params);
+	};
 
 public:
 
@@ -227,8 +279,8 @@ public:
 		this->account_event_stream_.set_callback(jc::functor(&lichess::AccountEventProcessor::process, &this->account_event_proc_));
 		this->account_event_proc_.set_callback(jc::functor(&AccountManager::game_start_callback, this));
 		this->account_event_proc_.set_callback(jc::functor(&AccountManager::game_finish_callback, this));
+		this->account_event_proc_.set_callback(jc::functor(&AccountManager::challenge_callback, this));
 		this->account_event_stream_.start();
-
 
 		{
 			bool _hasAIGame = false;
@@ -244,7 +296,13 @@ public:
 
 			if (!_hasAIGame)
 			{
+				using namespace std::chrono_literals;
+
 				auto _params = lichess::ChallengeAIParams{};
+				_params.days.reset();
+				_params.clock.emplace();
+				_params.clock->set_initial(1min);
+				_params.clock->set_increment(5s);
 				auto _result = this->account_client_.challenge_ai(_params);
 			};
 		};
@@ -266,7 +324,6 @@ public:
 			};
 		};
 	};
-	
 	void update()
 	{
 		const auto lck = std::unique_lock(this->mtx_);
@@ -295,6 +352,11 @@ private:
 
 	lichess::AccountEventProcessor account_event_proc_;
 };
+
+
+
+
+
 
 
 int main(int _nargs, const char* _vargs[])

@@ -67,6 +67,13 @@ namespace lichess
 	}
 	constexpr inline auto class_named_member_table_v = class_named_member_table<T>::value;
 
+	template <typename T>
+	concept cx_has_member_table = requires
+	{
+		class_named_member_table_v<T>;
+	};
+
+
 	namespace impl
 	{
 		template <typename T>
@@ -140,6 +147,32 @@ namespace lichess
 
 	namespace impl
 	{
+		template <typename V>
+		inline void member_to_json_method(json& _json, const std::string& _name, const V& _value)
+		{
+			_json[_name] = _value;
+		};
+		template <typename V>
+		inline void member_to_json_method(json& _json, const std::string& _name, const std::optional<V>& _value)
+		{
+			if (_value)
+			{
+				_json[_name] = *_value;
+			};
+		};
+
+
+		template <typename T, typename V>
+		requires requires (json& _json, const T* _class, const named_member<T, V>& _info)
+		{
+			member_to_json_method(_json, std::string(_info.name()), _info.get(_class));
+		}
+		inline void member_to_json(json& _json, const T* _class, const named_member<T, V>& _info)
+		{
+			member_to_json_method(_json, std::string(_info.name()), _info.get(_class));
+		};
+
+
 		template <typename T, typename V>
 		requires requires (json& _json, const T* _class, const named_member<T, V>& _info)
 		{
@@ -149,6 +182,7 @@ namespace lichess
 		{
 			_json[std::string(_info.name())] = _info.get(_class);
 		};
+
 
 		template <typename T, typename... Ts, size_t... Idxs>
 		requires requires (json& _json, const T* _class, const std::tuple<Ts...>& _tup, std::index_sequence<Idxs...>)

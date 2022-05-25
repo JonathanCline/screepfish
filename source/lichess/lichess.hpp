@@ -18,6 +18,7 @@
 #include <mutex>
 #include <functional>
 #include <latch>
+#include <chrono>
 
 namespace lichess
 {
@@ -95,7 +96,7 @@ namespace lichess
 		std::string id;
 		std::string url;
 		std::string color;
-		std::string direction;
+		std::optional<std::string> direction;
 		TimeControl timeControl;
 		Challenger challenger;
 		Challenger destUser;
@@ -128,6 +129,37 @@ namespace lichess
 		std::string color = "random";
 		std::string variant = "standard";
 		std::string fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+		struct Clock
+		{
+			Clock& set_initial(std::chrono::seconds _time)
+			{
+				this->limit_ = _time.count();
+				return *this;
+			};
+			Clock& set_increment(std::chrono::seconds _time)
+			{
+				this->increment_ = _time.count();
+				return *this;
+			};
+
+			template <typename Rep, typename Period>
+			auto& set_initial(std::chrono::duration<Rep, Period> _time)
+			{
+				return this->set_initial(std::chrono::duration_cast<std::chrono::seconds>(_time));
+			};
+			template <typename Rep, typename Period>
+			auto& set_increment(std::chrono::duration<Rep, Period> _time)
+			{
+				return this->set_increment(std::chrono::duration_cast<std::chrono::seconds>(_time));
+			};
+
+			int64_t limit_ = 3000;
+			int64_t increment_ = 0;
+
+			Clock() = default;
+		};
+		std::optional<Clock> clock;
 
 		ChallengeAIParams() = default;
 	};
@@ -170,6 +202,9 @@ namespace lichess
 		GameFinishEvent() = default;
 	};
 
+	using ChallengeEvent = Challenge;
+
+
 	struct AcceptChallengeParams
 	{
 		std::string challengeId;
@@ -193,6 +228,7 @@ namespace lichess
 
 		using GameStartCallback = std::function<void(const GameStartEvent&)>;
 		using GameFinishCallback = std::function<void(const GameFinishEvent&)>;
+		using ChallengeCallback = std::function<void(const ChallengeEvent&)>;
 
 		void set_callback(GameStartCallback _callback)
 		{
@@ -204,9 +240,15 @@ namespace lichess
 			const auto lck = std::unique_lock(this->mtx_);
 			this->game_finish_callback_ = std::move(_callback);
 		};
+		void set_callback(ChallengeCallback _callback)
+		{
+			const auto lck = std::unique_lock(this->mtx_);
+			this->challenge_callback_ = std::move(_callback);
+		};
 
 		void push(const GameStartEvent& _event) const;
 		void push(const GameFinishEvent& _event) const;
+		void push(const ChallengeEvent& _event) const;
 
 		void process(const json& _json);
 
@@ -216,7 +258,7 @@ namespace lichess
 		mutable std::mutex mtx_;
 		GameStartCallback game_start_callback_;
 		GameFinishCallback game_finish_callback_;
-
+		ChallengeCallback challenge_callback_;
 	};
 
 
@@ -255,7 +297,7 @@ namespace lichess
 		
 		struct Clock
 		{
-			int64_t limit;
+			int64_t initial;
 			int64_t increment;
 
 			Clock() = default;
@@ -305,6 +347,33 @@ namespace lichess
 		mutable std::mutex mtx_;
 		GameFullCallback game_full_callback_;
 		GameStateCallback game_state_callback_;
+	};
+
+
+	struct MoveParams
+	{
+		std::string gameID;
+		std::string move;
+		std::optional<bool> offeringDraw;
+		MoveParams() = default;
+	};
+
+	struct Move
+	{
+		bool ok;
+		Move() = default;
+	};
+
+	struct ResignParams
+	{
+		std::string gameID;
+		ResignParams() = default;
+	};
+
+	struct Resign
+	{
+		bool ok;
+		Resign() = default;
 	};
 
 
@@ -458,15 +527,11 @@ namespace lichess
 		Result<ChallengeAI> challenge_ai(ChallengeAIParams _params);
 		Result<AcceptChallenge> accept_challenge(AcceptChallengeParams _params);
 
+		Result<Move> bot_move(MoveParams _params);
+		Result<Resign> bot_resign(ResignParams _params);
 
 
-
-
-		Client(const char* _authToken) :
-			client_("https://lichess.org")
-		{
-			this->client_.set_bearer_token_auth(_authToken);
-		};
+		Client(const char* _authToken);
 
 	private:
 		httplib::Client client_;

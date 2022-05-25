@@ -107,6 +107,17 @@ namespace lichess
 					_params.insert(std::make_pair(std::string(_info.name()), this->pstr(v)));
 				};
 			};
+
+			void operator()(httplib::Params& _params, const ChallengeAIParams* _class, const named_member<ChallengeAIParams,
+				std::optional<ChallengeAIParams::Clock>>& _info) const
+			{
+				auto& v = _info.get(_class);
+				if (this->add_to_params(v))
+				{
+					_params.insert({ "clock.limit", this->pstr(v->limit_) });
+					_params.insert({ "clock.increment", this->pstr(v->increment_) });
+				};
+			};
 		};
 
 		template <typename DestType, typename OpT>
@@ -297,6 +308,17 @@ namespace lichess
 
 
 	template <>
+	struct class_named_member_table<ChallengeAIParams::Clock>
+	{
+		using type = ChallengeAIParams::Clock;
+		constexpr static auto value = std::make_tuple
+		(
+			_LICHESS_MEMBER(increment_),
+			_LICHESS_MEMBER(limit_)
+		);
+	};
+
+	template <>
 	struct class_named_member_table<ChallengeAIParams>
 	{
 		using type = ChallengeAIParams;
@@ -306,7 +328,8 @@ namespace lichess
 			_LICHESS_MEMBER(days),
 			_LICHESS_MEMBER(color),
 			_LICHESS_MEMBER(variant),
-			_LICHESS_MEMBER(fen)
+			_LICHESS_MEMBER(fen),
+			_LICHESS_MEMBER(clock)
 		);
 	};
 
@@ -401,7 +424,7 @@ namespace lichess
 		using type = GameFullEvent::Clock;
 		constexpr static auto value = std::make_tuple
 		(		
-			_LICHESS_MEMBER(limit),
+			_LICHESS_MEMBER(initial),
 			_LICHESS_MEMBER(increment)
 		);
 	};
@@ -424,6 +447,25 @@ namespace lichess
 		);
 	};
 
+	template <>
+	struct class_named_member_table<Move>
+	{
+		using type = Move;
+		constexpr static auto value = std::make_tuple
+		(
+			_LICHESS_MEMBER(ok)
+		);
+	};
+
+	template <>
+	struct class_named_member_table<Resign>
+	{
+		using type = Resign;
+		constexpr static auto value = std::make_tuple
+		(
+			_LICHESS_MEMBER(ok)
+		);
+	};
 
 
 
@@ -559,6 +601,66 @@ namespace lichess
 		return parse_json<AcceptChallenge>(*_result);
 	};
 
+	Result<Move> Client::bot_move(MoveParams _params)
+	{
+		const auto _endpoint = "/api/bot/game/" + _params.gameID + "/move/" + _params.move;
+		auto _httpParams = httplib::Params();
+		if (_params.offeringDraw)
+		{
+			_httpParams.insert({
+				"offeringDraw", impl::tostr(*_params.offeringDraw)
+				});
+		};
+
+		auto _result = this->client_.Post(_endpoint.c_str(), _httpParams);
+		if (!_result)
+		{
+			return std::nullopt;
+		};
+
+		if (_result->status != 200)
+		{
+			// Error occured
+			return std::nullopt;
+		};
+
+		return parse_json<Move>(*_result);
+	};
+
+	Result<Resign> Client::bot_resign(ResignParams _params)
+	{
+		const auto _endpoint = "/api/bot/game/" + _params.gameID + "/resign";
+
+		auto _result = this->client_.Post(_endpoint.c_str());
+		if (!_result)
+		{
+			return std::nullopt;
+		};
+
+		if (_result->status != 200)
+		{
+			// Error occured
+			return std::nullopt;
+		};
+
+		return parse_json<Resign>(*_result);
+	};
+
+	Client::Client(const char* _authToken) :
+		client_("https://lichess.org")
+	{
+		this->client_.set_bearer_token_auth(_authToken);
+		this->client_.set_logger([](const httplib::Request& _req, const httplib::Response& _res)
+			{
+				if (_res.has_header("Content-Type") && _res.get_header_value("Content-Type") == "application/json")
+				{
+					if (!_res.body.empty())
+					{
+						std::cout << "[DEBUG] " << json::parse(_res.body).dump(1, '\t') << '\n';
+					};
+				};
+			});
+	};
 };
 
 namespace lichess
@@ -582,7 +684,7 @@ namespace lichess
 {
 	void AccountEventProcessor::push(const GameStartEvent& _event) const
 	{
-		const auto lck = std::unique_lock(this->mtx_);	
+		const auto lck = std::unique_lock(this->mtx_);
 		if (auto& _cb = this->game_start_callback_; _cb)
 		{
 			_cb(_event);
@@ -590,34 +692,55 @@ namespace lichess
 	};
 	void AccountEventProcessor::push(const GameFinishEvent& _event) const
 	{
-		const auto lck = std::unique_lock(this->mtx_);	
+		const auto lck = std::unique_lock(this->mtx_);
 		if (auto& _cb = this->game_finish_callback_; _cb)
 		{
 			_cb(_event);
 		};
 	};
-	
+	void AccountEventProcessor::push(const ChallengeEvent& _event) const
+	{
+		const auto lck = std::unique_lock(this->mtx_);
+		if (auto& _cb = this->challenge_callback_; _cb)
+		{
+			_cb(_event);
+		};
+	};
+
 	void AccountEventProcessor::process(const json& _json)
 	{
-		if (_json.contains("type"))
+		try
 		{
-			const std::string _type = _json.at("type");
-			if (_type == "gameStart")
+			if (_json.contains("type"))
 			{
-				GameStartEvent _event;
-				_event = _json.at("game");
-				this->push(_event);
-			}
-			else if (_type == "gameFinish")
-			{
-				GameFinishEvent _event;
-				_event = _json.at("game");
-				this->push(_event);
-			}
-			else
-			{
-				// Unhandled case
+				const std::string _type = _json.at("type");
+				if (_type == "gameStart")
+				{
+					GameStartEvent _event;
+					_event = _json.at("game");
+					this->push(_event);
+				}
+				else if (_type == "gameFinish")
+				{
+					GameFinishEvent _event;
+					_event = _json.at("game");
+					this->push(_event);
+				}
+				else if (_type == "challenge")
+				{
+					Challenge _event;
+					_event = _json.at("challenge");
+					this->push(_event);
+				}
+				else
+				{
+					// Unhandled case
+				};
 			};
+		}
+		catch (const json::exception& _exc)
+		{
+			std::cout << "[ERROR] Json parsing exception :\n" << _exc.what() << '\n';
 		};
 	};
 };
@@ -643,25 +766,33 @@ namespace lichess
 	
 	void GameEventProcessor::process(const json& _json)
 	{
-		if (_json.contains("type"))
+		try
 		{
-			const std::string _type = _json.at("type");
-			if (_type == "gameFull")
+			if (_json.contains("type"))
 			{
-				GameFullEvent _event;
-				_event = _json;
-				this->push(_event);
-			}
-			else if (_type == "gameState")
-			{
-				GameStateEvent _event;
-				_event = _json;
-				this->push(_event);
-			}
-			else
-			{
-				// Unhandled case
+				const std::string _type = _json.at("type");
+				if (_type == "gameFull")
+				{
+					GameFullEvent _event;
+					_event = _json;
+					this->push(_event);
+				}
+				else if (_type == "gameState")
+				{
+					GameStateEvent _event;
+					_event = _json;
+					this->push(_event);
+				}
+				else
+				{
+					// Unhandled case
+				};
 			};
+		}
+		catch (const json::exception& _exc)
+		{
+			std::cout << "[ERROR] Json parsing exception :\n" << _exc.what() << '\n';
+			std::cout << "  raw json = \n" << _json.dump(1, '\t') << '\n';
 		};
 	};
 };

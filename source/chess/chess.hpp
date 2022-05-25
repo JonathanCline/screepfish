@@ -35,6 +35,67 @@ namespace chess
 		h = 7
 	};
 
+	// File math operators
+	constexpr File operator+(File _file, int8_t _count)
+	{
+		return File(jc::to_underlying(_file) + _count);
+	};
+	constexpr File operator+(int8_t _count, File _file)
+	{
+		return File(jc::to_underlying(_file) + _count);
+	};
+	constexpr File operator-(File _file, int8_t _count)
+	{
+		return File(jc::to_underlying(_file) - _count);
+	};
+	constexpr File& operator+=(File& _file, int8_t _count)
+	{
+		_file = _file + _count;
+		return _file;
+	};
+	constexpr File& operator-=(File& _file, int8_t _count)
+	{
+		_file = _file - _count;
+		return _file;
+	};
+
+
+	/**
+	 * @brief Increments the given file if possible.
+	 * @param _file File to increment.
+	 * @param _count How much to increment.
+	 * @return True if possible, false on not possible.
+	*/
+	constexpr bool trynext(File& _file, int _count = 1)
+	{
+		auto _newFile = File(jc::to_underlying(_file) + _count);
+		if (_newFile > File::h)
+		{
+			return false;
+		}
+		else
+		{
+			_file = _newFile;
+			return true;
+		};
+	};
+
+	/**
+	 * @brief Increments the given file if possible.
+	 * @param _file File to increment.
+	 * @param _count How much to increment.
+	 * @param _possible Try/Fail out variable.
+	 * @return Incremented file value if possible, or no change.
+	*/
+	constexpr File trynext(File _file, int _count, bool& _possible)
+	{
+		_possible = trynext(_file, _count);
+		return _file;
+	};
+
+
+
+
 	/**
 	 * @brief Gets the character representation for a file.
 	 * @param _file Chess board file.
@@ -140,6 +201,66 @@ namespace chess
 		r7 = 6,
 		r8 = 7
 	};
+
+	// Rank math operators
+	constexpr Rank operator+(Rank _rank, int8_t _count)
+	{
+		return Rank(jc::to_underlying(_rank) + _count);
+	};
+	constexpr Rank operator+(int8_t _count, Rank _rank)
+	{
+		return Rank(jc::to_underlying(_rank) + _count);
+	};
+	constexpr Rank operator-(Rank _rank, int8_t _count)
+	{
+		return Rank(jc::to_underlying(_rank) - _count);
+	};
+	constexpr Rank& operator+=(Rank& _rank, int8_t _count)
+	{
+		_rank = _rank + _count;
+		return _rank;
+	};
+	constexpr Rank& operator-=(Rank& _rank, int8_t _count)
+	{
+		_rank = _rank - _count;
+		return _rank;
+	};
+
+
+	/**
+	 * @brief Increments the given rank if possible.
+	 * @param _rank Rank to increment.
+	 * @param _count How much to increment.
+	 * @return True if possible, false on not possible.
+	*/
+	constexpr bool trynext(Rank& _rank, int _count = 1)
+	{
+		auto _newRank = Rank(jc::to_underlying(_rank) + _count);
+		if (_newRank > Rank::r8)
+		{
+			return false;
+		}
+		else
+		{
+			_rank = _newRank;
+			return true;
+		};
+	};
+
+	/**
+	 * @brief Increments the given rank if possible.
+	 * @param _rank Rank to increment.
+	 * @param _count How much to increment.
+	 * @param _possible Try/Fail out variable.
+	 * @return Incremented rank value if possible, or no change.
+	*/
+	constexpr Rank trynext(Rank _rank, int _count, bool& _possible)
+	{
+		_possible = trynext(_rank, _count);
+		return _rank;
+	};
+
+
 
 	/**
 	 * @brief Gets the character representation for a rank.
@@ -247,6 +368,40 @@ namespace chess
 		File file_;
 		Rank rank_;
 	};
+
+	/**
+	 * @brief Increments the given position if possible.
+	 * @param _position Position to increment.
+	 * @param _dFile How much to increment the file.
+	 * @param _dRank How much to increment the rank.
+	 * @param _possible Try/Fail out variable.
+	 * @return Incremented position value if possible, or no change.
+	*/
+	constexpr Position trynext(Position _position, int _dFile, int _dRank, bool& _possible)
+	{
+		const auto _newFile = trynext(_position.file(), _dFile, _possible);
+		if (!_possible) { return _position; };
+
+		const auto _newRank = trynext(_position.rank(), _dRank, _possible);
+		if (!_possible) { return _position; };
+
+		return Position(_newFile, _newRank);
+	};
+
+	/**
+	 * @brief Increments the given position if possible.
+	 * @param _position Position to increment.
+	 * @param _dFile How much to increment the file.
+	 * @param _dRank How much to increment the rank.
+	 * @return True if possible, false otherwise.
+	*/
+	constexpr bool trynext(Position& _position, int _dFile, int _dRank)
+	{
+		auto _possible = true;
+		_position = trynext(_position, _dFile, _dRank, _possible);
+		return _possible;
+	};
+
 
 	/**
 	 * @brief Allows more natural construction of a position value from a file, rank pair.
@@ -555,37 +710,60 @@ namespace chess
 
 
 	/**
+	 * @brief Represents a piece actually on a chess board.
+	*/
+	class BoardPiece : public Piece
+	{
+	public:
+		constexpr Position position() const
+		{
+			return this->pos_;
+		};
+		constexpr void set_position(Position _pos) noexcept
+		{
+			this->pos_ = _pos;
+		};
+
+		constexpr Rank rank() const noexcept { return this->position().rank(); };
+		constexpr File file() const noexcept { return this->position().file(); };
+
+		constexpr void promote(PieceType _type) noexcept
+		{
+			*this = BoardPiece(_type, this->color(), this->position());
+		};
+
+		constexpr BoardPiece(Type _type, Color _color, Position _pos) :
+			Piece(_type, _color), pos_(_pos)
+		{};
+	private:
+		Position pos_;
+	};
+
+	/**
 	 * @brief Represents a chess board by tracking the pieces directly.
 	*/
 	class Board
 	{
 	private:
 
-		class PieceInfo : public Piece
+		auto end() const { return this->pieces_.end(); };
+		
+		
+	public:
+
+		auto find(Position _pos)
 		{
-		public:
-			constexpr Position position() const
-			{
-				return this->pos_;
-			};
-			constexpr void set_position(Position _pos) noexcept
-			{
-				this->pos_ = _pos;
-			};
-
-			constexpr Rank rank() const noexcept { return this->position().rank(); };
-			constexpr File file() const noexcept { return this->position().file(); };
-
-			constexpr void promote(PieceType _type) noexcept
-			{
-				*this = PieceInfo(_type, this->color(), this->position());
-			};
-
-			constexpr PieceInfo(Type _type, Color _color, Position _pos) :
-				Piece(_type, _color), pos_(_pos)
-			{};
-		private:
-			Position pos_;
+			return std::ranges::find_if(this->pieces_, [_pos](BoardPiece& p)
+				{
+					return p.position() == _pos;
+				});
+		};
+		auto find(Position _pos) const
+		{
+			return std::ranges::find_if(this->pieces_, [_pos](const BoardPiece& p)
+				{
+					return p.position() == _pos;
+				});
 		};
 
 		auto find(Piece _piece)
@@ -597,46 +775,69 @@ namespace chess
 			return std::ranges::find(this->pieces_, _piece);
 		};
 
-		auto end() const { return this->pieces_.end(); };
-		
-		auto find(Position _pos)
-		{
-			return std::ranges::find_if(this->pieces_, [_pos](PieceInfo& p)
-				{
-					return p.position() == _pos;
-				});
-		};
-		auto find(Position _pos) const
-		{
-			return std::ranges::find_if(this->pieces_, [_pos](const PieceInfo& p)
-				{
-					return p.position() == _pos;
-				});
-		};
-
-		Piece at(Position _pos) const
-		{
-			if (const auto it = this->find(_pos); it != this->end())
-			{
-				return *it;
-			}
-			else
-			{
-				return Piece{};
-			};
-		};
-
-	public:
-		
 		void clear() noexcept { this->pieces_.clear(); };
 
 		void new_piece(Piece _piece, Position _pos)
 		{
-			this->pieces_.push_back(PieceInfo(_piece.type(), _piece.color(), _pos));
+			this->pieces_.push_back(BoardPiece(_piece.type(), _piece.color(), _pos));
 		};
 		void new_piece(PieceType _piece, Color _color, Position _pos)
 		{
-			this->pieces_.push_back(PieceInfo(_piece, _color, _pos));
+			this->pieces_.push_back(BoardPiece(_piece, _color, _pos));
+		};
+
+		const BoardPiece* get(Position _pos) const
+		{
+			if (const auto it = this->find(_pos); it != this->end())
+			{
+				return &*it;
+			}
+			else
+			{
+				return nullptr;
+			};
+		};
+		const BoardPiece* get(File _file, Rank _rank) const
+		{
+			return this->get((_file, _rank));
+		};
+
+		bool has_enemy_piece(Position _pos, Color _myColor) const
+		{
+			if (const auto p = this->get(_pos); p)
+			{
+				return p->color() != _myColor;
+			}
+			else
+			{
+				return false;
+			};
+		};
+		bool has_friendy_piece(Position _pos, Color _myColor) const
+		{
+			if (const auto p = this->get(_pos); p)
+			{
+				return p->color() == _myColor;
+			}
+			else
+			{
+				return false;
+			};
+		};
+		bool has_piece(Position _pos) const
+		{
+			return this->get(_pos) != nullptr;
+		};
+		bool has_enemy_piece_or_empty(Position _pos, Color _myColor) const
+		{
+			if (const auto p = this->get(_pos); p)
+			{
+				return p->color() != _myColor;
+			}
+			else
+			{
+				return true;
+			};
 		};
 
 		void erase_piece(Position _position)
@@ -650,12 +851,12 @@ namespace chess
 		void move_piece(Position _fromPos, Position _toPos, PieceType _promotion = PieceType::none)
 		{
 			{
-				const auto _from = this->at(_fromPos);
-				const auto _to = this->at(_toPos);
+				const auto _from = this->get(_fromPos);
+				const auto _to = this->get(_toPos);
 
-				if (_from && _from == PieceType::king)
+				if (_from && *_from == PieceType::king)
 				{
-					if (_from.color() == Color::white && _fromPos == (File::e, Rank::r1))
+					if (_from->color() == Color::white && _fromPos == (File::e, Rank::r1))
 					{
 						if (_toPos == (File::c, Rank::r1))
 						{
@@ -666,7 +867,7 @@ namespace chess
 							this->find((File::h, Rank::r1))->set_position((File::f, Rank::r1));
 						};
 					}
-					else if (_from.color() == Color::black && _fromPos == (File::e, Rank::r8))
+					else if (_from->color() == Color::black && _fromPos == (File::e, Rank::r8))
 					{
 						if (_toPos == (File::c, Rank::r8))
 						{
@@ -696,12 +897,14 @@ namespace chess
 			it->set_position(_toPos);
 		};
 		
+		const auto& pieces() const { return this->pieces_; }
+
 		friend std::ostream& operator<<(std::ostream& _ostr, const Board& _value);
 
 		Board() = default;
 
 	private:
-		std::vector<PieceInfo> pieces_;
+		std::vector<BoardPiece> pieces_;
 	};
 
 
@@ -763,4 +966,31 @@ namespace chess
 		return _board;
 	};
 
+
+
+	class IGame
+	{
+	public:
+
+		const Board& board() const
+		{
+			return this->board_;
+		};
+
+		Board board_;
+		
+		IGame() = default;
+	protected:
+		~IGame() = default;
+	};
+
+	class IChessEngine
+	{
+	public:
+
+		virtual Move play_turn(IGame& _game) = 0;
+
+		IChessEngine() = default;
+		virtual ~IChessEngine() = default;
+	};
 };
