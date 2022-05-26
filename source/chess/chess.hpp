@@ -2,6 +2,7 @@
 
 /** @file */
 
+#include "bitboard.hpp"
 #include "position.hpp"
 
 #include "utility/number.hpp"
@@ -72,7 +73,7 @@ namespace chess
 		mate,
 	};
 
-	using Rating = int_fast32_t;
+	using Rating = float;
 
 	
 
@@ -259,6 +260,11 @@ namespace chess
 	class Piece
 	{
 	public:
+
+		/**
+		 * @brief Exposes the piece type enum values for use
+		*/
+		using enum PieceType;
 
 		/**
 		 * @brief Types of chess pieces.
@@ -568,8 +574,16 @@ namespace chess
 			this->pieces_by_pos_.at(this->toindex(_pos)) = Piece{};
 			if (pIt != this->pend())
 			{
+				if (pIt->color() == Color::white)
+				{
+					this->wpieces_.reset(_pos);
+				}
+				else
+				{
+					this->bpieces_.reset(_pos);
+				};
+
 				this->perase(pIt);
-				
 			};
 		};
 		void erase(const Position& _pos)
@@ -584,17 +598,47 @@ namespace chess
 
 			auto& f = this->pieces_by_pos_.at(this->toindex(_from));
 			auto& t = this->pieces_by_pos_.at(this->toindex(_to));
-				
+			
+			// Remove old piece bit
+			if (pIt->color() == Color::white)
+			{
+				this->wpieces_.reset(_from);
+			}
+			else
+			{
+				this->bpieces_.reset(_from);
+			};
+
 			// Check if destination position has a piece
 			if (t)
 			{
 				const auto toIt = this->pfind(_to);
+				
+				// Remove captured piece bit
+				if (toIt->color() == Color::white)
+				{
+					this->wpieces_.reset(_to);
+				}
+				else
+				{
+					this->bpieces_.reset(_to);
+				};
 				pIt->set_position(_to);
 				this->perase(toIt);
 			}
 			else
 			{
 				pIt->set_position(_to);
+			};
+
+			// Set new piece bit
+			if (pIt->color() == Color::white)
+			{
+				this->bpieces_.set(_to);
+			}
+			else
+			{
+				this->wpieces_.set(_to);
 			};
 
 			t = f;
@@ -641,15 +685,33 @@ namespace chess
 		void clear() noexcept
 		{
 			this->pieces_by_pos_.fill(Piece{});
-			this->pieces_.fill(BoardPiece{});
+			this->toplay_ = Color::white;
+			this->bcastle_king_ = false;
+			this->bcastle_queen_ = false;
+			this->wcastle_king_ = false;
+			this->wcastle_queen_ = false;
 			this->enpassant_target_.reset();
-			this->move_count_ = 0;
+			this->fullmove_count_ = 1;
+			this->halfmove_count_ = 0;
+
+			this->pieces_.fill(BoardPiece{});
+			this->bpieces_.reset();
+			this->wpieces_.reset();
 		};
 
 		void new_piece(Piece _piece, Position _pos)
 		{
 			this->pieces_by_pos_.at(this->toindex(_pos)) = _piece;
 			*this->pend() = BoardPiece(_piece, _pos);
+
+			if (_piece.color() == Color::white)
+			{
+				this->wpieces_.set(_pos);
+			}
+			else
+			{
+				this->bpieces_.set(_pos);
+			};
 		};
 		void new_piece(PieceType _piece, Color _color, Position _pos)
 		{
@@ -699,6 +761,19 @@ namespace chess
 			return o;
 		};
 		
+		/**
+		 * @brief Gets the player who is to move.
+		 * @return Color.
+		*/
+		Color get_toplay() const noexcept
+		{
+			return this->toplay_;
+		};
+		
+		void set_toplay(Color _toplay)
+		{
+			this->toplay_ = _toplay;
+		};
 
 
 		bool has_enemy_piece(Position _pos, Color _myColor) const
@@ -757,16 +832,19 @@ namespace chess
 				const auto _from = this->get(_fromPos);
 				const auto _to = this->get(_toPos);
 
+				// Castling move handling
 				if (_from == PieceType::king)
 				{
 					if (_from.color() == Color::white && _fromPos == (File::e, Rank::r1))
 					{
 						if (_toPos == (File::c, Rank::r1))
 						{
+							assert(this->wcastle_queen_);
 							this->just_move_piece((File::a, Rank::r1), (File::d, Rank::r1));
 						}
 						else if (_toPos == (File::g, Rank::r1))
 						{
+							assert(this->wcastle_king_);
 							this->just_move_piece((File::h, Rank::r1), (File::f, Rank::r1));
 						};
 					}
@@ -774,10 +852,12 @@ namespace chess
 					{
 						if (_toPos == (File::c, Rank::r8))
 						{
+							assert(this->bcastle_queen_);
 							this->just_move_piece((File::a, Rank::r8), (File::d, Rank::r8));
 						}
 						else if (_toPos == (File::g, Rank::r8))
 						{
+							assert(this->bcastle_king_);
 							this->just_move_piece((File::h, Rank::r8), (File::f, Rank::r8));
 						};
 					};
@@ -802,6 +882,57 @@ namespace chess
 					};
 				};
 
+				// Castling flag checking behavior
+				if (_from == PieceType::king)
+				{
+					if (_from.color() == Color::white)
+					{
+						this->wcastle_king_ = false;
+						this->wcastle_queen_ = false;
+					}
+					else
+					{
+						this->bcastle_king_ = false;
+						this->bcastle_queen_ = false;
+					};
+				}
+				else if (_from == PieceType::rook)
+				{
+					if (_from.color() == Color::white)
+					{
+						if (_fromPos == (File::h, Rank::r1))
+						{
+							this->wcastle_king_ = false;
+						}
+						else if (_fromPos == (File::a, Rank::r1))
+						{
+							this->wcastle_queen_ = false;
+						};
+					}
+					else
+					{
+						if (_fromPos == (File::h, Rank::r8))
+						{
+							this->bcastle_king_ = false;
+						}
+						else if (_fromPos == (File::a, Rank::r8))
+						{
+							this->bcastle_queen_ = false;
+						};
+					};
+				};
+
+				// Half move handling (fifty move rule)
+				if (_to || _from == Piece::pawn)
+				{
+					// Reset halfmove counter
+					this->halfmove_count_ = 0;
+				}
+				else
+				{
+					// Increment halfmove counter
+					++this->halfmove_count_;
+				};
 			};
 
 			auto it = this->find(_fromPos);
@@ -829,7 +960,13 @@ namespace chess
 			this->just_move_piece(_fromPos, _toPos);
 
 			// Increment move counter
-			this->move_count_ = 0;
+			if (this->toplay_ == Color::black)
+			{
+				this->fullmove_count_ += 1;
+			};
+			
+			// Swap to play flag
+			this->toplay_ = !this->toplay_;
 		};
 
 		void move(const PieceMove& _move)
@@ -850,7 +987,73 @@ namespace chess
 		{
 			return this->enpassant_target_.value();
 		};
+		void set_enpassant_target(Position _pos)
+		{
+			this->enpassant_target_ = _pos;
+		};
 
+		bool get_castle_kingside_flag(Color _player) const
+		{
+			if (_player == Color::white)
+			{
+				return this->wcastle_king_;
+			}
+			else
+			{
+				return this->bcastle_king_;
+			};
+		};
+		bool get_castle_queenside_flag(Color _player) const
+		{
+			if (_player == Color::white)
+			{
+				return this->wcastle_queen_;
+			}
+			else
+			{
+				return this->bcastle_queen_;
+			};
+		};
+		void set_castle_kingside_flag(Color _player, bool _flag)
+		{
+			if (_player == Color::white)
+			{
+				this->wcastle_king_ = _flag;
+			}
+			else
+			{
+				this->bcastle_king_ = _flag;
+			};
+		};
+		void set_castle_queenside_flag(Color _player, bool _flag)
+		{
+			if (_player == Color::white)
+			{
+				this->wcastle_queen_ = _flag;
+			}
+			else
+			{
+				this->bcastle_queen_ = _flag;
+			};
+		};
+
+		uint16_t get_full_move_count() const
+		{
+			return this->fullmove_count_;
+		};
+		uint16_t get_half_move_count() const
+		{
+			return this->halfmove_count_;
+		};
+
+		void set_full_move_count(uint16_t _count)
+		{
+			this->fullmove_count_ = _count;
+		};
+		void set_half_move_count(uint16_t _count)
+		{
+			this->halfmove_count_ = _count;
+		};
 
 
 		const std::span<const BoardPiece> pieces() const
@@ -868,7 +1071,31 @@ namespace chess
 		std::array<Piece, 64> pieces_by_pos_{};
 		std::array<BoardPiece, 32> pieces_{};
 		std::optional<Position> enpassant_target_;
-		uint16_t move_count_ = 0;
+		
+		BitBoard bpieces_;
+		BitBoard wpieces_;
+		
+		/**
+		 * @brief Whos turn it is to play.
+		*/
+		Color toplay_ = Color::white;
+
+		/**
+		 * @brief Half-moves since the last piece capture or pawn advance.
+		*/
+		uint16_t halfmove_count_ = 0;
+
+		/**
+		 * @brief Full-moves played, increments every time black plays.
+		*/
+		uint16_t fullmove_count_ = 1;
+
+		// Castle tracking
+		bool bcastle_king_ = false;
+		bool bcastle_queen_ = false;
+		bool wcastle_king_ = false;
+		bool wcastle_queen_ = false;
+
 	};
 	
 	
@@ -982,23 +1209,26 @@ namespace chess
 
 		// Set black positions
 		
-		// King and queen
-		_board.new_piece(PieceType::king, Color::black, (File::e, Rank::r8));
-		_board.new_piece(PieceType::queen, Color::black, (File::d, Rank::r8));
-
-		// Rooks + Minor pieces
-		_board.new_piece(PieceType::rook, Color::black, (File::a, Rank::r8));
-		_board.new_piece(PieceType::rook, Color::black, (File::h, Rank::r8));
+		// Back row
+		_board.new_piece(PieceType::rook,	Color::black, (File::a, Rank::r8));
 		_board.new_piece(PieceType::knight, Color::black, (File::b, Rank::r8));
-		_board.new_piece(PieceType::knight, Color::black, (File::g, Rank::r8));
 		_board.new_piece(PieceType::bishop, Color::black, (File::c, Rank::r8));
+		_board.new_piece(PieceType::queen,	Color::black, (File::d, Rank::r8));
+		_board.new_piece(PieceType::king,	Color::black, (File::e, Rank::r8));
 		_board.new_piece(PieceType::bishop, Color::black, (File::f, Rank::r8));
+		_board.new_piece(PieceType::rook,	Color::black, (File::h, Rank::r8));
+		_board.new_piece(PieceType::knight, Color::black, (File::g, Rank::r8));
 
 		// Pawns
-		for (auto it = FileIterator(); it != FileIterator::end(); ++it)
+		for (auto& _file : files_v)
 		{
-			_board.new_piece(PieceType::pawn, Color::black, (*it, Rank::r7));
+			_board.new_piece(PieceType::pawn, Color::black, (_file, Rank::r7));
 		};
+
+		// Castle flags
+		_board.set_castle_kingside_flag(Color::black, true);
+		_board.set_castle_queenside_flag(Color::black, true);
+
 
 
 
@@ -1006,23 +1236,25 @@ namespace chess
 
 		// Set white positions
 
-		// King and queen
-		_board.new_piece(PieceType::king, Color::white, (File::e, Rank::r1));
-		_board.new_piece(PieceType::queen, Color::white, (File::d, Rank::r1));
-
-		// Rooks + Minor pieces
-		_board.new_piece(PieceType::rook, Color::white, (File::a, Rank::r1));
-		_board.new_piece(PieceType::rook, Color::white, (File::h, Rank::r1));
+		// Back row
+		_board.new_piece(PieceType::rook,	Color::white, (File::a, Rank::r1));
 		_board.new_piece(PieceType::knight, Color::white, (File::b, Rank::r1));
-		_board.new_piece(PieceType::knight, Color::white, (File::g, Rank::r1));
 		_board.new_piece(PieceType::bishop, Color::white, (File::c, Rank::r1));
+		_board.new_piece(PieceType::queen,	Color::white, (File::d, Rank::r1));
+		_board.new_piece(PieceType::king,	Color::white, (File::e, Rank::r1));
 		_board.new_piece(PieceType::bishop, Color::white, (File::f, Rank::r1));
+		_board.new_piece(PieceType::rook,	Color::white, (File::h, Rank::r1));
+		_board.new_piece(PieceType::knight, Color::white, (File::g, Rank::r1));
 
 		// Pawns
-		for (auto it = FileIterator(); it != FileIterator::end(); ++it)
+		for (auto& _file : files_v)
 		{
-			_board.new_piece(PieceType::pawn, Color::white, (*it, Rank::r2));
+			_board.new_piece(PieceType::pawn, Color::white, (_file, Rank::r2));
 		};
+
+		// Castle flags
+		_board.set_castle_kingside_flag(Color::white, true);
+		_board.set_castle_queenside_flag(Color::white, true);
 
 
 		return _board;

@@ -77,10 +77,17 @@ namespace chess
 			_grid[static_cast<size_t>(7 - y)][x] = c;
 		};
 
+		_ostr << "+-+-+-+-+-+-+-+-+\n";
 		for (auto& vx : _grid)
 		{
-			_ostr.write(vx.data(), vx.size());
+			for (auto& c : vx)
+			{
+				_ostr.put('|');
+				_ostr.put(c);
+			};
+			_ostr.put('|');
 			_ostr.put('\n');
+			_ostr << "+-+-+-+-+-+-+-+-+\n";
 		};
 
 		return _ostr;

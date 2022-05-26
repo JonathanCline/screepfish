@@ -1,4 +1,6 @@
+#include "chess/fen.hpp"
 #include "chess/chess.hpp"
+
 #include "engine/engine.hpp"
 
 #include "env.hpp"
@@ -81,6 +83,10 @@ private:
 				_resignParams.gameID = this->game_id_;
 				
 				std::cout << "[ERROR] Failed to submit move : " << _response << '\n';
+				std::cout << sstr.str() << '\n';
+				std::cout << _board << '\n';
+				std::cout << chess::get_fen(_board) << '\n';
+
 				this->client_.bot_resign(_resignParams);
 			};
 		};
@@ -302,11 +308,11 @@ public:
 				using namespace std::chrono_literals;
 			
 				auto _params = lichess::ChallengeAIParams{};
-				_params.level = 3;
+				_params.level = 2;
 				_params.days.reset();
 				_params.clock.emplace();
 				_params.clock->set_initial(1min);
-				_params.clock->set_increment(1min);
+				_params.clock->set_increment(1s);
 				auto _result = this->account_client_.challenge_ai(_params);
 			};
 		};
@@ -358,6 +364,48 @@ private:
 };
 
 
+bool run_tests()
+{
+	bool _runOnFinish = false;
+	
+
+
+	using namespace chess;
+
+	{
+		const auto _fen = "r3k1nr/pppn1ppp/4b3/4q3/Pb5P/8/3PP1P1/RNBQKBNR w KQkq - 0 8";
+		auto _board = *parse_fen(_fen);
+		_board.move(Move((File::d, Rank::r2), (File::d, Rank::r4)));
+		if (!is_check(_board, Color::white))
+		{
+			std::cout << _board << '\n';
+			abort();
+		};
+		__debugbreak();
+	};
+
+	{
+		const auto _fen = "1rb1kbnr/ppNppppp/2n5/6NQ/4P3/3P4/PPP2PPq/R3KB1R b KQk - 1 11";
+		const auto _board = *parse_fen(_fen);
+		
+		std::cout << _fen << '\n';
+		std::cout << get_fen(_board) << '\n';
+		std::cout << _board << '\n';
+		if (!is_check(_board, Color::black))
+		{
+			abort();
+		};
+	};
+
+
+
+
+
+	return _runOnFinish;
+};
+
+
+
 
 
 
@@ -365,6 +413,8 @@ private:
 
 int main(int _nargs, const char* _vargs[])
 {
+	if (!run_tests()) { return 0; };
+
 	if (_nargs == 0 || !_vargs || !_vargs[0])
 	{
 		std::cout << "No arguments provided, not even exec path1!\n";

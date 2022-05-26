@@ -17,10 +17,16 @@ namespace chess
 		
 		using size_type = uint64_t;
 
+		
+		constexpr size_type toindex(Position _pos) const
+		{
+			return static_cast<size_type>(_pos);
+		};
 		constexpr size_type toindex(File _file, Rank _rank) const
 		{
-			return (jc::to_underlying(_file) << 3) | jc::to_underlying(_rank);
+			return this->toindex((_file, _rank));
 		};
+
 		constexpr Position topos(size_type _index) const
 		{
 			const auto _rank = Rank(_index & 0b0000'0111);
@@ -30,9 +36,18 @@ namespace chess
 
 	public:
 
+		void set(Position _pos)
+		{
+			this->bits_.set(this->toindex(_pos));
+		};
 		void set(File _file, Rank _rank)
 		{
 			this->bits_.set(this->toindex(_file, _rank));
+		};
+		
+		void reset(Position _pos)
+		{
+			this->bits_.reset(this->toindex(_pos));
 		};
 		void reset(File _file, Rank _rank)
 		{
@@ -43,6 +58,17 @@ namespace chess
 			this->bits_.reset();
 		};
 
+		void set(Position _pos, bool _value)
+		{
+			if (_value)
+			{
+				this->set(_pos);
+			}
+			else
+			{
+				this->reset(_pos);
+			};
+		};
 		void set(File _file, Rank _rank, bool _value)
 		{
 			if (_value)
@@ -53,6 +79,11 @@ namespace chess
 			{
 				this->reset(_file, _rank);
 			};
+		};
+
+		bool test(Position _pos) const
+		{
+			return this->bits_.test(this->toindex(_pos));
 		};
 		bool test(File _file, Rank _rank) const
 		{
