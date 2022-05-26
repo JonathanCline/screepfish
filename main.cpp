@@ -70,22 +70,27 @@ private:
 		if (*this->my_turn_)
 		{
 			const auto _response = this->engine_.play_turn(_game);
-
-			auto _params = lichess::MoveParams();
-			_params.gameID = this->game_id_;
-			std::stringstream sstr{};
-			sstr << _response;
-			_params.move = sstr.str();
-
-			if (!this->client_.bot_move(_params))
+			bool _passed = false;
+			if (_response)
+			{
+				auto _params = lichess::MoveParams();
+				_params.gameID = this->game_id_;
+				std::stringstream sstr{};
+				sstr << *_response;
+				_params.move = sstr.str();
+				_passed = this->client_.bot_move(_params).has_value();
+			};
+			if (!_passed)
 			{
 				auto _resignParams = lichess::ResignParams();
 				_resignParams.gameID = this->game_id_;
-				
-				std::cout << "[ERROR] Failed to submit move : " << _response << '\n';
-				std::cout << sstr.str() << '\n';
-				std::cout << _board << '\n';
-				std::cout << chess::get_fen(_board) << '\n';
+
+				if (_response)
+				{
+					std::cout << "[ERROR] Failed to submit move : " << *_response << '\n';
+					std::cout << _board << '\n';
+					std::cout << chess::get_fen(_board) << '\n';
+				};
 
 				this->client_.bot_resign(_resignParams);
 			};
@@ -308,7 +313,7 @@ public:
 				using namespace std::chrono_literals;
 			
 				auto _params = lichess::ChallengeAIParams{};
-				_params.level = 2;
+				_params.level = 3;
 				_params.days.reset();
 				_params.clock.emplace();
 				_params.clock->set_initial(1min);
@@ -366,7 +371,7 @@ private:
 
 bool run_tests()
 {
-	bool _runOnFinish = false;
+	bool _runOnFinish = true;
 	
 
 
@@ -378,10 +383,8 @@ bool run_tests()
 		_board.move(Move((File::d, Rank::r2), (File::d, Rank::r4)));
 		if (!is_check(_board, Color::white))
 		{
-			std::cout << _board << '\n';
 			abort();
 		};
-		__debugbreak();
 	};
 
 	{
@@ -397,6 +400,45 @@ bool run_tests()
 		};
 	};
 
+	{
+		auto _board = Board();
+		reset_board(_board);
+
+		auto _tree = MoveTree();
+		_tree.board = _board;
+		_tree.to_play = _board.get_toplay();
+		
+		_tree.evalulate_next();
+		if (const auto s = _tree.total_outcomes(); s != 20)
+		{
+			std::cout << "Expected 20, got " << s << '\n';
+			abort();
+		};
+
+		_tree.evalulate_next();
+		if (const auto s = _tree.total_outcomes(); s != 400)
+		{
+			std::cout << "Expected 400, got " << s << '\n';
+			abort();
+		};
+
+		_tree.evalulate_next();
+		if (const auto s = _tree.total_outcomes(); s != 8902)
+		{
+			std::cout << "Expected 8902, got " << s << '\n';
+			std::cout << "  delta = " << (int)s - 8902 << '\n';
+			//abort();
+		};
+
+		_tree.evalulate_next();
+		if (const auto s = _tree.total_outcomes(); s != 197281)
+		{
+			std::cout << "Expected 197281, got " << s << '\n';
+			std::cout << "  delta = " << (int)s - 8902 << '\n';
+			//abort();
+		};
+
+	};
 
 
 

@@ -1282,7 +1282,7 @@ namespace chess
 	{
 	public:
 
-		virtual Move play_turn(IGame& _game) = 0;
+		virtual std::optional<Move> play_turn(IGame& _game) = 0;
 
 		IChessEngine() = default;
 		virtual ~IChessEngine() = default;

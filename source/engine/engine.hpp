@@ -5,6 +5,8 @@
 #include "chess/chess.hpp"
 #include "chess/move_tree.hpp"
 
+#include <variant>
+
 namespace sch
 {
 	class ScreepFish : public chess::IChessEngine
@@ -12,8 +14,6 @@ namespace sch
 	private:
 
 		chess::MoveTree build_move_tree(const chess::Board& _board, chess::Color _forPlayer, int _depth);
-
-		chess::Move best_move(const chess::Board& _board, chess::Color _forPlayer, int _depth);
 
 		struct BoardCache
 		{
@@ -34,7 +34,7 @@ namespace sch
 
 	public:
 
-		chess::Move play_turn(chess::IGame& _game) final;
+		std::optional<chess::Move> play_turn(chess::IGame& _game) final;
 
 		void set_color(chess::Color _color);
 		void set_board(chess::Board _board);

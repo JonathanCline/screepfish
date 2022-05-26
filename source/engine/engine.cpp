@@ -52,11 +52,6 @@ namespace sch
 	};
 
 	
-	chess::Move ScreepFish::best_move(const chess::Board& _board, chess::Color _forPlayer, int _depth)
-	{
-		auto _tree = this->build_move_tree(_board, _forPlayer, _depth);
-		return _tree.best_move();
-	};
 
 	void ScreepFish::cache(const chess::Board& _board)
 	{
@@ -67,7 +62,7 @@ namespace sch
 	};
 
 
-	chess::Move ScreepFish::play_turn(chess::IGame& _game)
+	std::optional<chess::Move> ScreepFish::play_turn(chess::IGame& _game)
 	{
 		using namespace chess;
 
@@ -83,21 +78,16 @@ namespace sch
 		const auto _clock = std::chrono::steady_clock{};
 		const auto t0 = _clock.now();
 
-		const auto _move = best_move(_board, _myColor, 3);
+		const auto _depth = 4;
+		auto _tree = this->build_move_tree(_board, _myColor, _depth);
+		
+		const auto _move = _tree.best_move();
 		
 		const auto t1 = _clock.now();
 		const auto td = t1 - t0;
 		std::cout << "Delta time : " << std::chrono::duration_cast<std::chrono::duration<double>>(td) << '\n';
-
+		std::cout << _tree.tree_size() << '\n';
 		std::cout << _board << '\n';
-
-		auto _newBoard = _board;
-		_newBoard.move(_move);
-		if (is_check(_newBoard, _myColor))
-		{
-			// This should never occur
-			abort();
-		};
 
 		return _move;
 	};

@@ -1,5 +1,6 @@
 #include "move_tree.hpp"
 
+#include <iostream>
 
 namespace chess
 {
@@ -26,21 +27,19 @@ namespace chess
 				// Rate the move
 				auto _newBoard = _board;
 				_newBoard.move(*p);
+				const auto _hash = chess::hash(_newBoard, _newBoard.get_toplay() == Color::black);
+
 				const auto _rating = rate_move(_newBoard, *p, !this->move_played_by);
 
 				// Assign values
 				it->move_played_by = !this->move_played_by;
 				it->move = RatedMove{ *p, _rating };
+				it->hash = _hash;
 
 				// Next
 				++it;
 			};
 
-			// Sort children by rating
-			std::ranges::sort(this->responses, [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
-				{
-					return lhs.move.rating > rhs.move.rating;
-				});
 		}
 		else
 		{
@@ -50,7 +49,46 @@ namespace chess
 				_child.evaluate_next(_board);
 			};
 		};
+
+		// Sort children by rating
+		std::ranges::sort(this->responses, [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
+			{
+				return lhs.move.rating > rhs.move.rating;
+			});
+
+		// Set our rating to show the best opponent response
+		if (!this->responses.empty())
+		{
+			this->move.rating = -this->responses.front().move.rating;
+		};
 	};
+
+	size_t MoveTreeNode::tree_size() const
+	{
+		size_t n = this->responses.size();
+		for (auto& v : this->responses)
+		{
+			n += v.tree_size();
+		};
+		return n;
+	};
+	size_t MoveTreeNode::total_outcomes() const
+	{
+		size_t n = 0;
+		for (auto& v : this->responses)
+		{
+			if (v.responses.empty())
+			{
+				n += 1;
+			}
+			else
+			{
+				n += v.total_outcomes();
+			};
+		};
+		return n;
+	};
+
 
 
 	// MoveTree
@@ -86,21 +124,18 @@ namespace chess
 				// Rate the move
 				auto _newBoard = _board;
 				_newBoard.move(*p);
+				const auto _hash = hash(_newBoard, _newBoard.get_toplay() == Color::black);
+			
 				const auto _rating = rate_move(_newBoard, *p, this->to_play);
 
 				// Assign values
 				it->move_played_by = this->to_play;
 				it->move = RatedMove{ *p, _rating };
+				it->hash = _hash;
 
 				// Next
 				++it;
 			};
-
-			// Sort children by rating
-			std::ranges::sort(this->moves, [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
-				{
-					return lhs.move.rating > rhs.move.rating;
-				});
 		}
 		else
 		{
@@ -110,20 +145,58 @@ namespace chess
 				_child.evaluate_next(_board);
 			};
 		};
+
+		// Sort children by rating
+		std::ranges::sort(this->moves, [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
+			{
+				return lhs.move.rating > rhs.move.rating;
+			});
 	};
 
-	Move MoveTree::best_move()
+	std::optional<Move> MoveTree::best_move()
 	{
-		for (auto& c : this->moves)
+		MoveTreeNode* at = this->moves.data();
+		while (at)
 		{
-			auto& cr = c.responses.front().move.rating;
-
-
-
+			std::cout << at->move.move << ", ";
+			if (at->responses.empty())
+				break;
+			at = at->responses.data();
 		};
+		std::cout << '\n';
 
+		if (this->moves.empty())
+		{
+			return std::nullopt;
+		}
+		else
+		{
+			return this->moves.front().move.move;
+		};
+	};
 
-		return this->moves.front().move.move;
+	size_t MoveTree::tree_size() const
+	{
+		size_t n = this->moves.size();
+		for (auto& v : this->moves)
+		{
+			n += v.tree_size();
+		};
+		return n;
+	};
+
+	size_t MoveTree::total_outcomes() const
+	{
+		size_t n = 0;
+		for (auto& v : this->moves)
+		{
+			n += v.total_outcomes();
+		};
+		if (n == 0)
+		{
+			n = this->moves.size();
+		};
+		return n;
 	};
 
 };
