@@ -519,6 +519,47 @@ namespace chess
 	{
 		using namespace chess;
 
+		if (_piece.color() == Color::white)
+		{
+			if (_piece.rank() < Rank::r7)
+			{
+				if (_piece.file() != File::a)
+				{
+					if (_board.get(next(_piece.position(), -1, 1)) == Piece(Piece::pawn, Color::black))
+					{
+						return true;
+					};
+				};
+				if (_piece.file() != File::h)
+				{
+					if (_board.get(next(_piece.position(), 1, 1)) == Piece(Piece::pawn, Color::black))
+					{
+						return true;
+					};
+				};
+			};
+		}
+		else
+		{
+			if (_piece.rank() > Rank::r2)
+			{
+				if (_piece.file() != File::a)
+				{
+					if (_board.get(next(_piece.position(), -1, -1)) == Piece(Piece::pawn, Color::white))
+					{
+						return true;
+					};
+				};
+				if (_piece.file() != File::h)
+				{
+					if (_board.get(next(_piece.position(), 1, -1)) == Piece(Piece::pawn, Color::white))
+					{
+						return true;
+					};
+				};
+			};
+		};
+
 		const auto _end = _board.pend();
 		for (auto it = _board.pbegin(); it != _end; ++it)
 		{
@@ -527,12 +568,6 @@ namespace chess
 			{
 				switch (p.type())
 				{
-				case PieceType::pawn:
-					if (is_piece_attacked_by_pawn(_board, _piece, p))
-					{
-						return true;
-					};
-					break;
 				case PieceType::knight:
 					if (is_piece_attacked_by_knight(_board, _piece, p))
 					{
