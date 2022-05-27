@@ -505,7 +505,8 @@ namespace chess
 			};
 
 			if (_board.is_empty((File::f, _dest.rank()))
-				&& _board.is_empty((File::g, _dest.rank())))
+				&& _board.is_empty((File::g, _dest.rank()))
+				&& can_castle_kingside(_board, _piece.color()))
 			{
 				_buffer.write(_position, _dest);
 			};
@@ -524,7 +525,8 @@ namespace chess
 
 			if (_board.is_empty((File::d, _dest.rank()))
 				&& _board.is_empty((File::c, _dest.rank()))
-				&& _board.is_empty((File::b, _dest.rank())))
+				&& _board.is_empty((File::b, _dest.rank()))
+				&& can_castle_queenside(_board, _piece.color()))
 			{
 				_buffer.write(_position, _dest);
 			};
@@ -618,17 +620,6 @@ namespace chess
 		};
 	};
 
-
-	bool is_check(const chess::Board& _board, const chess::Color _forPlayer)
-	{
-		using namespace chess;
-		auto p = _board.pfind(chess::PieceType::king, _forPlayer);
-		if (p != _board.pend())
-		{
-			return is_piece_attacked(_board, *p);
-		};
-		return true;
-	};
 	void get_moves(const chess::Board& _board, const chess::Color _forPlayer, MoveBuffer& _buffer, const bool _isCheck)
 	{
 		static thread_local auto _bufferData = std::array<chess::Move, 256>{};
@@ -663,6 +654,50 @@ namespace chess
 				_buffer.write(*p);
 			};
 		};
+	};
+
+
+
+	bool can_castle_kingside(const chess::Board& _board, chess::Color _player)
+	{
+		if (!_board.get_castle_kingside_flag(_player))
+		{
+			return false;
+		};
+
+		if (is_check(_board, _player))
+		{
+			return false;
+		};
+
+		return true;
+	};
+	bool can_castle_queenside(const chess::Board& _board, chess::Color _player)
+	{
+		if (!_board.get_castle_kingside_flag(_player))
+		{
+			return false;
+		};
+
+		if (is_check(_board, _player))
+		{
+			return false;
+		};
+
+		return true;
+	};
+
+
+
+	bool is_check(const chess::Board& _board, const chess::Color _forPlayer)
+	{
+		using namespace chess;
+		auto p = _board.pfind(chess::PieceType::king, _forPlayer);
+		if (p != _board.pend())
+		{
+			return is_piece_attacked(_board, *p);
+		};
+		return true;
 	};
 	bool is_checkmate(const chess::Board& _board, const chess::Color _forPlayer)
 	{

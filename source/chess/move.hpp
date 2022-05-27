@@ -67,6 +67,13 @@ namespace chess
 
 	void get_moves(const chess::Board& _board, const chess::Color _forPlayer, MoveBuffer& _buffer, const bool _isCheck = false);
 
+
+	bool can_castle_kingside(const chess::Board& _board, chess::Color _player);
+	bool can_castle_queenside(const chess::Board& _board, chess::Color _player);
+
+
+
+
 	bool is_check(const chess::Board& _board, const chess::Color _forPlayer);
 	bool is_checkmate(const chess::Board& _board, const chess::Color _forPlayer);
 

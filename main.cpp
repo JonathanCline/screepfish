@@ -297,18 +297,13 @@ public:
 		this->account_event_stream_.start();
 
 		{
-			bool _hasAIGame = false;
 			auto _games = this->account_client_.get_ongoing_games();
 			for (auto& v : _games->nowPlaying)
 			{
-				if (v.opponent.ai)
-				{
-					_hasAIGame = true;
-				};
 				this->game_streams_.emplace_back(this->env_.token.c_str(), v.gameId, this->account_info_.id);
 			};
 
-			if (!_hasAIGame && _games->nowPlaying.empty())
+			if (_games->nowPlaying.empty())
 			{
 				using namespace std::chrono_literals;
 			
@@ -317,7 +312,7 @@ public:
 				_params.days.reset();
 				_params.clock.emplace();
 				_params.clock->set_initial(1min);
-				_params.clock->set_increment(1min);
+				_params.clock->set_increment(4s);
 				auto _result = this->account_client_.challenge_ai(_params);
 			};
 		};
