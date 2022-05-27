@@ -560,7 +560,53 @@ void perf_test()
 };
 
 
+void local_game()
+{
+	using namespace chess;
+	auto _board = Board();
+	reset_board(_board);
 
+	auto e0 = sch::ScreepFish();
+	auto e1 = sch::ScreepFish();
+
+	auto _move = Move();
+
+	e0.start(_board, Color::white);
+	if (const auto m = e0.get_move(); m) {
+		_move = *m;
+	};
+	
+	_board.move(_move);
+	e1.start(_board, Color::black);
+
+	while (true)
+	{
+		e1.set_board(_board);
+		if (auto m = e1.get_move(); m)
+		{
+			_move = *m;
+		}
+		else
+		{
+			std::cout << "white wins\n";
+			break;
+		};
+		_board.move(_move);
+
+		e0.set_board(_board);
+		if (auto m = e0.get_move(); m)
+		{
+			_move = *m;
+		}
+		else
+		{
+			std::cout << "black wins\n";
+			break;
+		};
+		_board.move(_move);
+	};
+	exit(0);
+};
 
 
 
