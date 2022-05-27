@@ -104,16 +104,23 @@ namespace sch
 					auto _depth = 4;
 
 					// Bump depth as many moves will be discarded
-					if (is_check(_board, _myColor))
-					{
-						_depth += 1;
-					};
-					// Bump depth if no queens on board
-					if (_board.pfind(Piece::queen, Color::white) == _board.pend() && _board.pfind(Piece::queen, Color::black) == _board.pend())
-					{
-						_depth += 1;
-					};
+					const bool _isCheck = is_check(_board, _myColor);
 
+					if (_isCheck)
+					{
+						_depth += 1;
+					};
+					
+					// Bump depth if no queens on board
+					if (_board.pfind(Piece::queen, Color::white) == _board.pend() && _board.pfind(Piece::queen, Color::black) == _board.pend()
+						&& _pieceCount <= 15)
+					{
+						_depth += 1;
+					};
+					if (_pieceCount <= 8 && !_isCheck)
+					{
+						_depth += 1;
+					};
 
 					const auto _clock = std::chrono::steady_clock{};
 					

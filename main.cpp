@@ -315,7 +315,7 @@ public:
 				using namespace std::chrono_literals;
 			
 				auto _params = lichess::ChallengeAIParams{};
-				_params.level = 3;
+				_params.level = 4;
 				_params.days.reset();
 				_params.clock.emplace();
 				_params.clock->set_initial(1min);
@@ -557,8 +557,6 @@ void perf_test()
 	std::cout << "rt0 : " << rt0 << '\n';
 	std::cout << "rt1 : " << rt1 << '\n';
 	std::cout << "drt : " << (int64_t)rt1 - (int64_t)rt0 << '\n';
-
-	exit(0);
 };
 
 

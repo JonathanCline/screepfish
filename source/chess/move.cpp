@@ -62,6 +62,7 @@ namespace chess
 	};
 
 
+	
 	consteval BitBoardCX compute_pawn_attack_squares(Position _pos, Color _color)
 	{
 		auto bb = BitBoardCX();
@@ -89,7 +90,6 @@ namespace chess
 		};
 		return bb;
 	};
-
 	consteval auto compute_pawn_attack_squares(Color _color)
 	{
 		std::array<BitBoardCX, 64> bbs{};
@@ -121,6 +121,58 @@ namespace chess
 		{
 			return black_pawn_attack_squares_v[static_cast<size_t>(_pos)];
 		};
+	};
+
+
+
+	consteval BitBoardCX compute_knight_attack_squares(Position _pos)
+	{
+		auto bb = BitBoardCX();
+		constexpr auto _deltaPairs = std::array
+		{
+			std::pair{ 1, 2 },
+			std::pair{ 1, -2 },
+
+			std::pair{ 2, 1 },
+			std::pair{ 2, -1 },
+
+			std::pair{ -1, 2 },
+			std::pair{ -1, -2 },
+
+			std::pair{ -2, -1 },
+			std::pair{ -2, 1 },
+		};
+
+		bool _possible = false;
+		Position _nextPos{};
+		for (const auto& [df, dr] : _deltaPairs)
+		{
+			_nextPos = trynext(_pos, df, dr, _possible);
+			if (_possible)
+			{
+				bb.set(_nextPos);
+			};
+		};
+
+		return bb;
+	};
+	consteval auto compute_knight_attack_squares()
+	{
+		std::array<BitBoardCX, 64> bbs{};
+		auto it = bbs.begin();
+		for (auto& v : positions_v)
+		{
+			*it = compute_knight_attack_squares(v);
+			++it;
+		};
+		return bbs;
+	};
+
+	// Precompute attack squares
+	constexpr inline auto knight_attack_squares_v = compute_knight_attack_squares();
+	constexpr inline auto get_knight_attack_squares(Position _pos)
+	{
+		return knight_attack_squares_v[static_cast<size_t>(_pos)];
 	};
 
 
@@ -160,7 +212,7 @@ namespace chess
 		return false;
 	};
 
-	bool is_piece_attacked_by_knight(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
+	bool is_piece_attacked_by_knight_old(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
 	{
 		using namespace chess;
 
@@ -194,6 +246,14 @@ namespace chess
 
 		return false;
 	};
+	bool is_piece_attacked_by_knight(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
+	{
+		using namespace chess;
+		
+		const auto _attackBB = get_knight_attack_squares(_byPiece.position());
+		return _attackBB.test(_piece.position());
+	};
+	
 	bool is_piece_attacked_by_bishop(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
 	{
 		using namespace chess;
