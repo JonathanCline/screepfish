@@ -56,20 +56,11 @@ private:
 			_board.move_piece(_move.from(), _move.to(), _move.promotion());
 		};
 
-		class LichessGame : public chess::IGame
-		{
-		public:
-
-			LichessGame() = default;
-		};
-
-		auto _game = LichessGame();
-		_game.board_ = _board;
 		this->engine_.set_board(_board);
 
 		if (*this->my_turn_)
 		{
-			const auto _response = this->engine_.play_turn(_game);
+			const auto _response = this->engine_.get_move();
 			bool _passed = false;
 			if (_response)
 			{
@@ -112,8 +103,23 @@ private:
 			this->my_color_ = chess::Color::white;
 		};
 
+		// Lichess likes to give startpos as an initial fen string, switch that to actual fen if recieved
+		std::string_view _fen = _event.initialFen;
+		if (_fen == "startpos")
+		{
+			_fen = chess::standard_start_pos_fen_v;
+		};
+
+		// Parse fen into board state
+		auto _board = chess::parse_fen(_fen);
+		if (!_board)
+		{
+			std::cout << _event.initialFen << '\n';
+			abort();
+		};
+
 		// Tell the engine which color it is playing as
-		this->engine_.set_color(*this->my_color_);
+		this->engine_.start(*_board, *this->my_color_);
 
 		// Count played moves
 		auto _movesPlayedCount = std::ranges::count(_event.state.moves, ' ');
@@ -192,6 +198,7 @@ public:
 	};
 	void set_close()
 	{
+		this->engine_.stop();
 		this->keep_open_ = false;
 	};
 
