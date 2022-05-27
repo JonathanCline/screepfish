@@ -619,7 +619,7 @@ void local_game()
 
 	terminal_open();
 	
-	terminal_set("window.size=8x8 window.cellsize=32x32");
+	terminal_set("window.size=8x8; window.cellsize=32x32");
 
     // Printing text
 
