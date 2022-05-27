@@ -223,6 +223,18 @@ namespace chess
 		chess::Rank::r8,
 	};
 
+	constexpr auto rev_ranks_v = std::array
+	{
+		chess::Rank::r8,
+		chess::Rank::r7,
+		chess::Rank::r6,
+		chess::Rank::r5,
+		chess::Rank::r4,
+		chess::Rank::r3,
+		chess::Rank::r2,
+		chess::Rank::r1,
+	};
+
 	// Rank math operators
 	constexpr Rank operator+(Rank _rank, int8_t _count)
 	{

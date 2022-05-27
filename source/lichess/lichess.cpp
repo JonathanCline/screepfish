@@ -94,11 +94,6 @@ namespace lichess
 			
 				
 			template <typename T, typename V>
-			requires requires (httplib::Params& _params, const T* _class,
-				const named_member<T, V>& _info, ToParamMemberOp _op)
-			{
-				_params.insert(std::make_pair(std::string(_info.name()), _op.pstr(_info.get(_class))));
-			}
 			void operator()(httplib::Params& _params, const T* _class, const named_member<T, V>& _info) const
 			{
 				auto& v = _info.get(_class);

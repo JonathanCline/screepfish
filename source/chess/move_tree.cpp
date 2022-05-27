@@ -27,14 +27,14 @@ namespace chess
 				// Rate the move
 				auto _newBoard = _board;
 				_newBoard.move(*p);
-				const auto _hash = chess::hash(_newBoard, _newBoard.get_toplay() == Color::black);
+				//const auto _hash = chess::hash(_newBoard, _newBoard.get_toplay() == Color::black);
 
 				const auto _rating = rate_move(_newBoard, *p, !this->move_played_by);
 
 				// Assign values
 				it->move_played_by = !this->move_played_by;
 				it->move = RatedMove{ *p, _rating };
-				it->hash = _hash;
+				//it->hash = _hash;
 
 				// Next
 				++it;
@@ -106,6 +106,7 @@ namespace chess
 	{
 		// Apply our move.
 		auto& _board = this->board;
+
 
 		if (this->moves.empty())
 		{

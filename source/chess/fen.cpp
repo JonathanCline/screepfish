@@ -330,7 +330,7 @@ namespace chess
 		std::string s{};
 	
 		// Add ranks
-		for (auto& r : ranks_v | std::views::reverse)
+		for (auto& r : rev_ranks_v)
 		{
 			if (!s.empty())
 			{

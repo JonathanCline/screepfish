@@ -70,6 +70,6 @@ namespace chess
 	bool is_check(const chess::Board& _board, const chess::Color _forPlayer);
 	bool is_checkmate(const chess::Board& _board, const chess::Color _forPlayer);
 
-	chess::Rating rate_move(const chess::Board& _board, const chess::Move& _move, chess::Color _forPlayer);
+	chess::Rating rate_move(const chess::Board& _board, const chess::Move& _move, chess::Color _forPlayer, const bool _isCheck = false);
 
 };

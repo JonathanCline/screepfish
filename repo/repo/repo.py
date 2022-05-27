@@ -30,7 +30,8 @@ defs = []
 
 defs.extend([
 	# TODO : Improve this please.
-	repo.CMakeDef("HTTPLIB_INSTALL", "OFF")
+	repo.CMakeDef("HTTPLIB_INSTALL", "OFF"),
+	repo.CMakeDef("CMAKE_BUILD_TYPE", "release")
 ])
 
 rman = repo.RepoMan()

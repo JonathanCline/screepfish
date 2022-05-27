@@ -317,7 +317,7 @@ public:
 				_params.days.reset();
 				_params.clock.emplace();
 				_params.clock->set_initial(1min);
-				_params.clock->set_increment(1s);
+				_params.clock->set_increment(1min);
 				auto _result = this->account_client_.challenge_ai(_params);
 			};
 		};

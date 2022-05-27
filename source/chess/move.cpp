@@ -636,6 +636,11 @@ namespace chess
 
 		using namespace chess;
 
+		if (_board.pfind(Piece::king, _forPlayer) == _board.pend())
+		{
+			return;
+		};
+
 		const auto _bufferStart = _movesBuffer.head();
 		{
 			const auto _end = _board.pend();
@@ -708,17 +713,17 @@ namespace chess
 	};
 
 
-	chess::Rating rate_move(const chess::Board& _board, const chess::Move& _move, chess::Color _forPlayer)
+	chess::Rating rate_move(const chess::Board& _board, const chess::Move& _move, chess::Color _forPlayer, const bool _isCheck)
 	{
 		using namespace chess;
 
 		auto _rating = Rating(0);
+
 		if (is_checkmate(_board, !_forPlayer))
 		{
-			_rating += 100000;
-			return _rating;
+			return 100000.0f;
 		};
-		
+
 		if (_board.get(_move.from()) == Piece::king)
 		{
 			if (_board.get_castle_kingside_flag(_forPlayer))
@@ -733,6 +738,22 @@ namespace chess
 
 		for (auto& v : _board.pieces())
 		{
+			if (v == Piece::pawn)
+			{
+				int _closeToPromote = 0;
+				if (v.color() == Color::white)
+				{
+					_closeToPromote =
+						(int)v.rank();
+				}
+				else
+				{
+					_closeToPromote =
+						-((int)v.rank() - (int)Rank::r8);
+				};
+				_rating += ((float)_closeToPromote / 1000.0f);				
+			}
+
 			if (v.color() == _forPlayer)
 			{
 				_rating += material_value(v.type());
