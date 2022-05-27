@@ -371,6 +371,48 @@ private:
 };
 
 
+
+auto average_runtime(auto&& _op, size_t _times)
+{
+	namespace ch = std::chrono;
+	using clk = ch::steady_clock;
+	using dur = ch::duration<double>;
+
+	auto _runs = std::vector<dur>(_times, dur{});
+
+	for (size_t n = 0; n != _times; ++n)
+	{
+		const auto t0 = clk::now();
+		_op();
+		const auto t1 = clk::now();
+		_runs[n] = ch::duration_cast<dur>(t1 - t0);
+		std::this_thread::yield();
+	};
+	
+	dur _avgDur = std::accumulate(_runs.begin(), _runs.end(), dur{});
+	return _avgDur / _runs.size();
+};
+
+auto count_runs_for(auto&& _op, std::chrono::nanoseconds _maxTime)
+{
+	namespace ch = std::chrono;
+	using clk = ch::steady_clock;
+	
+	size_t n = 0;
+	const auto tEnd = clk::now() + _maxTime;
+	do
+	{
+		_op();
+		++n;
+	}
+	while (clk::now() < tEnd);
+
+	return n;
+};
+
+
+
+
 bool run_tests()
 {
 	bool _runOnFinish = true;
@@ -458,11 +500,66 @@ bool run_tests()
 		};
 	};
 
+	// Queen blocked rating
+	{
+		Rating rt0 = 0.0f;
+		Rating rt1 = 0.0f;
+
+		{
+			auto _board = Board();
+			reset_board(_board);
+			rt0 = rate_board(_board, Color::white);
+		};
+
+		{
+			auto _board = Board();
+			reset_board(_board);
+			_board.erase_piece((File::d, Rank::r2));
+			_board.erase_piece((File::d, Rank::r7));
+			rt1 = rate_board(_board, Color::white);
+		};
+
+		// rt1 should be slightly higher
+		if (rt0 >= rt1)
+		{
+			std::cout << rt1 << " should be greater than " << rt0 << '\n';
+			abort();
+		};
+	};
 
 
 	return _runOnFinish;
 };
 
+
+void perf_test()
+{
+	using namespace chess;
+	
+	auto b = Board();
+	reset_board(b);
+
+	const auto kp = BoardPiece(Piece::king, Color::white, (File::e, Rank::r1));
+	const auto pp = BoardPiece(Piece::pawn, Color::black, (File::e, Rank::r7));
+
+	const auto fn0 = [&b, kp]()
+	{
+		is_piece_attacked_old(b, kp);
+	};
+	const auto fn1 = [&b, kp]()
+	{
+		is_piece_attacked(b, kp);
+	};
+
+	using namespace std::chrono_literals;
+	const auto rt0 = count_runs_for(fn0, 1s);
+	const auto rt1 = count_runs_for(fn1, 1s);
+	std::cout << "rt0 : " << rt0 << '\n';
+	std::cout << "rt1 : " << rt1 << '\n';
+	std::cout << "drt : " << (int64_t)rt1 - (int64_t)rt0 << '\n';
+
+	exit(0);
+};
 
 
 
@@ -473,6 +570,7 @@ bool run_tests()
 int main(int _nargs, const char* _vargs[])
 {
 	if (!run_tests()) { return 0; };
+	perf_test();
 
 	if (_nargs == 0 || !_vargs || !_vargs[0])
 	{

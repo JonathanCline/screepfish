@@ -174,19 +174,30 @@ namespace chess
 	private:
 		using size_type = uint64_t;
 		
+		constexpr size_type toindex(Position _pos) const
+		{
+			return static_cast<size_type>(_pos);
+		};
 		constexpr size_type toindex(File _file, Rank _rank) const
 		{
-			return (jc::to_underlying(_file) << 3) | jc::to_underlying(_rank);
+			return this->toindex(Position(_file, _rank));
 		};
+		
+
 		constexpr Position topos(size_type _index) const
 		{
 			const auto _rank = Rank(_index  & 0b0000'0111);
 			const auto _file = File((_index & 0b0011'1000) >> 3);
 			return Position(_file, _rank);
 		};
+
 		constexpr size_type bitmask(size_type _index) const
 		{
 			return size_type(1) << _index;
+		};
+		constexpr size_type bitmask(Position _pos) const
+		{
+			return this->bitmask(this->toindex(_pos));
 		};
 		constexpr size_type bitmask(File _file, Rank _rank) const
 		{
@@ -204,6 +215,11 @@ namespace chess
 		{
 			this->bits_ |= this->bitmask(_file, _rank);
 		};
+		constexpr void set(Position _pos)
+		{
+			this->bits_ |= this->bitmask(_pos);
+		};
+
 		constexpr void reset(File _file, Rank _rank)
 		{
 			this->bits_ &= ~this->bitmask(_file, _rank);
@@ -224,9 +240,14 @@ namespace chess
 				this->reset(_file, _rank);
 			};
 		};
+	
 		constexpr bool test(File _file, Rank _rank) const
 		{
 			return this->bits_ & this->bitmask(_file, _rank);
+		};
+		constexpr bool test(Position _pos) const
+		{
+			return this->bits_ & this->bitmask(_pos);
 		};
 
 		constexpr bool all() const

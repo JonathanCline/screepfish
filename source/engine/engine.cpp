@@ -85,6 +85,10 @@ namespace sch
 	void ScreepFish::thread_main(std::stop_token _stop)
 	{
 		this->init_barrier_.arrive_and_wait();
+
+		// Storage for tracking calcultion times
+		auto _times = std::vector<std::chrono::steady_clock::duration>();
+
 		while (!_stop.stop_requested())
 		{
 			{
@@ -96,16 +100,23 @@ namespace sch
 					const auto& _board = this->board_;
 					const auto& _myColor = this->my_color_;
 					
+					const size_t _pieceCount = _board.pieces().size();
+					auto _depth = 4;
+
+					// Bump depth as many moves will be discarded
 					if (is_check(_board, _myColor))
 					{
-						std::cout << "Board is in check!\n";
+						_depth += 1;
+					};
+					// Bump depth if no queens on board
+					if (_board.pfind(Piece::queen, Color::white) == _board.pend() && _board.pfind(Piece::queen, Color::black) == _board.pend())
+					{
+						_depth += 1;
 					};
 
+
 					const auto _clock = std::chrono::steady_clock{};
-
-					const size_t _pieceCount = _board.pieces().size();
-
-					const auto _depth = (_pieceCount < 8) ? 5 : 4;
+					
 
 					const auto t0 = _clock.now();
 					auto _tree = this->build_move_tree(_board, _myColor, _depth);
@@ -117,6 +128,8 @@ namespace sch
 					const auto tdA = t1 - t0;
 					const auto tdB = t2 - t1;
 					const auto td = t2 - t0;
+
+					_times.push_back(td);
 
 					constexpr auto fn = [](auto v)
 					{
@@ -132,6 +145,16 @@ namespace sch
 
 			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		};
+
+		using dur = std::chrono::duration<double>;
+		dur _avgDur{};
+		for (auto& v : _times)
+		{
+			_avgDur += std::chrono::duration_cast<dur>(v);
+		};
+		_avgDur /= _times.size();
+
+		std::cout << "Average calculation time = " << _avgDur << '\n';
 	};
 
 
