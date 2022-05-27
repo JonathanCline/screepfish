@@ -6,8 +6,7 @@
 #include "env.hpp"
 
 #include "lichess/lichess.hpp"
-
-#include "BearLibTerminal.h"
+#include "terminal/terminal.hpp"
 
 #include "utility/string.hpp"
 #include "utility/system.hpp"
@@ -17,6 +16,7 @@
 #include <cassert>
 #include <optional>
 #include <iostream>
+#include <filesystem>
 
 #include <jclib/functor.h>
 #include <sstream>
@@ -571,36 +571,14 @@ void perf_test()
 	};
 };
 
-
-void write_board_to_terminal(const chess::Board& _board)
-{
-	bool _whiteSquare = false;
-	for (auto& _pos : chess::rev_positions_v)
-	{
-		const auto r = (int)_pos.rank();
-		const auto f = (int)_pos.file();
-
-		if(_whiteSquare)
-		{
-			terminal_bkcolor("white");
-		}
-		else
-		{
-			terminal_bkcolor("black");
-		};
-		terminal_put(f, r, 'x');
-
-		_whiteSquare = !_whiteSquare;
-	};
-
-	terminal_refresh();
-};
-
-void local_game()
+void local_game(const char* _assetsDirectoryPath)
 {
 	using namespace chess;
+	auto _terminal = chess::Terminal(_assetsDirectoryPath);
+
 	auto _board = Board();
 	reset_board(_board);
+	_terminal.set_board(_board);
 
 	auto e0 = sch::ScreepFish();
 	auto e1 = sch::ScreepFish();
@@ -613,32 +591,17 @@ void local_game()
 	};
 	
 	_board.move(_move);
+	_terminal.set_board(_board);
 	e1.start(_board, Color::black);
-
-
-
-	terminal_open();
-	
-	terminal_set("window.size=8x8; window.cellsize=32x32");
-
-    // Printing text
-
-    terminal_print(1, 1, "Chess!");
-    terminal_refresh();
 
 	while (true)
 	{
-		if (const auto ev = terminal_read(); ev != 0)
+		if (_terminal.should_close())
 		{
-			if (ev == TK_CLOSE)
-			{
-				break;
-			};
-			//terminal_read();
+			break;
 		};
 
-
-		write_board_to_terminal(_board);
+		e1.set_board(_board);
 		if (auto m = e1.get_move(); m)
 		{
 			_move = *m;
@@ -648,9 +611,10 @@ void local_game()
 			std::cout << "white wins\n";
 			break;
 		};
-		_board.move(_move);
 
-		write_board_to_terminal(_board);
+		_board.move(_move);
+		_terminal.set_board(_board);
+
 		e0.set_board(_board);
 		if (auto m = e0.get_move(); m)
 		{
@@ -661,10 +625,10 @@ void local_game()
 			std::cout << "black wins\n";
 			break;
 		};
-		_board.move(_move);
-	};  
 
-    terminal_close();
+		_board.move(_move);
+		_terminal.set_board(_board);
+	};  
 
 	exit(0);
 };
@@ -686,20 +650,24 @@ void local_game()
 
 int main(int _nargs, const char* _vargs[])
 {
-	if (!run_tests()) { return 1; };
-	//perf_test();
-	local_game();
 
-	
 	if (_nargs == 0 || !_vargs || !_vargs[0])
 	{
 		std::cout << "No arguments provided, not even exec path1!\n";
 		exit(1);
 	};
 
+	if (!run_tests()) { return 1; };
+	{
+		const auto p = (std::filesystem::path(_vargs[0]).parent_path() / "assets" / "chess").generic_string();
+		std::cout << p << '\n';
+		local_game(p.c_str());
+	};
+	
 	const auto _env = sch::load_env(_vargs[0]);
 	auto _accountManager = AccountManager(_env);
 	_accountManager.start();
+
 
 	while (true)
 	{

@@ -43,7 +43,7 @@ namespace chess
 		return c - '0';
 	};
 
-	inline char piece_to_char(PieceType p)
+	char piece_to_char(PieceType p)
 	{
 		switch (p)
 		{
@@ -65,10 +65,10 @@ namespace chess
 			abort();
 		};
 	};
-	inline char piece_to_char(Piece p)
+	char piece_to_char(Piece p)
 	{
 		auto c = piece_to_char(p.type());
-		if (p.color() == Color::white)
+		if (p != Piece::none && p.color() == Color::white)
 		{
 			c = (char)toupper(c);
 		};

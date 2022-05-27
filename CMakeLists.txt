@@ -31,7 +31,17 @@ add_custom_target(
 	VERBATIM
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE httplib jclib nlohmann_json BearLibTerminal)
+# Make assets link
+add_custom_target(
+	assets_link
+	ALL
+	COMMAND ${MAKE_LINK_SCRIPT} ${CMAKE_CURRENT_SOURCE_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets --quiet
+	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+	VERBATIM
+)
+
+
+target_link_libraries(${PROJECT_NAME} PRIVATE httplib jclib nlohmann_json BearLibTerminal lodepng)
 target_include_directories(${PROJECT_NAME} PRIVATE source)
 
 if (CLANG STREQUAL "ON")
@@ -40,3 +50,4 @@ endif()
 
 install(TARGETS ${PROJECT_NAME} DESTINATION .)
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/env" DESTINATION .)
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets" DESTINATION .)
