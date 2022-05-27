@@ -116,6 +116,7 @@ namespace sch
 					const auto td = t1 - t0;
 					std::cout << "Delta time : " << std::chrono::duration_cast<std::chrono::duration<double>>(td) << '\n';
 					std::cout << _board << '\n';
+					std::cout << _board.get_white_piece_bitboard() << '\n';
 
 					this->best_move_ = _move;
 				};

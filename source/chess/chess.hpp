@@ -634,11 +634,11 @@ namespace chess
 			// Set new piece bit
 			if (pIt->color() == Color::white)
 			{
-				this->bpieces_.set(_to);
+				this->wpieces_.set(_to);
 			}
 			else
 			{
-				this->wpieces_.set(_to);
+				this->bpieces_.set(_to);
 			};
 
 			t = f;
@@ -1054,6 +1054,16 @@ namespace chess
 		{
 			this->halfmove_count_ = _count;
 		};
+
+		BitBoard get_black_piece_bitboard() const
+		{
+			return this->bpieces_;
+		};
+		BitBoard get_white_piece_bitboard() const
+		{
+			return this->wpieces_;
+		};
+
 
 
 		const std::span<const BoardPiece> pieces() const

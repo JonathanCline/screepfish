@@ -5,6 +5,7 @@
 #include "position.hpp"
 
 #include <bitset>
+#include <iostream>
 
 namespace chess
 {
@@ -163,6 +164,10 @@ namespace chess
 
 		std::bitset<64> bits_;
 	};
+
+	std::ostream& operator<<(std::ostream& _ostr, const BitBoard& _value);
+
+
 
 	class BitBoardCX
 	{
