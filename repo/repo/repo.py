@@ -1,9 +1,11 @@
 import os
 from pathlib import Path
+import platform as platform_lib
 import re
+import sys
 import hubris
 import hubris.repoman as repo
-import hubris.platform as platform 
+import hubris.platform as platform
 
 build_root = "_build"
 install_root = "_install"
@@ -28,10 +30,19 @@ deps = {
 
 defs = []
 
+# Set target system variable
+if platform_lib.system() == "Windows":
+	archBit, o = platform_lib.architecture()
+	if archBit.startswith("64"):
+		defs.append(repo.CMakeDef("TARGET_SYSTEM", "Win64"))
+	else:
+		defs.append(repo.CMakeDef("TARGET_SYSTEM", "Win32"))
+
 defs.extend([
 	# TODO : Improve this please.
 	repo.CMakeDef("HTTPLIB_INSTALL", "OFF"),
-	repo.CMakeDef("CMAKE_BUILD_TYPE", "release")
+	repo.CMakeDef("CMAKE_BUILD_TYPE", "release"),
+	repo.CMakeDef("CLANG", "ON")
 ])
 
 rman = repo.RepoMan()

@@ -4,7 +4,7 @@
 
 namespace chess
 {
-	void MoveTreeNode::evaluate_next(const Board& _previousBoard)
+	void MoveTreeNode::evaluate_next(const Board& _previousBoard, bool _followChecks)
 	{
 		// Apply our move.
 		auto _board = _previousBoard;
@@ -36,6 +36,11 @@ namespace chess
 				it->move = RatedMove{ *p, _rating };
 				//it->hash = _hash;
 
+				if (_followChecks && is_check(_newBoard, it->move_played_by))
+				{
+					it->evaluate_next(_board, false);
+				};
+
 				// Next
 				++it;
 			};
@@ -46,7 +51,7 @@ namespace chess
 			// Propogate to children
 			for (auto& _child : this->responses)
 			{
-				_child.evaluate_next(_board);
+				_child.evaluate_next(_board, _followChecks);
 			};
 		};
 
@@ -143,7 +148,7 @@ namespace chess
 			// Propogate to children
 			for (auto& _child : this->moves)
 			{
-				_child.evaluate_next(_board);
+				_child.evaluate_next(_board, false);
 			};
 		};
 
@@ -154,25 +159,24 @@ namespace chess
 			});
 	};
 
-	std::optional<Move> MoveTree::best_move()
+	std::optional<Move> MoveTree::best_move(std::mt19937& _rnd)
 	{
-		MoveTreeNode* at = this->moves.data();
-		while (at)
-		{
-			std::cout << at->move.move << ", ";
-			if (at->responses.empty())
-				break;
-			at = at->responses.data();
-		};
-		std::cout << '\n';
-
 		if (this->moves.empty())
 		{
 			return std::nullopt;
 		}
 		else
 		{
-			return this->moves.front().move.move;
+			auto& _best = this->moves.front().move;
+			const auto it = std::ranges::find_if(this->moves, [&_best](MoveTreeNode& v)
+				{
+					return v.move.rating != _best.rating;
+				});
+
+		 	const auto _rndNum = _rnd();
+			const auto _rndIndex = _rndNum % (it - this->moves.begin());
+			const auto _rndIter = this->moves.begin() + _rndIndex;
+			return _rndIter->move.move;
 		};
 	};
 

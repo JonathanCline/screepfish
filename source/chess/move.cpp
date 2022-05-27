@@ -122,6 +122,62 @@ namespace chess
 			return black_pawn_attack_squares_v[static_cast<size_t>(_pos)];
 		};
 	};
+	
+	
+	consteval BitBoardCX compute_pawn_move_squares(Position _pos, Color _color)
+	{
+		auto bb = BitBoardCX();
+		if (_color == Color::white)
+		{
+			if (_pos.rank() == Rank::r2)
+			{
+				bb.set(_pos.file(), Rank::r4);
+			};
+			bb.set(next((_pos.file(), _pos.rank()), 0, 1));
+		}
+		else
+		{
+			if (_pos.rank() == Rank::r7)
+			{
+				bb.set(_pos.file(), Rank::r5);
+			};
+			bb.set(next((_pos.file(), _pos.rank()), 0, -1));
+		};
+
+		return bb;
+	};
+	consteval auto compute_pawn_move_squares(Color _color)
+	{
+		std::array<BitBoardCX, 64> bbs{};
+		auto it = bbs.begin();
+		for (auto& v : positions_v)
+		{
+			if (v.rank() == Rank::r1 || v.rank() == Rank::r8)
+			{
+				++it;
+				continue;
+			};
+			*it = compute_pawn_move_squares(v, _color);
+			++it;
+		};
+		return bbs;
+	};
+
+	// Precompute move squares
+	constexpr inline auto white_pawn_move_squares_v = compute_pawn_move_squares(Color::white);
+	constexpr inline auto black_pawn_move_squares_v = compute_pawn_move_squares(Color::black);
+
+	constexpr inline auto get_pawn_movement_squares(Position _pos, Color _color)
+	{
+		if (_color == Color::white)
+		{
+			return white_pawn_move_squares_v[static_cast<size_t>(_pos)];
+		}
+		else
+		{
+			return black_pawn_move_squares_v[static_cast<size_t>(_pos)];
+		};
+	};
 
 
 
@@ -557,9 +613,9 @@ namespace chess
 
 		{
 			bool _possible = false;
-			const auto _newPosOne = (_file, trynext(_rank, _deltaRank, _possible));
+			const auto _newPosOne = next((_file, _rank), 0, _deltaRank);
 
-			if (_possible && _board.is_empty(_newPosOne))
+			if (_board.is_empty(_newPosOne))
 			{
 				_buffer.write(Move(_position, _newPosOne,
 					(_newPosOne.rank() == Rank::r8 || _newPosOne.rank() == Rank::r1) ?
@@ -570,8 +626,8 @@ namespace chess
 				// Can move x2 if not blocked
 				if (_doubleDeltaRank)
 				{
-					const auto _newPosTwo = (_file, trynext(_rank, _deltaRank * 2, _possible));
-					if (_possible && _board.is_empty(_newPosTwo))
+					const auto _newPosTwo = next((_file, _rank), 0, _deltaRank * 2);
+					if (_board.is_empty(_newPosTwo))
 					{
 						_buffer.write(Move(_position, _newPosTwo));
 					};

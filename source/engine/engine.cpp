@@ -69,17 +69,22 @@ namespace sch
 		this->board_ = _initialBoard;
 		this->my_color_ = _color;
 
+		std::cout << "About to start screepfish thread" << std::endl;
 		this->thread_ = std::jthread([this](std::stop_token _stop)
 			{
+				std::cout << "Started screepfish thread" << std::endl;
 				this->thread_main(_stop);
 			});
-
 
 		this->init_barrier_.arrive_and_wait();
 	};
 	void ScreepFish::stop()
 	{
 		this->thread_.request_stop();
+		if (this->thread_.joinable())
+		{
+			this->thread_.join();
+		};
 	};
 	
 	void ScreepFish::thread_main(std::stop_token _stop)
@@ -112,11 +117,11 @@ namespace sch
 					};
 					
 					// Bump depth if no queens on board
-					if (_board.pfind(Piece::queen, Color::white) == _board.pend() && _board.pfind(Piece::queen, Color::black) == _board.pend()
-						&& _pieceCount <= 15)
-					{
-						_depth += 1;
-					};
+					//if (_board.pfind(Piece::queen, Color::white) == _board.pend() && _board.pfind(Piece::queen, Color::black) == _board.pend()
+					//	&& _pieceCount <= 15)
+					//{
+					//	_depth += 1;
+					//};
 					if (_pieceCount <= 8 && !_isCheck)
 					{
 						_depth += 1;
@@ -129,7 +134,7 @@ namespace sch
 					auto _tree = this->build_move_tree(_board, _myColor, _depth);
 					
 					const auto t1 = _clock.now();
-					const auto _move = _tree.best_move();
+					const auto _move = _tree.best_move(this->rnd_);
 					const auto t2 = _clock.now();
 
 					const auto tdA = t1 - t0;
@@ -144,8 +149,6 @@ namespace sch
 					};
 
 					std::cout << "Delta time : " << fn(td) << '(' << fn(tdA) << ", " << fn(tdB) << ")\n";
-					std::cout << _board << '\n';
-
 					this->best_move_ = _move;
 				};
 			};
@@ -166,9 +169,14 @@ namespace sch
 
 
 	ScreepFish::ScreepFish() :
-		init_barrier_(2)
+		init_barrier_(2),
+		rnd_(std::random_device{}())
 	{
 		
+	};
+	ScreepFish::~ScreepFish()
+	{
+		this->stop();
 	};
 
 };

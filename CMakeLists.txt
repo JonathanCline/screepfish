@@ -31,9 +31,12 @@ add_custom_target(
 	VERBATIM
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE httplib jclib nlohmann_json)
+target_link_libraries(${PROJECT_NAME} PRIVATE httplib jclib nlohmann_json BearLibTerminal)
 target_include_directories(${PROJECT_NAME} PRIVATE source)
 
+if (CLANG STREQUAL "ON")
+	#target_compile_options(${PROJECT_NAME} PUBLIC -ftime-report)
+endif()
 
 install(TARGETS ${PROJECT_NAME} DESTINATION .)
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/env" DESTINATION .)

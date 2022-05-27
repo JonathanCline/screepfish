@@ -472,7 +472,7 @@ namespace lichess
 	{
 		v = j;
 	}
-	inline std::optional<T> parse_json(const httplib::Response& _response)
+	inline Result<T> parse_json(const httplib::Response& _response)
 	{
 		json _json{};
 		try
@@ -483,7 +483,7 @@ namespace lichess
 		{
 			std::cout << "[ERROR] Failed to parse json from http response\n\t" <<
 				_exc.what() << '\n';
-			return std::nullopt;
+			return FailResult();
 		};
 
 		auto o = T();
@@ -495,7 +495,7 @@ namespace lichess
 		{
 			std::cout << "[ERROR] Failed to parse json object into C++\n\t" <<
 				_exc.what() << '\n';
-			return std::nullopt;
+			return FailResult();
 		};
 		
 		return o;
@@ -510,11 +510,11 @@ namespace lichess
 		auto _result = this->client_.Get("/api/account");
 		if (!_result)
 		{
-			return std::nullopt;
+			return FailResult(_result.error(), 0);
 		};
 		if (_result->status != 200)
 		{
-			return std::nullopt;
+			return FailResult(_result->status);
 		};
 
 		return parse_json<AccountInfo>(*_result);
@@ -525,11 +525,11 @@ namespace lichess
 		auto _result = this->client_.Get("/api/account/playing");
 		if (!_result)
 		{
-			return std::nullopt;
+			return FailResult(_result.error(), 0);
 		};
 		if (_result->status != 200)
 		{
-			return std::nullopt;
+			return FailResult(_result->status);
 		};
 
 		return parse_json<OngoingGames>(*_result);
@@ -540,11 +540,11 @@ namespace lichess
 		auto _result = this->client_.Get("/api/challenge");
 		if (!_result)
 		{
-			return std::nullopt;
+			return FailResult(_result.error(), 0);
 		};
 		if (_result->status != 200)
 		{
-			return std::nullopt;
+			return FailResult(_result->status);
 		};
 
 		return parse_json<Challenges>(*_result);
@@ -560,18 +560,18 @@ namespace lichess
 		auto _result = this->client_.Post("/api/challenge/ai", _httpParams);
 		if (!_result)
 		{
-			return std::nullopt;
+			return FailResult(_result.error(), 0);
 		};
 
 		if (_result->status == 201)
 		{
 			// Ok, no response though
-			return std::nullopt;
+			return ChallengeAI{};
 		}
 		else if (_result->status != 200)
 		{
 			// Error occured
-			return std::nullopt;
+			return FailResult(_result->status);
 		};
 
 		return parse_json<ChallengeAI>(*_result);
@@ -584,13 +584,13 @@ namespace lichess
 		auto _result = this->client_.Post(_endpoint.c_str());
 		if (!_result)
 		{
-			return std::nullopt;
+			return FailResult(_result.error(), 0);
 		};
 
 		if (_result->status != 200)
 		{
 			// Error occured
-			return std::nullopt;
+			return FailResult(_result->status);
 		};
 
 		return parse_json<AcceptChallenge>(*_result);
@@ -610,13 +610,13 @@ namespace lichess
 		auto _result = this->client_.Post(_endpoint.c_str(), _httpParams);
 		if (!_result)
 		{
-			return std::nullopt;
+			return FailResult(_result.error(), 0);
 		};
 
 		if (_result->status != 200)
 		{
 			// Error occured
-			return std::nullopt;
+			return FailResult(_result->status);
 		};
 
 		return parse_json<Move>(*_result);
@@ -629,13 +629,13 @@ namespace lichess
 		auto _result = this->client_.Post(_endpoint.c_str());
 		if (!_result)
 		{
-			return std::nullopt;
+			return FailResult(_result.error(), 0);
 		};
 
 		if (_result->status != 200)
 		{
 			// Error occured
-			return std::nullopt;
+			return FailResult(_result->status);
 		};
 
 		return parse_json<Resign>(*_result);

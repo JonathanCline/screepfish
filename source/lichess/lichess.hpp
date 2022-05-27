@@ -4,6 +4,8 @@
 
 #include "json.hpp"
 
+#include <jclib/maybe.h>
+
 #ifndef CPPHTTPLIB_OPENSSL_SUPPORT
 	#define CPPHTTPLIB_OPENSSL_SUPPORT
 #endif
@@ -378,8 +380,27 @@ namespace lichess
 
 
 
+	struct FailResult
+	{
+
+		FailResult() = default;
+		
+		explicit FailResult(httplib::Error _error, int _status) :
+			error_(_error), status_(_status)
+		{};
+		explicit FailResult(int _status) :
+			error_{}, status_(_status)
+		{};
+
+
+		httplib::Error error_{};
+		int status_ = 0;
+	};
+
 	template <typename T>
-	using Result = std::optional<T>;
+	using Result = jc::maybe<T, FailResult>;
+
+
 
 	class StreamClient
 	{
@@ -421,13 +442,30 @@ namespace lichess
 
 			_data->init_latch.arrive_and_wait();
 
+			std::cout << "[Debug] Entered main stream loop" << std::endl;
+
 			auto _headers = httplib::Headers();
 			_client.set_read_timeout(std::chrono::minutes{ 2 });
+			_client.set_write_timeout(std::chrono::minutes{ 2 });
+			_client.set_connection_timeout(std::chrono::seconds(20));
+			_client.set_keep_alive(true);
+			const auto _isSocketOpen = _client.is_socket_open();
+			std::cout << _isSocketOpen << std::endl;
+			const auto _isValid = _client.is_valid();
+			std::cout << _isValid << std::endl;
 
 			auto _result = _client.Get(_path.c_str(), _headers,
 				[&](const httplib::Response& _response) -> bool
 				{
-					return !_stop.stop_requested();
+					if (_stop.stop_requested())
+					{
+						std::cout << "[Debug] Stop requested" << std::endl;
+						return false;
+					}
+					else
+					{
+						return true;
+					};
 				},
 				[&](const char* _data, size_t _len) -> bool
 				{
@@ -452,13 +490,28 @@ namespace lichess
 							_callback(_json);
 						};
 					};
-					return !_stop.stop_requested();
+					
+					if (_stop.stop_requested())
+					{
+						std::cout << "[Debug] Stop requested" << std::endl;
+						return false;
+					}
+					else
+					{
+						return true;
+					};
 				}
 				);
-			
+
+			std::cout << "[Debug] Exiting main stream loop" << std::endl;
+
 			if (_result.error() == httplib::Error::Success)
 			{
 				// good
+			}
+			else
+			{
+				std::cout << "[Error] Stream exited with error " << (int)_result.error() << '\n';
 			};
 		};
 

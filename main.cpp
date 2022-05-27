@@ -7,6 +7,8 @@
 
 #include "lichess/lichess.hpp"
 
+#include "BearLibTerminal.h"
+
 #include "utility/string.hpp"
 #include "utility/system.hpp"
 
@@ -90,6 +92,10 @@ private:
 
 	void on_game_full(const lichess::GameFullEvent& _event)
 	{
+		std::cout << "[Debug] on_game_full" << std::endl;
+
+
+
 		const auto lck = std::unique_lock(this->mtx_);
 
 		if (auto& _blackID = _event.black.id; _blackID && _blackID.value() == this->player_id_)
@@ -293,6 +299,8 @@ public:
 	{
 		this->account_info_ = *this->account_client_.get_account_info();
 		
+		std::cout << "Logged in as user = " << this->account_info_.username << std::endl;
+
 		// Lock while we perform setup
 		const auto lck = std::unique_lock(this->mtx_);
 
@@ -307,20 +315,28 @@ public:
 			auto _games = this->account_client_.get_ongoing_games();
 			for (auto& v : _games->nowPlaying)
 			{
-				this->game_streams_.emplace_back(this->env_.token.c_str(), v.gameId, this->account_info_.id);
+				//this->game_streams_.emplace_back(this->env_.token.c_str(), v.gameId, this->account_info_.id);
 			};
 
 			if (_games->nowPlaying.empty())
 			{
 				using namespace std::chrono_literals;
-			
+
+				std::this_thread::sleep_for(std::chrono::seconds(1));
+
 				auto _params = lichess::ChallengeAIParams{};
 				_params.level = 4;
 				_params.days.reset();
 				_params.clock.emplace();
 				_params.clock->set_initial(1min);
-				_params.clock->set_increment(4s);
+				_params.clock->set_increment(5s);
 				auto _result = this->account_client_.challenge_ai(_params);
+				if (!_result)
+				{
+					std::cout << "[Error] Failed to challenge the AI - " <<
+						_result.alternate().error_ << " - " <<
+						_result.alternate().status_ << '\n';
+				}
 			};
 		};
 
@@ -334,7 +350,7 @@ public:
 					_params.challengeId = v.id;
 					if (!this->account_client_.accept_challenge(_params))
 					{
-						std::cout << "[ERROR] Failed to accept challenge with ID " <<
+						std::cout << "[Error] Failed to accept challenge with ID " <<
 							v.id << '\n';
 					};
 				};
@@ -556,6 +572,30 @@ void perf_test()
 };
 
 
+void write_board_to_terminal(const chess::Board& _board)
+{
+	bool _whiteSquare = false;
+	for (auto& _pos : chess::rev_positions_v)
+	{
+		const auto r = (int)_pos.rank();
+		const auto f = (int)_pos.file();
+
+		if(_whiteSquare)
+		{
+			terminal_bkcolor("white");
+		}
+		else
+		{
+			terminal_bkcolor("black");
+		};
+		terminal_put(f, r, 'x');
+
+		_whiteSquare = !_whiteSquare;
+	};
+
+	terminal_refresh();
+};
+
 void local_game()
 {
 	using namespace chess;
@@ -575,9 +615,30 @@ void local_game()
 	_board.move(_move);
 	e1.start(_board, Color::black);
 
+
+
+	terminal_open();
+	
+	terminal_set("window.size=8x8 window.cellsize=32x32");
+
+    // Printing text
+
+    terminal_print(1, 1, "Chess!");
+    terminal_refresh();
+
 	while (true)
 	{
-		e1.set_board(_board);
+		if (const auto ev = terminal_read(); ev != 0)
+		{
+			if (ev == TK_CLOSE)
+			{
+				break;
+			};
+			//terminal_read();
+		};
+
+
+		write_board_to_terminal(_board);
 		if (auto m = e1.get_move(); m)
 		{
 			_move = *m;
@@ -589,6 +650,7 @@ void local_game()
 		};
 		_board.move(_move);
 
+		write_board_to_terminal(_board);
 		e0.set_board(_board);
 		if (auto m = e0.get_move(); m)
 		{
@@ -600,7 +662,10 @@ void local_game()
 			break;
 		};
 		_board.move(_move);
-	};
+	};  
+
+    terminal_close();
+
 	exit(0);
 };
 
@@ -622,10 +687,10 @@ void local_game()
 int main(int _nargs, const char* _vargs[])
 {
 	if (!run_tests()) { return 1; };
-	perf_test();
-	exit(0);
+	//perf_test();
+	local_game();
 
-
+	
 	if (_nargs == 0 || !_vargs || !_vargs[0])
 	{
 		std::cout << "No arguments provided, not even exec path1!\n";

@@ -8,7 +8,9 @@
 #include <mutex>
 #include <thread>
 #include <barrier>
-#include <variant>
+#include <variant> 
+#include <atomic>
+#include <random>
 
 namespace sch
 {
@@ -31,6 +33,7 @@ namespace sch
 
 
 		ScreepFish();
+		~ScreepFish();
 
 	private:
 		chess::Board board_;
@@ -42,6 +45,8 @@ namespace sch
 		std::optional<chess::Move> best_move_;
 
 		std::jthread thread_;
+
+		std::mt19937 rnd_;
 	};
 
 };

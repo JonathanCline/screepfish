@@ -415,6 +415,17 @@ namespace chess
 			return _pos;
 		})();
 
+	constexpr inline auto rev_positions_v = ([]()
+		{
+			auto _pos = std::array<Position, 64>{};
+			auto it = _pos.begin();
+			for (uint8_t b = 0; b != 64; ++b)
+			{
+				*it = Position::from_bits(63 - b);
+				++it;
+			};
+			return _pos;
+		})();
 
 
 	/**
