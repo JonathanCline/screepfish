@@ -10,6 +10,11 @@
 
 namespace chess
 {
+	char piece_to_char(PieceType p);
+	char piece_to_char(Piece p);
+
+	
+
 	constexpr auto standard_start_pos_fen_v = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 	std::optional<Board> parse_fen(const std::string_view _fen);

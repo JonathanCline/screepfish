@@ -62,6 +62,13 @@ namespace chess
 
 
 
+	constexpr Color square_color(Position _pos)
+	{
+		const auto a = static_cast<size_t>(_pos);
+		const auto b = (((int)_pos.rank() % 2) == 0);
+		const auto c = (((int)_pos.file() % 2) == 0);
+		return (b ^ c) ? Color::white : Color::black;
+	};
 
 
 

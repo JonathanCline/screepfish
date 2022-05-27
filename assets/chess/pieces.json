@@ -1,0 +1,8 @@
+[
+	{
+		"type" : "king",
+		"color" : "white",
+		"file" : "king_white.png",
+		"codepoint" : "0x2654"
+	}
+]
