@@ -432,7 +432,7 @@ auto count_runs_for(auto&& _op, std::chrono::nanoseconds _maxTime)
 bool run_tests()
 {
 	bool _runOnFinish = true;
-	
+
 
 
 	using namespace chess;
@@ -450,7 +450,7 @@ bool run_tests()
 	{
 		const auto _fen = "1rb1kbnr/ppNppppp/2n5/6NQ/4P3/3P4/PPP2PPq/R3KB1R b KQk - 1 11";
 		const auto _board = *parse_fen(_fen);
-		
+
 		std::cout << _fen << '\n';
 		std::cout << get_fen(_board) << '\n';
 		std::cout << _board << '\n';
@@ -467,7 +467,7 @@ bool run_tests()
 		auto _tree = MoveTree();
 		_tree.board = _board;
 		_tree.to_play = _board.get_toplay();
-		
+
 		_tree.evalulate_next();
 		if (const auto s = _tree.total_outcomes(); s != 20)
 		{
@@ -494,7 +494,7 @@ bool run_tests()
 		if (const auto s = _tree.total_outcomes(); s != 197281)
 		{
 			std::cout << "Expected 197281, got " << s << '\n';
-			std::cout << "  delta = " << (int)s - 8902 << '\n';
+			std::cout << "  delta = " << (int)s - 197281 << '\n';
 			//abort();
 		};
 
@@ -516,6 +516,57 @@ bool run_tests()
 		};
 	};
 
+	{
+		auto _board = Board();
+		reset_board(_board);
+
+		size_t _bRooks = 0;
+		size_t _wRooks = 0;
+
+		for (auto& p : _board.pieces())
+		{
+			if (p == Piece::rook)
+			{
+				if (p.color() == Color::white)
+				{
+					++_wRooks;
+				}
+				else
+				{
+					++_bRooks;
+				};
+			};
+		};
+
+		if (_bRooks != 2) { abort(); };
+		if (_wRooks != 2) { abort(); };
+	};
+
+	// Rook blocked
+	{
+		auto _board = Board();
+		reset_board(_board);
+		
+		if (!chess::is_rook_blocked(_board, (File::a, Rank::r1), Color::white))
+		{
+			abort();
+		};
+		if (!chess::is_rook_blocked(_board, (File::h, Rank::r1), Color::white))
+		{
+			abort();
+		};
+		if (!chess::is_rook_blocked(_board, (File::a, Rank::r8), Color::black))
+		{
+			abort();
+		};
+		if (!chess::is_rook_blocked(_board, (File::h, Rank::r8), Color::black))
+		{
+			abort();
+		};
+
+		std::cout << _board << std::endl;
+	};
+
 	// Queen blocked rating
 	{
 		Rating rt0 = 0.0f;
@@ -525,6 +576,7 @@ bool run_tests()
 			auto _board = Board();
 			reset_board(_board);
 			rt0 = rate_board(_board, Color::white);
+			std::cout << _board << std::endl;
 		};
 
 		{
@@ -533,13 +585,24 @@ bool run_tests()
 			_board.erase_piece((File::d, Rank::r2));
 			_board.erase_piece((File::d, Rank::r7));
 			rt1 = rate_board(_board, Color::white);
-		};
+			const auto rt1b = rate_board(_board, Color::black);
 
-		// rt1 should be slightly higher
-		if (rt0 >= rt1)
-		{
-			std::cout << rt1 << " should be greater than " << rt0 << '\n';
-			abort();
+			if (chess::is_queen_blocked(_board, (File::d, Rank::r1), Color::white))
+			{
+				abort();
+			};
+			if (chess::is_queen_blocked(_board, (File::d, Rank::r8), Color::black))
+			{
+				abort();
+			};
+
+			// rt1 should be slightly higher
+			if (rt0 >= rt1)
+			{
+				std::cout << rt1 << " should be greater than " << rt0 << '\n';
+				std::cout << _board << std::endl;
+				abort();
+			};
 		};
 	};
 
@@ -571,7 +634,7 @@ void perf_test()
 	};
 };
 
-void local_game(const char* _assetsDirectoryPath)
+bool local_game(const char* _assetsDirectoryPath)
 {
 	using namespace chess;
 	auto _terminal = chess::Terminal(_assetsDirectoryPath);
@@ -598,7 +661,7 @@ void local_game(const char* _assetsDirectoryPath)
 	{
 		if (_terminal.should_close())
 		{
-			break;
+			return false;
 		};
 
 		e1.set_board(_board);
@@ -631,7 +694,7 @@ void local_game(const char* _assetsDirectoryPath)
 	};  
 
 	_terminal.wait_for_any_key();
-	exit(0);
+	return !_terminal.should_close();
 };
 
 /*
@@ -658,7 +721,7 @@ int main(int _nargs, const char* _vargs[])
 		exit(1);
 	};
 
-	if (_nargs >= 2 && _vargs[1] == "--perf")
+	if (_nargs >= 2 && _vargs[1] == std::string_view("--perf"))
 	{
 		perf_test();
 		exit(0);
@@ -669,9 +732,18 @@ int main(int _nargs, const char* _vargs[])
 	{
 		const auto p = (std::filesystem::path(_vargs[0]).parent_path() / "assets" / "chess").generic_string();
 		std::cout << p << '\n';
-		local_game(p.c_str());
+
+		bool _keepAlive = true;
+		while (_keepAlive)
+		{
+			_keepAlive = local_game(p.c_str());
+		};
 	};
 	
+	return 0;
+
+
+	// Renable when lichess lets us play the AI
 	const auto _env = sch::load_env(_vargs[0]);
 	auto _accountManager = AccountManager(_env);
 	_accountManager.start();

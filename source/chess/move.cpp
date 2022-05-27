@@ -1171,12 +1171,12 @@ namespace chess
 
 		constexpr auto checkmate_rating_v	  = 100000.0f;
 		
-		constexpr auto blocked_queen_rating_v = 0.0001f;
-		constexpr auto blocked_rook_rating_v  = 0.0001f;
+		constexpr auto blocked_queen_rating_v = 0.001f;
+		constexpr auto blocked_rook_rating_v  = 0.001f;
 		
-		constexpr auto pawn_push_rating_v	  = 0.0001f;
+		constexpr auto pawn_push_rating_v	  = 0.001f;
 
-		constexpr auto castle_ability_rating_v = 0.0001f;
+		constexpr auto castle_ability_rating_v = 0.001f;
 
 
 
@@ -1196,6 +1196,14 @@ namespace chess
 		if (_board.get_castle_queenside_flag(_forPlayer))
 		{
 			_rating += castle_ability_rating_v;
+		};
+		if (_board.get_castle_kingside_flag(!_forPlayer))
+		{
+			_rating -= castle_ability_rating_v;
+		};
+		if (_board.get_castle_queenside_flag(!_forPlayer))
+		{
+			_rating -= castle_ability_rating_v;
 		};
 
 		for (auto& v : _board.pieces())

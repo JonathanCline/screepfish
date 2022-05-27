@@ -152,7 +152,7 @@ namespace sch
 						return std::chrono::duration_cast<std::chrono::duration<double>>(v);
 					};
 
-					std::cout << "Delta time : " << fn(td) << '(' << fn(tdA) << ", " << fn(tdB) << ")\n";
+					//std::cout << "Delta time : " << fn(td) << '(' << fn(tdA) << ", " << fn(tdB) << ")\n";
 					
 					Response _resp{};
 					_resp.move = _move;
