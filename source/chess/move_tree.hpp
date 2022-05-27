@@ -23,6 +23,11 @@ namespace chess
 		MoveTreeNode() = default;
 	};
 
+	constexpr auto q = sizeof(MoveTreeNode);
+	
+
+
+
 	struct MoveTree
 	{
 		chess::Board board{}; // initial board state
