@@ -62,8 +62,133 @@ namespace chess
 	};
 
 
+	
+	consteval BitBoardCX compute_pawn_attack_squares(Position _pos, Color _color)
+	{
+		auto bb = BitBoardCX();
+		if (_pos.file() != File::a)
+		{
+			if (_color == Color::white)
+			{
+				bb.set(next(_pos, -1, 1));
+			}
+			else
+			{
+				bb.set(next(_pos, -1, -1));
+			};
+		};
+		if (_pos.file() != File::h)
+		{
+			if (_color == Color::white)
+			{
+				bb.set(next(_pos, 1, 1));
+			}
+			else
+			{
+				bb.set(next(_pos, 1, -1));
+			};
+		};
+		return bb;
+	};
+	consteval auto compute_pawn_attack_squares(Color _color)
+	{
+		std::array<BitBoardCX, 64> bbs{};
+		auto it = bbs.begin();
+		for (auto& v : positions_v)
+		{
+			if (v.rank() == Rank::r1 || v.rank() == Rank::r8)
+			{
+				++it;
+				continue;
+			};
+			*it = compute_pawn_attack_squares(v, _color);
+			++it;
+		};
+		return bbs;
+	};
+
+	// Precompute attack squares
+	constexpr inline auto white_pawn_attack_squares_v = compute_pawn_attack_squares(Color::white);
+	constexpr inline auto black_pawn_attack_squares_v = compute_pawn_attack_squares(Color::black);
+
+	constexpr inline auto get_pawn_attacking_squares(Position _pos, Color _color)
+	{
+		if (_color == Color::white)
+		{
+			return white_pawn_attack_squares_v[static_cast<size_t>(_pos)];
+		}
+		else
+		{
+			return black_pawn_attack_squares_v[static_cast<size_t>(_pos)];
+		};
+	};
+
+
+
+	consteval BitBoardCX compute_knight_attack_squares(Position _pos)
+	{
+		auto bb = BitBoardCX();
+		constexpr auto _deltaPairs = std::array
+		{
+			std::pair{ 1, 2 },
+			std::pair{ 1, -2 },
+
+			std::pair{ 2, 1 },
+			std::pair{ 2, -1 },
+
+			std::pair{ -1, 2 },
+			std::pair{ -1, -2 },
+
+			std::pair{ -2, -1 },
+			std::pair{ -2, 1 },
+		};
+
+		bool _possible = false;
+		Position _nextPos{};
+		for (const auto& [df, dr] : _deltaPairs)
+		{
+			_nextPos = trynext(_pos, df, dr, _possible);
+			if (_possible)
+			{
+				bb.set(_nextPos);
+			};
+		};
+
+		return bb;
+	};
+	consteval auto compute_knight_attack_squares()
+	{
+		std::array<BitBoardCX, 64> bbs{};
+		auto it = bbs.begin();
+		for (auto& v : positions_v)
+		{
+			*it = compute_knight_attack_squares(v);
+			++it;
+		};
+		return bbs;
+	};
+
+	// Precompute attack squares
+	constexpr inline auto knight_attack_squares_v = compute_knight_attack_squares();
+	constexpr inline auto get_knight_attack_squares(Position _pos)
+	{
+		return knight_attack_squares_v[static_cast<size_t>(_pos)];
+	};
+
+
+
 
 	bool is_piece_attacked_by_pawn(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
+	{
+		using namespace chess;
+
+		// Bitboard with squares pawn is attacking
+		const auto _attackingBB = get_pawn_attacking_squares(_byPiece.position(), _byPiece.color());
+		
+		// If bit is set, piece is being attacked
+		return _attackingBB.test(_piece.position());
+	};
+	bool is_piece_attacked_by_pawn_old(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
 	{
 		using namespace chess;
 
@@ -86,7 +211,8 @@ namespace chess
 
 		return false;
 	};
-	bool is_piece_attacked_by_knight(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
+
+	bool is_piece_attacked_by_knight_old(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
 	{
 		using namespace chess;
 
@@ -120,6 +246,14 @@ namespace chess
 
 		return false;
 	};
+	bool is_piece_attacked_by_knight(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
+	{
+		using namespace chess;
+		
+		const auto _attackBB = get_knight_attack_squares(_byPiece.position());
+		return _attackBB.test(_piece.position());
+	};
+	
 	bool is_piece_attacked_by_bishop(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
 	{
 		using namespace chess;
@@ -270,6 +404,61 @@ namespace chess
 	};
 
 
+	bool is_piece_attacked_old(const chess::Board& _board, const chess::BoardPiece& _piece)
+	{
+		using namespace chess;
+
+		const auto _end = _board.pend();
+		for (auto it = _board.pbegin(); it != _end; ++it)
+		{
+			auto& p = *it;
+			if (p.color() != _piece.color())
+			{
+				switch (p.type())
+				{
+				case PieceType::pawn:
+					if (is_piece_attacked_by_pawn_old(_board, _piece, p))
+					{
+						return true;
+					};
+					break;
+				case PieceType::knight:
+					if (is_piece_attacked_by_knight(_board, _piece, p))
+					{
+						return true;
+					};
+					break;
+				case PieceType::bishop:
+					if (is_piece_attacked_by_bishop(_board, _piece, p))
+					{
+						return true;
+					};
+					break;
+				case PieceType::rook:
+					if (is_piece_attacked_by_rook(_board, _piece, p))
+					{
+						return true;
+					};
+					break;
+				case PieceType::queen:
+					if (is_piece_attacked_by_queen(_board, _piece, p))
+					{
+						return true;
+					};
+					break;
+				case PieceType::king:
+					if (is_piece_attacked_by_king(_board, _piece, p))
+					{
+						return true;
+					};
+					break;
+				default:
+					break;
+				};
+			};
+		};
+		return false;
+	};
 	bool is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece)
 	{
 		using namespace chess;
@@ -325,6 +514,8 @@ namespace chess
 		};
 		return false;
 	};
+
+
 
 	void get_pawn_moves(const chess::Board& _board, const chess::BoardPiece& _piece,
 		MoveBuffer& _buffer, const bool _isCheck)
@@ -689,6 +880,126 @@ namespace chess
 
 
 
+
+	struct Neighbors
+	{
+		std::array<Position, 8> neighbors{};
+		size_t count = 0;
+
+		std::array<Position, 4> rook_{};
+		size_t rook_count_ = 0;
+
+		constexpr std::span<const Position> rook() const
+		{
+			return std::span<const Position>(this->rook_.data(), this->rook_count_);
+		};
+
+		constexpr operator std::span<const Position>() const noexcept
+		{
+			return std::span<const Position>(this->neighbors.data(), this->count);
+		};
+
+		constexpr void append(Position p)
+		{
+			this->neighbors[this->count++] = p;
+		};
+		constexpr void rook_append(Position p)
+		{
+			this->rook_[this->rook_count_++] = p;
+		};
+
+		constexpr Neighbors() = default;
+	};
+
+	consteval Neighbors find_neighbors(Position _pos)
+	{
+		auto _neighbors = Neighbors();
+
+		constexpr auto _offsets = std::array
+		{
+			std::pair{ 0, 1 },
+			std::pair{ 0, -1 },
+			std::pair{ 1, 0 },
+			std::pair{ -1, 0 },
+			std::pair{ 1, 1 },
+			std::pair{ -1, 1 },
+			std::pair{ 1, -1 },
+			std::pair{ -1, -1 },
+		};
+
+		for (const auto [df, dr] : _offsets)
+		{
+			bool _possible = false;
+			const auto p = trynext(_pos, df, dr, _possible);
+			if (_possible)
+			{
+				_neighbors.append(p);
+				if (df == 0 || dr == 0)
+				{
+					_neighbors.rook_append(p);
+				};
+			};
+		};
+
+		return _neighbors;
+	};
+	consteval auto precompute_neighbors()
+	{
+		std::array<Neighbors, 64> o{};
+		auto it = o.begin();
+		for (auto& v : positions_v)
+		{
+			*it = find_neighbors(v);
+			++it;
+		};
+		return o;
+	};
+
+	constexpr inline auto neighbors_v = precompute_neighbors();
+
+
+
+	std::span<const Position> get_surrounding_positions(Position _pos)
+	{
+		return neighbors_v[static_cast<size_t>(_pos)];
+	};
+	std::span<const Position> get_surrounding_positions_for_rook(Position _pos)
+	{
+		return neighbors_v[static_cast<size_t>(_pos)].rook();
+	};
+
+
+
+	bool is_queen_blocked(const Board& _board, const Position _pos, Color _color)
+	{
+		const auto _spos = get_surrounding_positions(_pos);
+		for (auto& o : _spos)
+		{
+			if (_board.has_enemy_piece_or_empty(o, _color))
+			{
+				return false;
+			};
+		};
+		return true;
+	};
+	bool is_rook_blocked(const Board& _board, const Position _pos, Color _color)
+	{
+		const auto _spos = get_surrounding_positions_for_rook(_pos);
+		for (auto& o : _spos)
+		{
+			if (_board.has_enemy_piece_or_empty(o, _color))
+			{
+				return false;
+			};
+		};
+		return true;
+	};
+
+
+
+
+
+
 	bool is_check(const chess::Board& _board, const chess::Color _forPlayer)
 	{
 		using namespace chess;
@@ -748,47 +1059,117 @@ namespace chess
 	};
 
 
-	chess::Rating rate_move(const chess::Board& _board, const chess::Move& _move, chess::Color _forPlayer, const bool _isCheck)
+	constexpr inline auto white_distance_to_promote_v = std::array
+	{
+		7, // rank 1
+		6, 5, 4, 3, 2, 1,
+		0 // rank 8
+	};
+	constexpr inline auto black_distance_to_promote_v = std::array
+	{
+		0, // rank 1
+		1, 2, 3, 4, 5, 6,
+		7 // rank 8
+	};
+
+
+
+	chess::Rating rate_board(const chess::Board& _board, chess::Color _forPlayer)
 	{
 		using namespace chess;
+
+		constexpr auto checkmate_rating_v	  = 100000.0f;
+		
+		constexpr auto blocked_queen_rating_v = 0.0001f;
+		constexpr auto blocked_rook_rating_v  = 0.0001f;
+		
+		constexpr auto pawn_push_rating_v	  = 0.0001f;
+
+		constexpr auto castle_ability_rating_v = 0.0001f;
+
+
+
+
 
 		auto _rating = Rating(0);
 
 		if (is_checkmate(_board, !_forPlayer))
 		{
-			return 100000.0f;
+			return checkmate_rating_v;
 		};
 
-		if (_board.get(_move.from()) == Piece::king)
+		if (_board.get_castle_kingside_flag(_forPlayer))
 		{
-			if (_board.get_castle_kingside_flag(_forPlayer))
-			{
-				_rating -= 0.00001f;
-			};
-			if (_board.get_castle_queenside_flag(_forPlayer))
-			{
-				_rating -= 0.00001f;
-			};
+			_rating += castle_ability_rating_v;
+		};
+		if (_board.get_castle_queenside_flag(_forPlayer))
+		{
+			_rating += castle_ability_rating_v;
 		};
 
 		for (auto& v : _board.pieces())
 		{
-			if (v == Piece::pawn)
+			switch (v.type())
 			{
-				int _closeToPromote = 0;
+			case Piece::pawn:
+			{
+				int _distanceToPromote = 0;
 				if (v.color() == Color::white)
 				{
-					_closeToPromote =
-						(int)v.rank();
+					_distanceToPromote = white_distance_to_promote_v[(int)v.rank()];
 				}
 				else
 				{
-					_closeToPromote =
-						-((int)v.rank() - (int)Rank::r8);
+					_distanceToPromote = black_distance_to_promote_v[(int)v.rank()];
 				};
-				_rating += ((float)_closeToPromote / 1000.0f);				
-			}
 
+				const auto _ratingValue = ((float)(7.0f - _distanceToPromote) / 7.0f) * pawn_push_rating_v;
+				if (v.color() == _forPlayer)
+				{
+					_rating += _ratingValue;
+				}
+				else
+				{
+					_rating -= _ratingValue;
+				};
+			};
+			break;
+			case Piece::queen:
+			{
+				if (is_queen_blocked(_board, v.position(), v.color()))
+				{
+					const auto _ratingValue = blocked_queen_rating_v;
+					if (v.color() == _forPlayer)
+					{
+						_rating -= _ratingValue;
+					}
+					else
+					{
+						_rating += _ratingValue;
+					};
+				};
+			};
+			break;
+			case Piece::rook:
+			{
+				if (is_rook_blocked(_board, v.position(), v.color()))
+				{
+					const auto _ratingValue = blocked_rook_rating_v;
+					if (v.color() == _forPlayer)
+					{
+						_rating -= _ratingValue;
+					}
+					else
+					{
+						_rating += _ratingValue;
+					};
+				};
+			};
+			break;
+			default:
+				break;
+			};
+		
 			if (v.color() == _forPlayer)
 			{
 				_rating += material_value(v.type());
@@ -800,6 +1181,11 @@ namespace chess
 		};
 
 		return _rating;
+	};
+
+	chess::Rating rate_move(const chess::Board& _board, const chess::Move& _move, chess::Color _forPlayer, const bool _isCheck)
+	{
+		return rate_board(_board, _forPlayer);
 	};
 
 };

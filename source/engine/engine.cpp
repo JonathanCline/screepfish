@@ -15,26 +15,6 @@
 
 namespace sch
 {
-	inline auto random_iter(auto& _range)
-	{
-		static std::random_device rnd{};
-		static std::mt19937 mt{ rnd() };
-
-		const auto _randomInt = mt();
-		const auto _randomPct = (static_cast<double>(_randomInt) + static_cast<double>(mt.min())) /
-			static_cast<double>(mt.max());
-
-		const auto _rangeSize = std::ranges::distance(_range);
-		const auto _randomIndex = static_cast<size_t>(ceil(static_cast<double>(_rangeSize) * _randomPct) - 1.0);
-
-		if (_rangeSize == 0)
-		{
-			return std::ranges::end(_range);
-		};
-
-		return std::ranges::next(std::ranges::begin(_range), _randomIndex);
-	};
-
 	chess::MoveTree ScreepFish::build_move_tree(const chess::Board& _board, chess::Color _forPlayer, int _depth)
 	{
 		using namespace chess;
@@ -51,60 +31,144 @@ namespace sch
 		return _tree;
 	};
 
-	
-
-	void ScreepFish::cache(const chess::Board& _board)
+	void ScreepFish::set_board(const chess::Board& _board)
 	{
-	};
-	const ScreepFish::BoardCache* ScreepFish::get_cached(size_t _hash)
-	{
-		return nullptr;
+		const auto lck = std::unique_lock(this->mtx_);
+		this->board_ = _board;
 	};
 
-
-	std::optional<chess::Move> ScreepFish::play_turn(chess::IGame& _game)
+	std::optional<chess::Move> ScreepFish::get_move()
 	{
-		using namespace chess;
-
-		const auto& _board = _game.board();
-
-
-		const auto& _myColor = this->my_color_;
-		if (is_check(_board, _myColor))
+		// Clear the previous best move
 		{
-			std::cout << "Board is in check!\n";
+			const auto lck = std::unique_lock(this->mtx_);
+			this->best_move_.reset();
 		};
 
-		const auto _clock = std::chrono::steady_clock{};
-		const auto t0 = _clock.now();
+		for(int n = 0; n != 1000; ++n)
+		{
+			// Try to get the next move
+			{
+				const auto lck = std::unique_lock(this->mtx_);
+				if (this->best_move_)
+				{
+					return this->best_move_;
+				};
+			};
 
-		const size_t _pieceCount = _board.pieces().size();
+			// Wait a bit
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		};
 
-		const auto _depth = (_pieceCount < 8)? 5 : 4;
-		auto _tree = this->build_move_tree(_board, _myColor, _depth);
-		
-		const auto _move = _tree.best_move();
-		
-		const auto t1 = _clock.now();
-		const auto td = t1 - t0;
-		std::cout << "Delta time : " << std::chrono::duration_cast<std::chrono::duration<double>>(td) << '\n';
-		std::cout << _board << '\n';
+		// Timed out
+		return std::nullopt;
+	};
 
-		return _move;
+	void ScreepFish::start(chess::Board _initialBoard, chess::Color _color)
+	{
+		this->board_ = _initialBoard;
+		this->my_color_ = _color;
+
+		this->thread_ = std::jthread([this](std::stop_token _stop)
+			{
+				this->thread_main(_stop);
+			});
+
+
+		this->init_barrier_.arrive_and_wait();
+	};
+	void ScreepFish::stop()
+	{
+		this->thread_.request_stop();
 	};
 	
-
-
-
-
-
-	void ScreepFish::set_color(chess::Color _color)
+	void ScreepFish::thread_main(std::stop_token _stop)
 	{
-		this->my_color_ = _color;
+		this->init_barrier_.arrive_and_wait();
+
+		// Storage for tracking calcultion times
+		auto _times = std::vector<std::chrono::steady_clock::duration>();
+
+		while (!_stop.stop_requested())
+		{
+			{
+				const auto lck = std::unique_lock(this->mtx_);
+				if (!this->best_move_)
+				{
+					using namespace chess;
+
+					const auto& _board = this->board_;
+					const auto& _myColor = this->my_color_;
+					
+					const size_t _pieceCount = _board.pieces().size();
+					auto _depth = 4;
+
+					// Bump depth as many moves will be discarded
+					const bool _isCheck = is_check(_board, _myColor);
+
+					if (_isCheck)
+					{
+						_depth += 1;
+					};
+					
+					// Bump depth if no queens on board
+					if (_board.pfind(Piece::queen, Color::white) == _board.pend() && _board.pfind(Piece::queen, Color::black) == _board.pend()
+						&& _pieceCount <= 15)
+					{
+						_depth += 1;
+					};
+					if (_pieceCount <= 8 && !_isCheck)
+					{
+						_depth += 1;
+					};
+
+					const auto _clock = std::chrono::steady_clock{};
+					
+
+					const auto t0 = _clock.now();
+					auto _tree = this->build_move_tree(_board, _myColor, _depth);
+					
+					const auto t1 = _clock.now();
+					const auto _move = _tree.best_move();
+					const auto t2 = _clock.now();
+
+					const auto tdA = t1 - t0;
+					const auto tdB = t2 - t1;
+					const auto td = t2 - t0;
+
+					_times.push_back(td);
+
+					constexpr auto fn = [](auto v)
+					{
+						return std::chrono::duration_cast<std::chrono::duration<double>>(v);
+					};
+
+					std::cout << "Delta time : " << fn(td) << '(' << fn(tdA) << ", " << fn(tdB) << ")\n";
+					std::cout << _board << '\n';
+
+					this->best_move_ = _move;
+				};
+			};
+
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		};
+
+		using dur = std::chrono::duration<double>;
+		dur _avgDur{};
+		for (auto& v : _times)
+		{
+			_avgDur += std::chrono::duration_cast<dur>(v);
+		};
+		_avgDur /= _times.size();
+
+		std::cout << "Average calculation time = " << _avgDur << '\n';
 	};
-	void ScreepFish::set_board(chess::Board _board)
+
+
+	ScreepFish::ScreepFish() :
+		init_barrier_(2)
 	{
-		this->board_ = std::move(_board);
+		
 	};
 
 };

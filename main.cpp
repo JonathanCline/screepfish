@@ -56,20 +56,11 @@ private:
 			_board.move_piece(_move.from(), _move.to(), _move.promotion());
 		};
 
-		class LichessGame : public chess::IGame
-		{
-		public:
-
-			LichessGame() = default;
-		};
-
-		auto _game = LichessGame();
-		_game.board_ = _board;
 		this->engine_.set_board(_board);
 
 		if (*this->my_turn_)
 		{
-			const auto _response = this->engine_.play_turn(_game);
+			const auto _response = this->engine_.get_move();
 			bool _passed = false;
 			if (_response)
 			{
@@ -112,8 +103,23 @@ private:
 			this->my_color_ = chess::Color::white;
 		};
 
+		// Lichess likes to give startpos as an initial fen string, switch that to actual fen if recieved
+		std::string_view _fen = _event.initialFen;
+		if (_fen == "startpos")
+		{
+			_fen = chess::standard_start_pos_fen_v;
+		};
+
+		// Parse fen into board state
+		auto _board = chess::parse_fen(_fen);
+		if (!_board)
+		{
+			std::cout << _event.initialFen << '\n';
+			abort();
+		};
+
 		// Tell the engine which color it is playing as
-		this->engine_.set_color(*this->my_color_);
+		this->engine_.start(*_board, *this->my_color_);
 
 		// Count played moves
 		auto _movesPlayedCount = std::ranges::count(_event.state.moves, ' ');
@@ -192,6 +198,7 @@ public:
 	};
 	void set_close()
 	{
+		this->engine_.stop();
 		this->keep_open_ = false;
 	};
 
@@ -308,7 +315,7 @@ public:
 				using namespace std::chrono_literals;
 			
 				auto _params = lichess::ChallengeAIParams{};
-				_params.level = 3;
+				_params.level = 4;
 				_params.days.reset();
 				_params.clock.emplace();
 				_params.clock->set_initial(1min);
@@ -362,6 +369,48 @@ private:
 
 	lichess::AccountEventProcessor account_event_proc_;
 };
+
+
+
+auto average_runtime(auto&& _op, size_t _times)
+{
+	namespace ch = std::chrono;
+	using clk = ch::steady_clock;
+	using dur = ch::duration<double>;
+
+	auto _runs = std::vector<dur>(_times, dur{});
+
+	for (size_t n = 0; n != _times; ++n)
+	{
+		const auto t0 = clk::now();
+		_op();
+		const auto t1 = clk::now();
+		_runs[n] = ch::duration_cast<dur>(t1 - t0);
+		std::this_thread::yield();
+	};
+	
+	dur _avgDur = std::accumulate(_runs.begin(), _runs.end(), dur{});
+	return _avgDur / _runs.size();
+};
+
+auto count_runs_for(auto&& _op, std::chrono::nanoseconds _maxTime)
+{
+	namespace ch = std::chrono;
+	using clk = ch::steady_clock;
+	
+	size_t n = 0;
+	const auto tEnd = clk::now() + _maxTime;
+	do
+	{
+		_op();
+		++n;
+	}
+	while (clk::now() < tEnd);
+
+	return n;
+};
+
+
 
 
 bool run_tests()
@@ -436,14 +485,128 @@ bool run_tests()
 	};
 
 
+	{
+		auto _board = Board();
+		reset_board(_board);
+		const auto rt0 = rate_board(_board, Color::white);
+		_board.move((File::a, Rank::r2), (File::a, Rank::r4));
+		const auto rt1 = rate_board(_board, Color::white);
+
+		// rt1 should be slightly higher
+		if (rt0 >= rt1)
+		{
+			std::cout << rt1 << " should be greater than " << rt0 << '\n';
+			abort();
+		};
+	};
+
+	// Queen blocked rating
+	{
+		Rating rt0 = 0.0f;
+		Rating rt1 = 0.0f;
+
+		{
+			auto _board = Board();
+			reset_board(_board);
+			rt0 = rate_board(_board, Color::white);
+		};
+
+		{
+			auto _board = Board();
+			reset_board(_board);
+			_board.erase_piece((File::d, Rank::r2));
+			_board.erase_piece((File::d, Rank::r7));
+			rt1 = rate_board(_board, Color::white);
+		};
+
+		// rt1 should be slightly higher
+		if (rt0 >= rt1)
+		{
+			std::cout << rt1 << " should be greater than " << rt0 << '\n';
+			abort();
+		};
+	};
 
 
 	return _runOnFinish;
 };
 
 
+void perf_test()
+{
+	using namespace chess;
+	
+	auto b = Board();
+	reset_board(b);
+
+	const auto kp = BoardPiece(Piece::king, Color::white, (File::e, Rank::r1));
+	const auto pp = BoardPiece(Piece::pawn, Color::black, (File::e, Rank::r7));
+
+	const auto fn0 = [&b, kp]()
+	{
+		is_piece_attacked_old(b, kp);
+	};
+	const auto fn1 = [&b, kp]()
+	{
+		is_piece_attacked(b, kp);
+	};
+
+	using namespace std::chrono_literals;
+	const auto rt0 = count_runs_for(fn0, 1s);
+	const auto rt1 = count_runs_for(fn1, 1s);
+	std::cout << "rt0 : " << rt0 << '\n';
+	std::cout << "rt1 : " << rt1 << '\n';
+	std::cout << "drt : " << (int64_t)rt1 - (int64_t)rt0 << '\n';
+};
 
 
+void local_game()
+{
+	using namespace chess;
+	auto _board = Board();
+	reset_board(_board);
+
+	auto e0 = sch::ScreepFish();
+	auto e1 = sch::ScreepFish();
+
+	auto _move = Move();
+
+	e0.start(_board, Color::white);
+	if (const auto m = e0.get_move(); m) {
+		_move = *m;
+	};
+	
+	_board.move(_move);
+	e1.start(_board, Color::black);
+
+	while (true)
+	{
+		e1.set_board(_board);
+		if (auto m = e1.get_move(); m)
+		{
+			_move = *m;
+		}
+		else
+		{
+			std::cout << "white wins\n";
+			break;
+		};
+		_board.move(_move);
+
+		e0.set_board(_board);
+		if (auto m = e0.get_move(); m)
+		{
+			_move = *m;
+		}
+		else
+		{
+			std::cout << "black wins\n";
+			break;
+		};
+		_board.move(_move);
+	};
+	exit(0);
+};
 
 
 
@@ -451,6 +614,7 @@ bool run_tests()
 int main(int _nargs, const char* _vargs[])
 {
 	if (!run_tests()) { return 0; };
+	perf_test();
 
 	if (_nargs == 0 || !_vargs || !_vargs[0])
 	{

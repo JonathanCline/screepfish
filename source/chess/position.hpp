@@ -7,6 +7,7 @@
 #include "utility/utility.hpp"
 
 #include <jclib/type_traits.h>
+#include <jclib/concepts.h>
 
 #include <cassert>
 #include <iosfwd>
@@ -353,7 +354,11 @@ namespace chess
 
 	public:
 
-		constexpr explicit operator size_t() const noexcept { return this->pos_; };
+		template <jc::cx_integer T>
+		constexpr explicit operator T() const noexcept { return static_cast<T>(this->pos_); };
+		
+		constexpr static Position from_bits(uint8_t _index) noexcept { return Position(_index); };
+
 
 		/**
 		 * @brief Gets the rank of this position.
@@ -391,6 +396,10 @@ namespace chess
 		};
 
 	private:
+		constexpr explicit Position(uint8_t _index) noexcept :
+			pos_(_index)
+		{};
+
 		uint8_t pos_;
 	};
 
@@ -398,13 +407,10 @@ namespace chess
 		{
 			auto _pos = std::array<Position, 64>{};
 			auto it = _pos.begin();
-			for (auto& f : files_v)
+			for (uint8_t b = 0; b != 64; ++b)
 			{
-				for (auto& r : ranks_v)
-				{
-					*it = Position(f, r);
-					++it;
-				};
+				*it = Position::from_bits(b);
+				++it;
 			};
 			return _pos;
 		})();

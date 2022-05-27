@@ -29,7 +29,7 @@ namespace chess
 				_newBoard.move(*p);
 				//const auto _hash = chess::hash(_newBoard, _newBoard.get_toplay() == Color::black);
 
-				const auto _rating = rate_move(_newBoard, *p, !this->move_played_by);
+				const auto _rating = rate_board(_newBoard, !this->move_played_by);
 
 				// Assign values
 				it->move_played_by = !this->move_played_by;
@@ -127,7 +127,7 @@ namespace chess
 				_newBoard.move(*p);
 				const auto _hash = hash(_newBoard, _newBoard.get_toplay() == Color::black);
 			
-				const auto _rating = rate_move(_newBoard, *p, this->to_play);
+				const auto _rating = rate_board(_newBoard, this->to_play);
 
 				// Assign values
 				it->move_played_by = this->to_play;

@@ -634,11 +634,11 @@ namespace chess
 			// Set new piece bit
 			if (pIt->color() == Color::white)
 			{
-				this->bpieces_.set(_to);
+				this->wpieces_.set(_to);
 			}
 			else
 			{
-				this->wpieces_.set(_to);
+				this->bpieces_.set(_to);
 			};
 
 			t = f;
@@ -977,6 +977,10 @@ namespace chess
 		{
 			this->move_piece(_move.from(), _move.to(), _move.promotion());
 		};
+		void move(Position _from, Position _to)
+		{
+			this->move_piece(_from, _to);
+		};
 
 
 		bool has_enpassant_target() const noexcept
@@ -1054,6 +1058,16 @@ namespace chess
 		{
 			this->halfmove_count_ = _count;
 		};
+
+		BitBoard get_black_piece_bitboard() const
+		{
+			return this->bpieces_;
+		};
+		BitBoard get_white_piece_bitboard() const
+		{
+			return this->wpieces_;
+		};
+
 
 
 		const std::span<const BoardPiece> pieces() const
@@ -1282,7 +1296,10 @@ namespace chess
 	{
 	public:
 
-		virtual std::optional<Move> play_turn(IGame& _game) = 0;
+		virtual void set_board(const chess::Board& _board) = 0;
+		virtual std::optional<chess::Move> get_move() = 0;
+		virtual void start(chess::Board _initialBoard, chess::Color _color) = 0;
+		virtual void stop() = 0;
 
 		IChessEngine() = default;
 		virtual ~IChessEngine() = default;

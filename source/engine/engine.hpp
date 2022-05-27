@@ -5,6 +5,9 @@
 #include "chess/chess.hpp"
 #include "chess/move_tree.hpp"
 
+#include <mutex>
+#include <thread>
+#include <barrier>
 #include <variant>
 
 namespace sch
@@ -14,39 +17,31 @@ namespace sch
 	private:
 
 		chess::MoveTree build_move_tree(const chess::Board& _board, chess::Color _forPlayer, int _depth);
-
-		struct BoardCache
-		{
-			size_t hash = 0;
-
-			bool is_bcheck = false;
-			bool is_bcheckmate = false;
-			bool is_wcheck = false;
-			bool is_wcheckmate = false;
-
-			BoardCache() = default;
-		};
-
-		std::vector<BoardCache> cache_{};
-
-		void cache(const chess::Board& _board);
-		const BoardCache* get_cached(size_t _hash);
+		
+		void thread_main(std::stop_token _stop);
 
 	public:
 
-		std::optional<chess::Move> play_turn(chess::IGame& _game) final;
+		void set_board(const chess::Board& _board) final;
+		std::optional<chess::Move> get_move() final;
 
-		void set_color(chess::Color _color);
-		void set_board(chess::Board _board);
+		void start(chess::Board _initialBoard, chess::Color _color) final;
+		void stop() final;
 
 
 
-
-		ScreepFish() = default;
+		ScreepFish();
 
 	private:
 		chess::Board board_;
 		chess::Color my_color_;
+
+		std::barrier<> init_barrier_;
+		mutable std::mutex mtx_;
+
+		std::optional<chess::Move> best_move_;
+
+		std::jthread thread_;
 	};
 
 };
