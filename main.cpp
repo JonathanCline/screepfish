@@ -64,12 +64,12 @@ private:
 		{
 			const auto _response = this->engine_.get_move();
 			bool _passed = false;
-			if (_response)
+			if (_response.move)
 			{
 				auto _params = lichess::MoveParams();
 				_params.gameID = this->game_id_;
 				std::stringstream sstr{};
-				sstr << *_response;
+				sstr << *_response.move;
 				_params.move = sstr.str();
 				_passed = this->client_.bot_move(_params).has_value();
 			};
@@ -78,9 +78,9 @@ private:
 				auto _resignParams = lichess::ResignParams();
 				_resignParams.gameID = this->game_id_;
 
-				if (_response)
+				if (_response.move)
 				{
-					std::cout << "[ERROR] Failed to submit move : " << *_response << '\n';
+					std::cout << "[ERROR] Failed to submit move : " << *_response.move << '\n';
 					std::cout << _board << '\n';
 					std::cout << chess::get_fen(_board) << '\n';
 				};
@@ -586,8 +586,8 @@ void local_game(const char* _assetsDirectoryPath)
 	auto _move = Move();
 
 	e0.start(_board, Color::white);
-	if (const auto m = e0.get_move(); m) {
-		_move = *m;
+	if (const auto m = e0.get_move(); m.move) {
+		_move = *m.move;
 	};
 	
 	_board.move(_move);
@@ -602,9 +602,9 @@ void local_game(const char* _assetsDirectoryPath)
 		};
 
 		e1.set_board(_board);
-		if (auto m = e1.get_move(); m)
+		if (auto m = e1.get_move(); m.move)
 		{
-			_move = *m;
+			_move = *m.move;
 		}
 		else
 		{
@@ -616,9 +616,9 @@ void local_game(const char* _assetsDirectoryPath)
 		_terminal.set_board(_board);
 
 		e0.set_board(_board);
-		if (auto m = e0.get_move(); m)
+		if (auto m = e0.get_move(); m.move)
 		{
-			_move = *m;
+			_move = *m.move;
 		}
 		else
 		{
@@ -630,6 +630,7 @@ void local_game(const char* _assetsDirectoryPath)
 		_terminal.set_board(_board);
 	};  
 
+	_terminal.wait_for_any_key();
 	exit(0);
 };
 
@@ -657,7 +658,14 @@ int main(int _nargs, const char* _vargs[])
 		exit(1);
 	};
 
+	if (_nargs >= 2 && _vargs[1] == "--perf")
+	{
+		perf_test();
+		exit(0);
+	};
+
 	if (!run_tests()) { return 1; };
+
 	{
 		const auto p = (std::filesystem::path(_vargs[0]).parent_path() / "assets" / "chess").generic_string();
 		std::cout << p << '\n';

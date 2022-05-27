@@ -1299,12 +1299,19 @@ namespace chess
 		~IGame() = default;
 	};
 
+	struct Response
+	{
+		std::optional<Move> move;
+
+		Response() = default;
+	};
+
 	class IChessEngine
 	{
 	public:
 
 		virtual void set_board(const chess::Board& _board) = 0;
-		virtual std::optional<chess::Move> get_move() = 0;
+		virtual Response get_move() = 0;
 		virtual void start(chess::Board _initialBoard, chess::Color _color) = 0;
 		virtual void stop() = 0;
 

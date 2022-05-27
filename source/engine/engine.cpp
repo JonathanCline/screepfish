@@ -37,7 +37,7 @@ namespace sch
 		this->board_ = _board;
 	};
 
-	std::optional<chess::Move> ScreepFish::get_move()
+	chess::Response ScreepFish::get_move()
 	{
 		// Clear the previous best move
 		{
@@ -52,7 +52,7 @@ namespace sch
 				const auto lck = std::unique_lock(this->mtx_);
 				if (this->best_move_)
 				{
-					return this->best_move_;
+					return this->best_move_.value();
 				};
 			};
 
@@ -61,7 +61,7 @@ namespace sch
 		};
 
 		// Timed out
-		return std::nullopt;
+		return chess::Response{};
 	};
 
 	void ScreepFish::start(chess::Board _initialBoard, chess::Color _color)
@@ -125,6 +125,10 @@ namespace sch
 					if (_pieceCount <= 8 && !_isCheck)
 					{
 						_depth += 1;
+					}
+					else if (_pieceCount <= 4 && !_isCheck)
+					{
+						_depth += 1;
 					};
 
 					const auto _clock = std::chrono::steady_clock{};
@@ -149,7 +153,10 @@ namespace sch
 					};
 
 					std::cout << "Delta time : " << fn(td) << '(' << fn(tdA) << ", " << fn(tdB) << ")\n";
-					this->best_move_ = _move;
+					
+					Response _resp{};
+					_resp.move = _move;
+					this->best_move_ = _resp;
 				};
 			};
 

@@ -21,6 +21,11 @@ namespace chess
 		_buffer.resize(p - _buffer.data());
 		return _buffer;
 	};
+	
+	void Terminal::wait_for_any_key()
+	{
+		terminal_read();
+	};
 
 	bool Terminal::should_close() const
 	{
@@ -274,7 +279,7 @@ namespace chess
 
 
 	Terminal::Terminal(const char* _assetsDirectoryPathStr) :
-		cw_(64), ch_(128)
+		cw_(32), ch_(64)
 	{
 		namespace fs = std::filesystem;
 

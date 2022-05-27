@@ -10,6 +10,8 @@ namespace chess
 	{
 	public:
 
+		void wait_for_any_key();
+
 		bool should_close() const;
 		void set_board(const chess::Board& _board);
 
