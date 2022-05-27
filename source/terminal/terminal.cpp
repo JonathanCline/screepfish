@@ -24,7 +24,10 @@ namespace chess
 	
 	void Terminal::wait_for_any_key()
 	{
-		terminal_read();
+		if (terminal_read() == TK_CLOSE)
+		{
+			this->should_close_ = true;
+		};
 	};
 
 	bool Terminal::should_close() const
@@ -37,7 +40,7 @@ namespace chess
 				return true;
 			};
 		};
-		return false;
+		return this->should_close_;
 	};
 
 	inline int white_piece_unicode(PieceType _piece)

@@ -1088,15 +1088,176 @@ namespace chess
 
 
 
+	constexpr BitBoardCX make_rank_bits(Rank _rank)
+	{
+		auto bb = BitBoardCX();
+		for (auto& v : files_v)
+		{
+			bb.set(v, _rank);
+		};
+		return bb;
+	};
+	constexpr BitBoardCX make_file_bits(File _file)
+	{
+		auto bb = BitBoardCX();
+		for (auto& v : ranks_v)
+		{
+			bb.set(_file, v);
+		};
+		return bb;
+	};
+	constexpr BitBoardCX make_file_bits(File _file, Rank _min, Rank _max)
+	{
+		auto bb = BitBoardCX();
+		for (Rank r = _min; r <= _max; r += 1)
+		{
+			bb.set(_file, r);
+		};
+		return bb;
+	};
+
+	constexpr BitBoardCX make_bits_in_direction(Position _startPos, int df, int dr)
+	{
+		auto bb = BitBoardCX();
+
+		bool _possible = false;
+		auto _nextPos = trynext(_startPos, df, dr, _possible);
+		while (_possible)
+		{
+			bb.set(_nextPos);
+			_nextPos = trynext(_nextPos, df, dr, _possible);
+		};
+		return bb;
+	};
+	constexpr BitBoardCX make_diagonal_bits(Position _pos)
+	{
+		auto bb = BitBoardCX();
+		const auto _directions = std::array
+		{
+			std::pair{ 1, 1 },
+			std::pair{ 1, -1 },
+			std::pair{ -1, 1 },
+			std::pair{ -1, -1 }
+		};
+		for (auto& v : _directions)
+		{
+			bb |= make_bits_in_direction(_pos, v.first, v.second);
+		};
+		return bb;
+	};
+
+
+
+	consteval BitBoardCX calculate_threat_positions(Position _pos)
+	{
+		auto bb = BitBoardCX();
+
+		// <--------->
+		bb |= make_rank_bits(_pos.rank());
+	
+		// ^ 
+		// |
+		// |
+		// v
+		bb |= make_file_bits(_pos.file());
+
+		// Diagonals (distance = 1)
+		bool _possible = false;
+		{
+			auto np = trynext(_pos, 1, 1, _possible);
+			if (_possible)
+			{
+				bb.set(np);
+			};
+			np = trynext(_pos, -1, 1, _possible);
+			if (_possible)
+			{
+				bb.set(np);
+			};
+			np = trynext(_pos, 1, -1, _possible);
+			if (_possible)
+			{
+				bb.set(np);
+			};
+			np = trynext(_pos, -1, -1, _possible);
+			if (_possible)
+			{
+				bb.set(np);
+			};
+		};
+
+		// Knights
+		bb |= get_knight_attack_squares(_pos);
+
+		// Diagonals
+		bb |= make_diagonal_bits(_pos);
+		return bb;
+	};
+	consteval auto calculate_threat_positions()
+	{
+		std::array<BitBoardCX, 64> bbs{};
+		for (auto& v : positions_v)
+		{
+			bbs[static_cast<size_t>(v)] = calculate_threat_positions(v);
+		}
+		return bbs;
+	};
+
+	constexpr inline auto threat_positions_v = calculate_threat_positions();
+
+	constexpr auto get_threat_positions(Position _pos)
+	{
+		return threat_positions_v[static_cast<size_t>(_pos)];
+	};
+
+	
+
 
 
 
 	bool is_check(const chess::Board& _board, const chess::Color _forPlayer)
 	{
 		using namespace chess;
+
 		auto p = _board.pfind(chess::PieceType::king, _forPlayer);
 		if (p != _board.pend())
 		{
+			// Quick check that an enemy pieces is in one of the threat positions
+			auto _threatPositions = BitBoard(get_threat_positions(p->position()));
+			if (_forPlayer == Color::white)
+			{
+				// If a piece is directly above us, remove the whole file above the king
+				if (p->rank() != Rank::r8 && _board.has_friendy_piece(next(p->position(), 0, 1), _forPlayer))
+				{
+					_threatPositions &= ~make_file_bits(p->file(), p->rank(), Rank::r8);
+				};
+
+				auto _threats = _threatPositions & _board.get_black_piece_bitboard();
+				if (_threats.none())
+				{
+					// No threats, cannot be in check
+					//std::cout << "Prevented check check\n";
+					return false;
+				};
+			}
+			else
+			{
+				// If a piece is directly below us, remove the whole file below the king
+				if (p->rank() != Rank::r1 && _board.has_friendy_piece(next(p->position(), 0, -1), _forPlayer))
+				{
+					_threatPositions &= ~make_file_bits(p->file(), Rank::r1, p->rank());
+				};
+				
+
+				auto _threats = _threatPositions & _board.get_white_piece_bitboard();
+				if (_threats.none())
+				{
+					// No threats, cannot be in check
+					//std::cout << "Prevented check check\n";
+					return false;
+				};
+			};
+
 			return is_piece_attacked(_board, *p);
 		};
 		return true;

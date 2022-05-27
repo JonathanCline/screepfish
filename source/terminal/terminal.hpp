@@ -29,5 +29,6 @@ namespace chess
 
 		int cw_;
 		int ch_;
+		bool should_close_ = false;
 	};
 };

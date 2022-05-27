@@ -20,7 +20,7 @@
 
 #include <jclib/functor.h>
 #include <sstream>
-
+#include <iomanip>
 
 struct GameStream
 {
@@ -618,19 +618,23 @@ void perf_test()
 	for (int n = 0; n != 10; ++n)
 	{
 		auto b = Board();
+		size_t total = 0;
 		reset_board(b);
-		const auto fn = [&b]()
+		const auto fn = [&b, &total]()
 		{
 			auto t = MoveTree();
 			t.board = b;
 			t.to_play = Color::white;
 			t.evalulate_next();
 			t.evalulate_next();
+			total += t.tree_size();
 		};
 
 		using namespace std::chrono_literals;
 		const auto rt = count_runs_for(fn, 1s);
 		std::cout << "rt : " << rt << '\n';
+		std::cout << "n  : " << total << '\n';
+		std::cout << "ns : " << std::fixed << (double)total / 1.0 << '\n';
 	};
 };
 
