@@ -536,27 +536,23 @@ void perf_test()
 {
 	using namespace chess;
 	
-	auto b = Board();
-	reset_board(b);
-
-	const auto kp = BoardPiece(Piece::king, Color::white, (File::e, Rank::r1));
-	const auto pp = BoardPiece(Piece::pawn, Color::black, (File::e, Rank::r7));
-
-	const auto fn0 = [&b, kp]()
+	for (int n = 0; n != 10; ++n)
 	{
-		is_piece_attacked_old(b, kp);
-	};
-	const auto fn1 = [&b, kp]()
-	{
-		is_piece_attacked(b, kp);
-	};
+		auto b = Board();
+		reset_board(b);
+		const auto fn = [&b]()
+		{
+			auto t = MoveTree();
+			t.board = b;
+			t.to_play = Color::white;
+			t.evalulate_next();
+			t.evalulate_next();
+		};
 
-	using namespace std::chrono_literals;
-	const auto rt0 = count_runs_for(fn0, 1s);
-	const auto rt1 = count_runs_for(fn1, 1s);
-	std::cout << "rt0 : " << rt0 << '\n';
-	std::cout << "rt1 : " << rt1 << '\n';
-	std::cout << "drt : " << (int64_t)rt1 - (int64_t)rt0 << '\n';
+		using namespace std::chrono_literals;
+		const auto rt = count_runs_for(fn, 1s);
+		std::cout << "rt : " << rt << '\n';
+	};
 };
 
 
@@ -608,13 +604,27 @@ void local_game()
 	exit(0);
 };
 
-
+/*
+	Initial:
+		rt : 3079
+		rt : 3305
+		rt : 3598
+		rt : 3613
+		rt : 3691
+		rt : 3741
+		rt : 3680
+		rt : 3723
+		rt : 3670
+		rt : 3874
+*/
 
 
 int main(int _nargs, const char* _vargs[])
 {
-	if (!run_tests()) { return 0; };
+	if (!run_tests()) { return 1; };
 	perf_test();
+	exit(0);
+
 
 	if (_nargs == 0 || !_vargs || !_vargs[0])
 	{
