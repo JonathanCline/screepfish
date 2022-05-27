@@ -443,6 +443,21 @@ bool run_tests()
 	};
 
 
+	{
+		auto _board = Board();
+		reset_board(_board);
+		const auto rt0 = rate_board(_board, Color::white);
+		_board.move((File::a, Rank::r2), (File::a, Rank::r4));
+		const auto rt1 = rate_board(_board, Color::white);
+
+		// rt1 should be slightly higher
+		if (rt0 >= rt1)
+		{
+			std::cout << rt1 << " should be greater than " << rt0 << '\n';
+			abort();
+		};
+	};
+
 
 
 	return _runOnFinish;

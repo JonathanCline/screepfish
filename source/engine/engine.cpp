@@ -102,21 +102,29 @@ namespace sch
 					};
 
 					const auto _clock = std::chrono::steady_clock{};
-					const auto t0 = _clock.now();
 
 					const size_t _pieceCount = _board.pieces().size();
 
 					const auto _depth = (_pieceCount < 8) ? 5 : 4;
+
+					const auto t0 = _clock.now();
 					auto _tree = this->build_move_tree(_board, _myColor, _depth);
-					std::cout << _tree.tree_size() << '\n';
-
-					const auto _move = _tree.best_move();
-
+					
 					const auto t1 = _clock.now();
-					const auto td = t1 - t0;
-					std::cout << "Delta time : " << std::chrono::duration_cast<std::chrono::duration<double>>(td) << '\n';
+					const auto _move = _tree.best_move();
+					const auto t2 = _clock.now();
+
+					const auto tdA = t1 - t0;
+					const auto tdB = t2 - t1;
+					const auto td = t2 - t0;
+
+					constexpr auto fn = [](auto v)
+					{
+						return std::chrono::duration_cast<std::chrono::duration<double>>(v);
+					};
+
+					std::cout << "Delta time : " << fn(td) << '(' << fn(tdA) << ", " << fn(tdB) << ")\n";
 					std::cout << _board << '\n';
-					std::cout << _board.get_white_piece_bitboard() << '\n';
 
 					this->best_move_ = _move;
 				};

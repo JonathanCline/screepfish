@@ -748,7 +748,22 @@ namespace chess
 	};
 
 
-	chess::Rating rate_move(const chess::Board& _board, const chess::Move& _move, chess::Color _forPlayer, const bool _isCheck)
+	constexpr inline auto white_distance_to_promote_v = std::array
+	{
+		7, // rank 1
+		6, 5, 4, 3, 2, 1,
+		0 // rank 8
+	};
+	constexpr inline auto black_distance_to_promote_v = std::array
+	{
+		0, // rank 1
+		1, 2, 3, 4, 5, 6,
+		7 // rank 8
+	};
+
+
+
+	chess::Rating rate_board(const chess::Board& _board, chess::Color _forPlayer)
 	{
 		using namespace chess;
 
@@ -759,35 +774,39 @@ namespace chess
 			return 100000.0f;
 		};
 
-		if (_board.get(_move.from()) == Piece::king)
+		if (_board.get_castle_kingside_flag(_forPlayer))
 		{
-			if (_board.get_castle_kingside_flag(_forPlayer))
-			{
-				_rating -= 0.00001f;
-			};
-			if (_board.get_castle_queenside_flag(_forPlayer))
-			{
-				_rating -= 0.00001f;
-			};
+			_rating += 0.00001f;
+		};
+		if (_board.get_castle_queenside_flag(_forPlayer))
+		{
+			_rating += 0.00001f;
 		};
 
 		for (auto& v : _board.pieces())
 		{
 			if (v == Piece::pawn)
 			{
-				int _closeToPromote = 0;
+				int _distanceToPromote = 0;
 				if (v.color() == Color::white)
 				{
-					_closeToPromote =
-						(int)v.rank();
+					_distanceToPromote = white_distance_to_promote_v[(int)v.rank()];
 				}
 				else
 				{
-					_closeToPromote =
-						-((int)v.rank() - (int)Rank::r8);
+					_distanceToPromote = black_distance_to_promote_v[(int)v.rank()];
 				};
-				_rating += ((float)_closeToPromote / 1000.0f);				
-			}
+				
+				const auto _ratingValue = ((float)(7 - _distanceToPromote) / 100.0f);
+				if (v.color() == _forPlayer)
+				{
+					_rating += _ratingValue;
+				}
+				else
+				{
+					_rating -= _ratingValue;
+				};
+			};
 
 			if (v.color() == _forPlayer)
 			{
@@ -800,6 +819,11 @@ namespace chess
 		};
 
 		return _rating;
+	};
+
+	chess::Rating rate_move(const chess::Board& _board, const chess::Move& _move, chess::Color _forPlayer, const bool _isCheck)
+	{
+		return rate_board(_board, _forPlayer);
 	};
 
 };

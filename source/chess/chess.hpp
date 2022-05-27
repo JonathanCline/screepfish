@@ -977,6 +977,10 @@ namespace chess
 		{
 			this->move_piece(_move.from(), _move.to(), _move.promotion());
 		};
+		void move(Position _from, Position _to)
+		{
+			this->move_piece(_from, _to);
+		};
 
 
 		bool has_enpassant_target() const noexcept
