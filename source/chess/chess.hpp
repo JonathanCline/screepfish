@@ -551,14 +551,51 @@ namespace chess
 			return *(this->pend() - 1);
 		};
 
+		// Gets the king piece
+		const BoardPiece& get_white_king() const
+		{
+			return this->pieces_.at(0);
+		};
+		const BoardPiece& get_black_king() const
+		{
+			return this->pieces_.at(1);
+		};
+		const BoardPiece& get_king(Color _color) const
+		{
+			if (_color == Color::white)
+			{
+				return this->get_white_king();
+			}
+			else
+			{
+				return this->get_black_king();
+			};
+		};
+
 		// find for pieces container
 		piterator pfind(const Piece& _piece)
 		{
+			if (_piece == Piece::black_king)
+			{
+				return this->pbegin() + 1;
+			}
+			else if (_piece == Piece::white_king)
+			{
+				return this->pbegin();
+			};
 			return std::find(this->pbegin(), this->pend(), _piece);
 		};
 		// find for pieces container
 		const_piterator pfind(const Piece& _piece) const
 		{
+			if (_piece == Piece::black_king)
+			{
+				return this->pbegin() + 1;
+			}
+			else if (_piece == Piece::white_king)
+			{
+				return this->pbegin();
+			};
 			return std::find(this->pbegin(), this->pend(), _piece);
 		};
 

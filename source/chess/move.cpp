@@ -1170,17 +1170,21 @@ namespace chess
 	{
 		using namespace chess;
 
-		auto p = _board.pfind(chess::PieceType::king, _forPlayer);
-		if (p != _board.pend())
+		const auto& p = _board.get_king(_forPlayer);
+		if (p)
 		{
 			// Quick check that an enemy pieces is in one of the threat positions
-			auto _threatPositions = BitBoard(get_threat_positions(p->position()));
+			auto _threatPositions = BitBoard(get_threat_positions(p.position()));
+
+			// Remove the enemy king as it will never be a threat
+			_threatPositions.reset(_board.get_king(!_forPlayer).position());
+
 			if (_forPlayer == Color::white)
 			{
 				// If a piece is directly above us, remove the whole file above the king
-				if (p->rank() != Rank::r8 && _board.has_friendy_piece(next(p->position(), 0, 1), _forPlayer))
+				if (p.rank() != Rank::r8 && _board.has_friendy_piece(next(p.position(), 0, 1), _forPlayer))
 				{
-					_threatPositions &= ~make_file_bits(p->file(), p->rank(), Rank::r8);
+					_threatPositions &= ~make_file_bits(p.file(), p.rank(), Rank::r8);
 				};
 
 				auto _threats = _threatPositions & _board.get_black_piece_bitboard();
@@ -1194,11 +1198,11 @@ namespace chess
 			else
 			{
 				// If a piece is directly below us, remove the whole file below the king
-				if (p->rank() != Rank::r1 && _board.has_friendy_piece(next(p->position(), 0, -1), _forPlayer))
+				if (p.rank() != Rank::r1 && _board.has_friendy_piece(next(p.position(), 0, -1), _forPlayer))
 				{
-					_threatPositions &= ~make_file_bits(p->file(), Rank::r1, p->rank());
+					_threatPositions &= ~make_file_bits(p.file(), Rank::r1, p.rank());
 				};
-				_board.pieces_on_file(p->file());
+				_board.pieces_on_file(p.file());
 
 				auto _threats = _threatPositions & _board.get_white_piece_bitboard();
 				if (_threats.none())
@@ -1209,7 +1213,7 @@ namespace chess
 				};
 			};
 
-			return is_piece_attacked(_board, *p);
+			return is_piece_attacked(_board, p);
 		};
 		return true;
 	};
