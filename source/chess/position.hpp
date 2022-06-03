@@ -611,6 +611,40 @@ namespace chess
 		constexpr bool operator==(const Position& rhs) const noexcept = default;
 		constexpr bool operator!=(const Position& rhs) const noexcept = default;
 
+		friend constexpr inline bool operator==(const Position& lhs, File rhs) noexcept
+		{
+			return lhs.file() == rhs;
+		};
+		friend constexpr inline bool operator==(const Position& lhs, Rank rhs) noexcept
+		{
+			return lhs.rank() == rhs;
+		};
+		friend constexpr inline bool operator==(File lhs, const Position& rhs) noexcept
+		{
+			return lhs == rhs.file();
+		};
+		friend constexpr inline bool operator==(Rank lhs, const Position& rhs) noexcept
+		{
+			return lhs == rhs.rank();
+		};
+
+		friend constexpr inline bool operator!=(const Position& lhs, File rhs) noexcept
+		{
+			return lhs.file() != rhs;
+		};
+		friend constexpr inline bool operator!=(const Position& lhs, Rank rhs) noexcept
+		{
+			return lhs.rank() != rhs;
+		};
+		friend constexpr inline bool operator!=(File lhs, const Position& rhs) noexcept
+		{
+			return lhs != rhs.file();
+		};
+		friend constexpr inline bool operator!=(Rank lhs, const Position& rhs) noexcept
+		{
+			return lhs != rhs.rank();
+		};
+
 		constexpr Position() noexcept = default;
 		constexpr Position(File _file, Rank _rank) noexcept :
 			pos_(concat(_file, _rank))
