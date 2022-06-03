@@ -611,13 +611,29 @@ namespace sch
 		return _runOnFinish;
 	};
 
+	auto perf_test_part(auto&& _op)
+	{
+		using namespace chess;
+
+		std::array<size_t, 5> _runs{};
+
+		for (auto& r : _runs)
+		{
+			using namespace std::chrono_literals;
+			r = sch::count_runs_within_duration(_op, 1s);
+		};
+
+		const auto _runsTotal = std::accumulate(_runs.begin(), _runs.end(), (size_t)0);
+		const auto _runsAvg = _runsTotal / _runs.size();
+		return _runsAvg;
+		std::cout << "rt : " << _runsAvg << std::endl;
+	};
+
 	void perf_test()
 	{
 		using namespace chess;
 
-		std::array<size_t, 10> _runs{};
-
-		for (auto& r : _runs)
+		// opening, depth 2
 		{
 			auto b = Board();
 			reset_board(b);
@@ -628,14 +644,23 @@ namespace sch
 				t.evalulate_next();
 				t.evalulate_next();
 			};
-
-			using namespace std::chrono_literals;
-			r = sch::count_runs_within_duration(fn, 1s);
+			const auto r = perf_test_part(fn);
+			std::cout << "opening (d2) - " << r << std::endl;
 		};
 
-		const auto _runsTotal = std::accumulate(_runs.begin(), _runs.end(), (size_t)0);
-		const auto _runsAvg = _runsTotal / _runs.size();
-		std::cout << "rt : " << _runsAvg << std::endl;
+		// midgame, depth 2
+		{
+			auto b = *parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
+			const auto fn = [&b]()
+			{
+				auto t = MoveTree();
+				t.board = b;
+				t.evalulate_next();
+				t.evalulate_next();
+			};
+			const auto r = perf_test_part(fn);
+			std::cout << "midgame (d2) - " << r << std::endl;
+		};
 	};
 
 	bool local_game(const char* _assetsDirectoryPath, bool _step)
