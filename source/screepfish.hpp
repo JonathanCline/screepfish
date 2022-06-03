@@ -8,7 +8,7 @@ namespace sch
 
 	void perf_test();
 
-	bool local_game(const char* _assetsDirectoryPath);
+	bool local_game(const char* _assetsDirectoryPath, bool _step);
 
 
 	int local_game_main(int _nargs, const char* _vargs[]);

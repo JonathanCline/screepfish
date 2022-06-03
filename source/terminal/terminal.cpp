@@ -40,7 +40,13 @@ namespace chess
 
 
 
-	
+	void Terminal::step()
+	{
+		if (this->step_)
+		{
+			this->wait_for_any_key();
+		};
+	};
 	void Terminal::wait_for_any_key()
 	{
 		if (const auto ev = terminal_read(); is_close_event(ev))
@@ -300,8 +306,8 @@ namespace chess
 
 
 
-	Terminal::Terminal(const char* _assetsDirectoryPathStr) :
-		cw_(32), ch_(64)
+	Terminal::Terminal(const char* _assetsDirectoryPathStr, bool _step) :
+		cw_(32), ch_(64), step_(_step)
 	{
 		namespace fs = std::filesystem;
 

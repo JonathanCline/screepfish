@@ -10,6 +10,7 @@ namespace chess
 	{
 	public:
 
+		void step();
 		void wait_for_any_key();
 
 		bool should_close() const;
@@ -19,7 +20,7 @@ namespace chess
 
 
 
-		Terminal(const char* _assetsDirectory);
+		Terminal(const char* _assetsDirectory, bool _step = false);
 		~Terminal();
 
 	private:
@@ -30,5 +31,6 @@ namespace chess
 		int cw_;
 		int ch_;
 		bool should_close_ = false;
+		bool step_ = false;
 	};
 };

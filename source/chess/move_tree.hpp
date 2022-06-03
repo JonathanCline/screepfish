@@ -36,12 +36,16 @@ namespace chess
 		std::vector<MoveTreeNode> moves{}; // moves that can be played from the initial board state
 		Color to_play{}; // who is to play
 
+
+
 		void evalulate_next();
 		std::optional<Move> best_move(std::mt19937& _rnd);
 		size_t tree_size() const;
 		size_t total_outcomes() const;
 
 		MoveTree() = default;
+
+		size_t depth_counter_ = 0;
 	};
 
 

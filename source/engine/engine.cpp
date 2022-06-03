@@ -136,7 +136,7 @@ namespace sch
 
 					const auto t0 = _clock.now();
 					auto _tree = this->build_move_tree(_board, _myColor, _depth);
-					
+
 					const auto t1 = _clock.now();
 					const auto _move = _tree.best_move(this->rnd_);
 					const auto t2 = _clock.now();

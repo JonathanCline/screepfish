@@ -96,7 +96,7 @@ namespace chess
 
 	void MoveTreeNode::show_best_line() const
 	{
-		std::cout << this->move.move << ' ';
+		std::cout << this->move.move << "(" << this->move.rating << ") ";
 		if (!this->responses.empty())
 		{
 			this->responses.front().show_best_line();
@@ -117,10 +117,7 @@ namespace chess
 
 	void MoveTree::evalulate_next()
 	{
-		// Apply our move.
 		auto& _board = this->board;
-
-
 		if (this->moves.empty())
 		{
 			// Get the possible responses
@@ -165,6 +162,8 @@ namespace chess
 			{
 				return lhs.move.rating > rhs.move.rating;
 			});
+
+		++this->depth_counter_;
 	};
 
 	std::optional<Move> MoveTree::best_move(std::mt19937& _rnd)
@@ -175,6 +174,14 @@ namespace chess
 		}
 		else
 		{
+			for (auto& v : this->moves)
+			{
+				if (v.responses.empty())
+				{
+					return v.move.move;
+				};
+			};
+
 			auto& _best = this->moves.front().move;
 			const auto it = std::ranges::find_if(this->moves, [&_best](MoveTreeNode& v)
 				{
@@ -184,7 +191,6 @@ namespace chess
 		 	const auto _rndNum = _rnd();
 			const auto _rndIndex = _rndNum % (it - this->moves.begin());
 			const auto _rndIter = this->moves.begin() + _rndIndex;
-			std::cout << _rndIter->move.move << ' ';
 			_rndIter->show_best_line();
 			std::cout << std::endl;
 

@@ -414,10 +414,6 @@ namespace sch
 		{
 			const auto _fen = "1rb1kbnr/ppNppppp/2n5/6NQ/4P3/3P4/PPP2PPq/R3KB1R b KQk - 1 11";
 			const auto _board = *parse_fen(_fen);
-
-			std::cout << _fen << '\n';
-			std::cout << get_fen(_board) << '\n';
-			std::cout << _board << '\n';
 			if (!is_check(_board, Color::black))
 			{
 				abort();
@@ -570,6 +566,29 @@ namespace sch
 			};
 		};
 
+		// Mate in 1
+		{
+			const auto _fen = "6rn/8/8/8/K7/2k5/1q6/8 b - - 92 118";
+			auto _board = *parse_fen(_fen);
+
+			if (chess::is_checkmate(_board, Color::white))
+			{
+				// Shouldn't be checkmate
+				abort();
+			};
+
+			auto _engine = sch::ScreepFish();
+			_engine.start(_board, Color::black);
+			_engine.set_board(_board);
+			const auto _move = _engine.get_move();
+
+			_board.move(*_move.move);
+			if (!chess::is_checkmate(_board, Color::white))
+			{
+				// Should be checkmate
+				abort();
+			};
+		};
 
 		return _runOnFinish;
 	};
@@ -602,10 +621,10 @@ namespace sch
 		std::cout << "rt : " << _runsAvg << std::endl;
 	};
 
-	bool local_game(const char* _assetsDirectoryPath)
+	bool local_game(const char* _assetsDirectoryPath, bool _step)
 	{
 		using namespace chess;
-		auto _terminal = chess::Terminal(_assetsDirectoryPath);
+		auto _terminal = chess::Terminal(_assetsDirectoryPath, _step);
 
 		auto _board = Board();
 		reset_board(_board);
@@ -623,6 +642,8 @@ namespace sch
 
 		_board.move(_move);
 		_terminal.set_board(_board);
+		_terminal.step();
+
 		e1.start(_board, Color::black);
 
 		while (true)
@@ -632,6 +653,7 @@ namespace sch
 				return false;
 			};
 
+			std::cout << "b: ";
 			e1.set_board(_board);
 			if (auto m = e1.get_move(); m.move)
 			{
@@ -644,13 +666,18 @@ namespace sch
 			};
 
 			_board.move(_move);
+			std::cout << get_fen(_board) << std::endl;
+
 			_terminal.set_board(_board);
+			_terminal.step();
+
 			if (_board.get_half_move_count() >= 50)
 			{
 				std::cout << "50 move rule" << std::endl;
 				break;
 			};
 
+			std::cout << "w: ";
 			e0.set_board(_board);
 			if (auto m = e0.get_move(); m.move)
 			{
@@ -663,7 +690,10 @@ namespace sch
 			};
 
 			_board.move(_move);
+			std::cout << get_fen(_board) << std::endl;
+
 			_terminal.set_board(_board);
+			_terminal.step();
 
 			if (_board.get_half_move_count() >= 50)
 			{
@@ -683,10 +713,25 @@ namespace sch
 		const auto p = (std::filesystem::path(_vargs[0]).parent_path() / "assets" / "chess").generic_string();
 		std::cout << p << '\n';
 
-		bool _keepAlive = true;
+		bool _step = false;
+		bool _one = false;
+		for (int n = 1; n < _nargs; ++n)
+		{
+			const auto _arg = std::string_view(_vargs[n]);
+			if (_arg == "--step")
+			{
+				_step = true;
+			}
+			else if (_arg == "--one")
+			{
+				_one = true;
+			};
+		};
+
+		bool _keepAlive = !_one;
 		while (_keepAlive)
 		{
-			_keepAlive = sch::local_game(p.c_str());
+			_keepAlive = sch::local_game(p.c_str(), _step);
 		};
 
 		return 0;
