@@ -79,7 +79,7 @@ namespace chess
 	constexpr bool trynext(File& _file, int _count = 1)
 	{
 		auto _newFile = File(jc::to_underlying(_file) + _count);
-		if (_newFile > File::h)
+		if (_newFile > File::h) JCLIB_UNLIKELY
 		{
 			return false;
 		}
@@ -270,7 +270,7 @@ namespace chess
 	constexpr bool trynext(Rank& _rank, int _count = 1)
 	{
 		auto _newRank = Rank(jc::to_underlying(_rank) + _count);
-		if (_newRank > Rank::r8)
+		if (_newRank > Rank::r8) JCLIB_UNLIKELY
 		{
 			return false;
 		}
@@ -762,10 +762,10 @@ namespace chess
 	constexpr Position trynext(Position _position, int _dFile, int _dRank, bool& _possible)
 	{
 		const auto _newFile = trynext(_position.file(), _dFile, _possible);
-		if (!_possible) { return _position; };
+		if (!_possible) JCLIB_UNLIKELY { return _position; };
 
 		const auto _newRank = trynext(_position.rank(), _dRank, _possible);
-		if (!_possible) { return _position; };
+		if (!_possible) JCLIB_UNLIKELY { return _position; };
 
 		return Position(_newFile, _newRank);
 	};

@@ -12,7 +12,7 @@ namespace chess
 		constexpr auto BLOCKED_BISHOP_RATING = 0.001f;
 		constexpr auto PAWN_PUSH_RATING = 0.001f;
 		constexpr auto CASTLE_ABILITY_RATING = 0.001f;
-		constexpr auto DEVELOPMENT_RATING = 0.0005f;
+		constexpr auto DEVELOPMENT_RATING = 0.005f;
 	};
 
 
@@ -245,6 +245,7 @@ namespace chess
 
 
 
+
 	bool is_piece_attacked_by_pawn(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
 	{
 		using namespace chess;
@@ -258,7 +259,6 @@ namespace chess
 	bool is_piece_attacked_by_knight(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
 	{
 		using namespace chess;
-		
 		const auto _attackBB = get_knight_attack_squares(_byPiece.position());
 		return _attackBB.test(_piece.position());
 	};
@@ -306,6 +306,14 @@ namespace chess
 		using namespace chess;
 
 		const auto _position = _byPiece.position();
+		const auto _offset = _piece.position() - _position;
+
+		if (!((_offset.delta_rank() == 0) ^ (_offset.delta_file() == 0)))
+		{
+			// Not on same file / rank
+			return false;
+		};
+
 		constexpr auto _directionPairs = std::array
 		{
 			std::pair{  0,  1 },
@@ -380,16 +388,9 @@ namespace chess
 						return true;
 					};
 
-					if (_board.has_friendy_piece(_nextPosition, _byPiece.color()))
+					if (!_board.is_empty(_nextPosition))
 					{
 						break;
-					}
-					else
-					{
-						if (_board.has_enemy_piece(_nextPosition, _byPiece.color()))
-						{
-							break;
-						};
 					};
 				}
 				else
@@ -409,26 +410,95 @@ namespace chess
 		return (fd <= 1 && rd <= 1);
 	};
 
-	bool is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece)
+	bool is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece, bool _inCheck)
+	{
+		std::array<Move, 64> _data{};
+		auto _buffer = MoveBuffer(_data);
+		const auto bp = _buffer.head();
+
+		get_piece_attacked_from_moves(_board, _piece, _buffer, _inCheck);
+		if (_buffer.head() != bp)
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		};
+	};
+
+
+
+	void get_piece_attacks_with_pawn(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece, MoveBuffer& _buffer)
+	{
+		if (is_piece_attacked_by_pawn(_board, _piece, _byPiece))
+		{
+			_buffer.write(_byPiece.position(), _piece.position());
+		};
+	};
+	void get_piece_attacks_with_knight(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece, MoveBuffer& _buffer)
+	{
+		if (is_piece_attacked_by_knight(_board, _piece, _byPiece))
+		{
+			_buffer.write(_byPiece.position(), _piece.position());
+		};
+	};
+	void get_piece_attacks_with_bishop(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece, MoveBuffer& _buffer)
+	{
+		if (is_piece_attacked_by_bishop(_board, _piece, _byPiece))
+		{
+			_buffer.write(_byPiece.position(), _piece.position());
+		};
+	};
+	void get_piece_attacks_with_rook(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece, MoveBuffer& _buffer)
+	{
+		if (is_piece_attacked_by_rook(_board, _piece, _byPiece))
+		{
+			_buffer.write(_byPiece.position(), _piece.position());
+		};
+	};
+	void get_piece_attacks_with_queen(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece, MoveBuffer& _buffer)
+	{
+		if (is_piece_attacked_by_queen(_board, _piece, _byPiece))
+		{
+			_buffer.write(_byPiece.position(), _piece.position());
+		};
+	};
+	void get_piece_attacks_with_king(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece, MoveBuffer& _buffer)
+	{
+		if (is_piece_attacked_by_king(_board, _piece, _byPiece))
+		{
+			_buffer.write(_byPiece.position(), _piece.position());
+		};
+	};
+
+	void get_piece_attacked_from_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _outBuffer, bool _inCheck)
 	{
 		using namespace chess;
 
+		std::array<Move, 32> _bufferData{};
+		MoveBuffer _buffer{ _bufferData.data(), _bufferData.data() + _bufferData.size() };
+		const auto bb = _buffer.head();
+
+		// Quicker pawn check
 		if (_piece.color() == Color::white)
 		{
 			if (_piece.rank() < Rank::r7)
 			{
 				if (_piece.file() != File::a)
 				{
-					if (_board.get(next(_piece.position(), -1, 1)) == Piece(Piece::pawn, Color::black))
+					const auto np = next(_piece.position(), -1, 1);
+					if (_board.get(np) == Piece(Piece::pawn, Color::black))
 					{
-						return true;
+						_buffer.write(np, _piece.position());
 					};
 				};
 				if (_piece.file() != File::h)
 				{
-					if (_board.get(next(_piece.position(), 1, 1)) == Piece(Piece::pawn, Color::black))
+					const auto np = next(_piece.position(), 1, 1);
+					if (_board.get(np) == Piece(Piece::pawn, Color::black))
 					{
-						return true;
+						_buffer.write(np, _piece.position());
 					};
 				};
 			};
@@ -439,16 +509,18 @@ namespace chess
 			{
 				if (_piece.file() != File::a)
 				{
-					if (_board.get(next(_piece.position(), -1, -1)) == Piece(Piece::pawn, Color::white))
+					const auto np = next(_piece.position(), -1, -1);
+					if (_board.get(np) == Piece(Piece::pawn, Color::white))
 					{
-						return true;
+						_buffer.write(np, _piece.position());
 					};
 				};
 				if (_piece.file() != File::h)
 				{
-					if (_board.get(next(_piece.position(), 1, -1)) == Piece(Piece::pawn, Color::white))
+					const auto np = next(_piece.position(), 1, -1);
+					if (_board.get(np) == Piece(Piece::pawn, Color::white))
 					{
-						return true;
+						_buffer.write(np, _piece.position());
 					};
 				};
 			};
@@ -463,42 +535,42 @@ namespace chess
 				switch (p.type())
 				{
 				case PieceType::knight:
-					if (is_piece_attacked_by_knight(_board, _piece, p))
-					{
-						return true;
-					};
+					get_piece_attacks_with_knight(_board, _piece, p, _buffer);
 					break;
 				case PieceType::bishop:
-					if (is_piece_attacked_by_bishop(_board, _piece, p))
-					{
-						return true;
-					};
+					get_piece_attacks_with_bishop(_board, _piece, p, _buffer);
 					break;
 				case PieceType::rook:
-					if (is_piece_attacked_by_rook(_board, _piece, p))
-					{
-						return true;
-					};
+					get_piece_attacks_with_rook(_board, _piece, p, _buffer);
 					break;
 				case PieceType::queen:
-					if (is_piece_attacked_by_queen(_board, _piece, p))
-					{
-						return true;
-					};
+					get_piece_attacks_with_queen(_board, _piece, p, _buffer);
 					break;
 				case PieceType::king:
-					if (is_piece_attacked_by_king(_board, _piece, p))
-					{
-						return true;
-					};
+					get_piece_attacks_with_king(_board, _piece, p, _buffer);
+					break;
+				case PieceType::pawn:
+					get_piece_attacks_with_pawn(_board, _piece, p, _buffer);
 					break;
 				default:
 					break;
 				};
 			};
 		};
-		return false;
+
+		const auto be = _buffer.head();
+		for (auto bp = bb; bp != be; ++bp)
+		{
+			auto b = _board;
+			b.move(*bp);
+
+			if (_piece.type() == Piece::king || !is_check(b, !_piece.color()))
+			{
+				_outBuffer.write(*bp);
+			};
+		};
 	};
+
 
 
 
@@ -679,6 +751,7 @@ namespace chess
 			std::pair{ -1,  0 },
 			std::pair{ -1,  1 },
 			std::pair{  0, -1 },
+
 			std::pair{  0,  1 },
 			std::pair{  1, -1 },
 			std::pair{  1,  0 },
@@ -694,7 +767,7 @@ namespace chess
 			};
 		};
 
-		if (_board.get_castle_kingside_flag(_piece.color()))
+		if (can_castle_kingside(_board, _piece.color()))
 		{
 			Position _dest{};
 			if (_piece.color() == Color::white)
@@ -705,15 +778,9 @@ namespace chess
 			{
 				_dest = Position(File::g, Rank::r8);
 			};
-
-			if (_board.is_empty((File::f, _dest.rank()))
-				&& _board.is_empty((File::g, _dest.rank()))
-				&& can_castle_kingside(_board, _piece.color()))
-			{
-				_buffer.write(_position, _dest);
-			};
+			_buffer.write(_position, _dest);
 		}
-		if (_board.get_castle_queenside_flag(_piece.color()))
+		if (can_castle_queenside(_board, _piece.color()))
 		{
 			Position _dest{};
 			if (_piece.color() == Color::white)
@@ -724,14 +791,7 @@ namespace chess
 			{
 				_dest = Position(File::c, Rank::r8);
 			};
-
-			if (_board.is_empty((File::d, _dest.rank()))
-				&& _board.is_empty((File::c, _dest.rank()))
-				&& _board.is_empty((File::b, _dest.rank()))
-				&& can_castle_queenside(_board, _piece.color()))
-			{
-				_buffer.write(_position, _dest);
-			};
+			_buffer.write(_position, _dest);
 		};
 	};
 	void get_bishop_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer, const bool _isCheck)
@@ -867,23 +927,98 @@ namespace chess
 			return false;
 		};
 
-		if (is_check(_board, _player))
+		// Check the squares that castling would occur across.
 		{
-			return false;
+			auto _checkSquares = std::array<Position, 2>{};
+			if (_player == Color::white)
+			{
+				_checkSquares[0] = (File::f, Rank::r1);
+				_checkSquares[1] = (File::g, Rank::r1);
+			}
+			else
+			{
+				_checkSquares[0] = (File::f, Rank::r8);
+				_checkSquares[1] = (File::g, Rank::r8);
+			};
+
+			// Cannot castle through other pieces.
+			for (auto& v : _checkSquares)
+			{
+				if (!_board.is_empty(v))
+				{
+					return false;
+				};
+			};
+
+			// Cannot castle out of check
+			if (is_check(_board, _player))
+			{
+				return false;
+			};
+
+			// Cannot castle through / into check
+			for (auto& v : _checkSquares)
+			{
+				auto b = _board;
+				b.move(b.get_king(_player).position(), v);
+				if (is_check(b, _player))
+				{
+					return false;
+				};
+			};
 		};
 
 		return true;
 	};
 	bool can_castle_queenside(const chess::Board& _board, chess::Color _player)
 	{
-		if (!_board.get_castle_kingside_flag(_player))
+		if (!_board.get_castle_queenside_flag(_player))
 		{
 			return false;
 		};
 
-		if (is_check(_board, _player))
+		// Check the squares that castling would occur across.
 		{
-			return false;
+			auto _checkSquares = std::array<Position, 3>{};
+			if (_player == Color::white)
+			{
+				_checkSquares[0] = (File::d, Rank::r1);
+				_checkSquares[1] = (File::c, Rank::r1);
+				_checkSquares[2] = (File::b, Rank::r1);
+			}
+			else
+			{
+				_checkSquares[0] = (File::d, Rank::r8);
+				_checkSquares[1] = (File::c, Rank::r8);
+				_checkSquares[2] = (File::b, Rank::r8);
+			};
+
+			// Cannot castle through other pieces.
+			for (auto& v : _checkSquares)
+			{
+				if (!_board.is_empty(v))
+				{
+					return false;
+				};
+			};
+
+			// Cannot castle out of check
+			if (is_check(_board, _player))
+			{
+				return false;
+			};
+
+			// Cannot castle through / into check
+			for (size_t n = 0; n != 2; ++n)
+			{
+				auto& v = _checkSquares[n];
+				auto b = _board;
+				b.move(b.get_king(_player).position(), v);
+				if (is_check(b, _player))
+				{
+					return false;
+				};
+			};
 		};
 
 		return true;
@@ -1528,6 +1663,30 @@ namespace chess
 			};
 			break;
 
+			case Piece::white_king:
+			{
+				if constexpr (Player == Color::white)
+				{
+					_rating += material_value(Piece::king);
+				}
+				else
+				{
+					_rating -= material_value(Piece::king);
+				};
+			};
+			break; 
+			case Piece::black_king:
+			{
+				if constexpr (Player == Color::white)
+				{
+					_rating -= material_value(Piece::king);
+				}
+				else
+				{
+					_rating += material_value(Piece::king);
+				};
+			};
+			break;
 			default:
 				break;
 			};

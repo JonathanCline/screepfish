@@ -1069,15 +1069,15 @@ namespace chess
 				*this->pfind(_fromPos) = _promotion;
 			};
 
-			if (_oldEnpassantTarget && *_oldEnpassantTarget == _toPos)
+			if (_oldEnpassantTarget && *_oldEnpassantTarget == _toPos &&
+				it->type() == Piece::pawn)
 			{
-				if (_toPos.rank() == Rank::r6)
+				const auto _enemyPos = (_toPos == Rank::r6) ?
+					(_toPos.file(), Rank::r5) :
+					(_toPos.file(), Rank::r4);
+				if (this->pfind(_enemyPos)->color() != it->color())
 				{
-					this->erase((_toPos.file(), Rank::r5));
-				}
-				else
-				{
-					this->erase((_toPos.file(), Rank::r4));
+					this->erase(_enemyPos);
 				};
 			};
 

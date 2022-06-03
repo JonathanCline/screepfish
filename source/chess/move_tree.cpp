@@ -274,6 +274,7 @@ namespace chess
 		return o;
 	};
 
+
 	size_t MoveTree::count_unique_positions()
 	{
 		auto bs = std::set<size_t>();

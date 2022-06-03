@@ -403,7 +403,7 @@ namespace sch
 
 	bool run_tests_main()
 	{
-		bool _runOnFinish = false;
+		bool _runOnFinish = true;
 
 		{
 			bool _failed = false;
@@ -420,7 +420,7 @@ namespace sch
 				};
 			};
 
-			if (_failed)
+			if (_failed && !_runOnFinish)
 			{
 				return _runOnFinish;
 			};
@@ -589,6 +589,69 @@ namespace sch
 				// Should be check
 				abort();
 			};
+		};
+
+		// Rook check
+		{
+			auto _board = *parse_fen("4r3/2bk1p2/8/PbP5/1P5p/5P2/1R5P/1N2K2R w K - 11 39");
+			if (!is_check(_board, Color::white))
+			{
+				// Should be check
+				std::cout << _board << std::endl;
+				abort();
+			};
+
+			_board.move((File::b, Rank::r2), (File::d, Rank::r2));
+			if (!is_piece_attacked_by_rook(_board,
+				_board.get_white_king(),
+				*_board.pfind((File::e, Rank::r8))
+			))
+			{
+				auto _data = std::array<Move, 32>{};
+				auto _buffer = MoveBuffer(_data);
+				get_rook_moves(_board, *_board.pfind((File::e, Rank::r8)), _buffer);
+				for (auto bp = _data.data(); bp != _buffer.head(); ++bp)
+				{
+					std::cout << *bp << std::endl;
+				};
+				std::cout << _board << std::endl;
+				abort();
+			};
+
+			if (!is_piece_attacked(_board, _board.get_white_king()))
+			{
+				// Should be check
+				std::cout << _board << std::endl;
+				abort();
+			};
+
+			if (!is_check(_board, Color::white))
+			{
+				// Should be check
+				std::cout << _board << std::endl;
+				abort();
+			};
+
+			auto _data = std::array<Move, 32>{};
+			auto _buffer = MoveBuffer(_data);
+			const auto b0 = _buffer.head();
+			get_moves(_board, Color::white, _buffer);
+			const auto b1 = _buffer.head();
+
+			for (auto bp = b0; bp != b1; ++bp)
+			{
+				std::cout << *bp << std::endl;
+
+				auto nb = _board;
+				nb.move(*bp);
+				if (is_check(nb, Color::white))
+				{
+					// Should NEVER be check
+					std::cout << nb << std::endl;
+					abort();
+				};
+			};
+			
 		};
 
 		return _runOnFinish;

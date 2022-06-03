@@ -2,6 +2,7 @@
 
 #include "test_base.hpp"
 #include "test_position_count.hpp"
+#include "test_castling.hpp"
 
 
 
@@ -34,8 +35,31 @@ namespace sch
 			std::vector<size_t>{ 44, 1486, 62'379 }
 		));
 
-
-
+		// Castling
+		_tests.push_back(jc::make_unique<Test_Castling>
+		(
+			std::string_view("All Castle"),
+			*chess::parse_fen("r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1"),
+			true, true, true, true
+		));
+		_tests.push_back(jc::make_unique<Test_Castling>
+		(
+			std::string_view("No Castle"),
+			*chess::parse_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
+			false, false, false, false
+		));
+		_tests.push_back(jc::make_unique<Test_Castling>
+		(
+			std::string_view("Castle Through Check"),
+			*chess::parse_fen("rnb1kbnr/pppppppp/8/8/8/4q3/PPP1P1PP/R3K2R w KQkq - 0 1"),
+			false, false, false, false
+		));
+		_tests.push_back(jc::make_unique<Test_Castling>
+		(
+			std::string_view("Castle Out of Check"),
+			*chess::parse_fen("rnb1kbnr/pppppppp/8/8/8/6q1/PPP1P1PP/R3K2R w KQkq - 0 1"),
+			false, false, false, false
+		));
 
 
 		// Run tests and collect results.
