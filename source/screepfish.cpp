@@ -682,6 +682,8 @@ namespace sch
 		{
 			_keepAlive = sch::local_game(p.c_str());
 		};
+
+		return 0;
 	};
 
 	int lichess_bot_main(int _nargs, const char* _vargs[])
@@ -696,5 +698,7 @@ namespace sch
 			std::this_thread::sleep_for(std::chrono::seconds(1));
 			_accountManager.update();
 		};
+
+		return 0;
 	};
 }
