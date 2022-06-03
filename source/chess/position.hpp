@@ -396,51 +396,156 @@ namespace chess
 
 
 
+
+	enum class DirectionBit : uint8_t
+	{
+		n = 0,
+
+		u = 0b0001,
+		l = 0b0010,
+		d = 0b0100,
+		r = 0b1000,
+
+		ul = 0b0011,
+		dl = 0b0110,
+		dr = 0b1100,
+		ur = 0b1001,
+	};
+	constexpr DirectionBit operator|(DirectionBit lhs, DirectionBit rhs)
+	{
+		return DirectionBit(jc::to_underlying(lhs) | jc::to_underlying(rhs));
+	};
+	constexpr DirectionBit operator&(DirectionBit lhs, DirectionBit rhs)
+	{
+		return DirectionBit(jc::to_underlying(lhs) & jc::to_underlying(rhs));
+	};
+
+
+
+
 	/**
 	 * @brief Holds a direction as a pos/neg rank/file pair.
 	*/
 	class Direction
 	{
 	public:
+
+		using Dir = DirectionBit;
+		using enum DirectionBit;
+
+	private:
+
+		constexpr static DirectionBit make_dir(int8_t df, int8_t dr)
+		{
+			auto fDir = Dir{};
+			auto rDir = Dir{};
+
+			if (df < 0)
+			{
+				fDir = Dir::l;
+			}
+			else if (df > 0)
+			{
+				fDir = Dir::r;
+			};
+
+			if (dr < 0)
+			{
+				rDir = Dir::d;
+			}
+			else if (dr > 0)
+			{
+				rDir = Dir::u;
+			};
+
+			return rDir | fDir;
+		};
+		constexpr static DirectionBit opposite(DirectionBit _dir)
+		{
+			switch (_dir)
+			{
+			case Dir::n: return Dir::n;
+			case Dir::d: return Dir::u;
+			case Dir::u: return Dir::d;
+			case Dir::l: return Dir::r;
+			case Dir::r: return Dir::l;
+			case Dir::dl: return Dir::ur;
+			case Dir::dr: return Dir::ul;
+			case Dir::ul: return Dir::dr;
+			case Dir::ur: return Dir::dl;
+			};
+		};
+
+	public:
 		using rep = uint8_t;
+
+		constexpr int8_t delta_rank() const
+		{
+			switch (this->dir_)
+			{
+			case Dir::u: [[fallthrough]];
+			case Dir::ul: [[fallthrough]];
+			case Dir::ur:
+				return 1;
+			case Dir::d: [[fallthrough]];
+			case Dir::dl: [[fallthrough]];
+			case Dir::dr:
+				return -1;
+			default:
+				return 0;
+			};
+		};
+		constexpr int8_t delta_file() const
+		{
+			switch (this->dir_)
+			{
+			case Dir::l: [[fallthrough]];
+			case Dir::ul: [[fallthrough]];
+			case Dir::dl:
+				return -1;
+			case Dir::r: [[fallthrough]];
+			case Dir::ur: [[fallthrough]];
+			case Dir::dr:
+				return 1;
+			default:
+				return 0;
+			};
+		};
 
 		constexpr bool pos_rank() const noexcept
 		{
-			return this->bits_ & 0b01;
+			return (this->dir_ & Dir::u) != Dir::n;
 		};
 		constexpr bool pos_file() const noexcept
 		{
-			return this->bits_ & 0b10;
+			return (this->dir_ & Dir::r) != Dir::n;
 		};
 		constexpr bool neg_rank() const noexcept
 		{
-			return !this->pos_rank();
+			return (this->dir_ & Dir::d) != Dir::n;
 		};
 		constexpr bool neg_file() const noexcept
 		{
-			return !this->pos_file();
+			return (this->dir_ & Dir::l) != Dir::n;
 		};
 
 		constexpr Offset offset(int8_t _count) const noexcept
 		{
-			return Offset
-			(
-				((this->pos_file()) ? _count : -_count),
-				((this->pos_rank()) ? _count : -_count)
-			);
+			return Offset(this->delta_file() * _count, this->delta_rank() * _count);
 		};
 		constexpr Offset offset() const noexcept
 		{
-			return Offset
-			(
-				((this->pos_file()) ? 1 : -1),
-				((this->pos_rank()) ? 1 : -1)
-			);
+			return Offset(this->delta_file(), this->delta_rank());
 		};
 
 		constexpr Direction operator-() const noexcept
 		{
-			return Direction(~this->bits_);
+			return Direction(this->opposite(this->dir_));
+		};
+
+		constexpr operator Dir() const noexcept
+		{
+			return this->dir_;
 		};
 
 		constexpr operator Offset() const noexcept
@@ -449,20 +554,21 @@ namespace chess
 		};
 
 		constexpr Direction() = default;
-		constexpr Direction(bool _posFile, bool _posRank) noexcept :
-			bits_(_posRank | (_posFile << 1))
+		constexpr Direction(Dir _dir) noexcept :
+			dir_(_dir)
+		{};
+		constexpr Direction(int8_t _fileOff, int8_t _rankOff) noexcept :
+			Direction(make_dir(_fileOff, _rankOff))
 		{};
 		constexpr Direction(const Offset& _offset) noexcept :
-			Direction(_offset.delta_file() > 0, _offset.delta_rank() > 0)
+			Direction(make_dir(_offset.delta_file(), _offset.delta_rank()))
 		{};
 
 	private:
-		constexpr explicit Direction(rep _bits) noexcept :
-			bits_(_bits)
-		{};
 
-		rep bits_;
+		Dir dir_;
 	};
+
 
 
 	/**
