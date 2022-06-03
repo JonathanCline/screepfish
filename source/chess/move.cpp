@@ -652,11 +652,17 @@ namespace chess
 
 			if (_board.is_empty(_newPosOne))
 			{
-				_buffer.write(Move(_position, _newPosOne,
-					(_newPosOne.rank() == Rank::r8 || _newPosOne.rank() == Rank::r1) ?
-					PieceType::queen :
-					PieceType::none
-				));
+				if (_newPosOne.rank() == Rank::r8 || _newPosOne.rank() == Rank::r1)
+				{
+					_buffer.write(Move(_position, _newPosOne, PieceType::bishop));
+					_buffer.write(Move(_position, _newPosOne, PieceType::rook));
+					_buffer.write(Move(_position, _newPosOne, PieceType::knight));
+					_buffer.write(Move(_position, _newPosOne, PieceType::queen));
+				}
+				else
+				{
+					_buffer.write(Move(_position, _newPosOne));
+				};
 
 				// Can move x2 if not blocked
 				if (_doubleDeltaRank)
@@ -678,7 +684,17 @@ namespace chess
 			if ((_board.has_enpassant_target() && _board.enpassant_target() == _newPos)
 				|| _board.has_enemy_piece(_newPos, _piece.color()))
 			{
-				_buffer.write(Move(_position, _newPos));
+				if (_newPos.rank() == Rank::r8 || _newPos.rank() == Rank::r1)
+				{
+					_buffer.write(Move(_position, _newPos, PieceType::bishop));
+					_buffer.write(Move(_position, _newPos, PieceType::rook));
+					_buffer.write(Move(_position, _newPos, PieceType::knight));
+					_buffer.write(Move(_position, _newPos, PieceType::queen));
+				}
+				else
+				{
+					_buffer.write(Move(_position, _newPos));
+				};
 			};
 		};
 		if (_file != File::a)
@@ -688,7 +704,17 @@ namespace chess
 			if ((_board.has_enpassant_target() && _board.enpassant_target() == _newPos)
 				|| _board.has_enemy_piece(_newPos, _piece.color()))
 			{
-				_buffer.write(Move(_position, _newPos));
+				if (_newPos.rank() == Rank::r8 || _newPos.rank() == Rank::r1)
+				{
+					_buffer.write(Move(_position, _newPos, PieceType::bishop));
+					_buffer.write(Move(_position, _newPos, PieceType::rook));
+					_buffer.write(Move(_position, _newPos, PieceType::knight));
+					_buffer.write(Move(_position, _newPos, PieceType::queen));
+				}
+				else
+				{
+					_buffer.write(Move(_position, _newPos));
+				};
 			};
 		};
 	};
@@ -980,9 +1006,16 @@ namespace chess
 		std::array<Position, 4> rook_{};
 		size_t rook_count_ = 0;
 
+		std::array<Position, 4> bishop_{};
+		size_t bishop_count_ = 0;
+
 		constexpr std::span<const Position> rook() const
 		{
 			return std::span<const Position>(this->rook_.data(), this->rook_count_);
+		};
+		constexpr std::span<const Position> bishop() const
+		{
+			return std::span<const Position>(this->bishop_.data(), this->bishop_count_);
 		};
 
 		constexpr operator std::span<const Position>() const noexcept
@@ -997,6 +1030,10 @@ namespace chess
 		constexpr void rook_append(Position p)
 		{
 			this->rook_[this->rook_count_++] = p;
+		};
+		constexpr void bishop_append(Position p)
+		{
+			this->bishop_[this->bishop_count_++] = p;
 		};
 
 		constexpr Neighbors() = default;
@@ -1028,6 +1065,10 @@ namespace chess
 				if (df == 0 || dr == 0)
 				{
 					_neighbors.rook_append(p);
+				}
+				else
+				{
+					_neighbors.bishop_append(p);
 				};
 			};
 		};
@@ -1058,6 +1099,10 @@ namespace chess
 	{
 		return neighbors_v[static_cast<size_t>(_pos)].rook();
 	};
+	std::span<const Position> get_surrounding_positions_for_bishop(Position _pos)
+	{
+		return neighbors_v[static_cast<size_t>(_pos)].bishop();
+	};
 
 
 
@@ -1076,6 +1121,18 @@ namespace chess
 	bool is_rook_blocked(const Board& _board, const Position _pos, Color _color)
 	{
 		const auto _spos = get_surrounding_positions_for_rook(_pos);
+		for (auto& o : _spos)
+		{
+			if (_board.has_enemy_piece_or_empty(o, _color))
+			{
+				return false;
+			};
+		};
+		return true;
+	};
+	bool is_bishop_blocked(const Board& _board, Position _pos, Color _color)
+	{
+		const auto _spos = get_surrounding_positions_for_bishop(_pos);
 		for (auto& o : _spos)
 		{
 			if (_board.has_enemy_piece_or_empty(o, _color))
@@ -1247,7 +1304,7 @@ namespace chess
 				{
 					_threatPositions &= ~make_file_bits(p->file(), Rank::r1, p->rank());
 				};
-				
+				_board.pieces_on_file(p->file());
 
 				auto _threats = _threatPositions & _board.get_white_piece_bitboard();
 				if (_threats.none())
@@ -1271,21 +1328,28 @@ namespace chess
 			return false;
 		};
 
-		static thread_local auto _bufferData = std::array<Move, 256>{};
-		auto _buffer = MoveBuffer(_bufferData.data(), _bufferData.data() + _bufferData.size());
-		const auto _bufferStart = _buffer.head();
-		get_moves(_board, _forPlayer, _buffer, true);
-		const auto _bufferEnd = _buffer.head();
-
-		for (auto p = _bufferStart; p != _bufferEnd; ++p)
+		static thread_local auto _bufferData = std::array<Move, 32>{};
+		for (auto& v : _board.pieces())
 		{
-			auto _futureBoard = _board;
-			_futureBoard.move(*p);
-			if (!is_check(_futureBoard, _forPlayer))
+			if (v.color() == _forPlayer)
 			{
-				return false;
+				auto _buffer = MoveBuffer(_bufferData.data(), _bufferData.data() + _bufferData.size());
+				const auto _bufferStart = _buffer.head();
+				get_piece_moves(_board, v, _buffer, true);
+				const auto _bufferEnd = _buffer.head();
+
+				for (auto p = _bufferStart; p != _bufferEnd; ++p)
+				{
+					auto _futureBoard = _board;
+					_futureBoard.move(*p);
+					if (!is_check(_futureBoard, _forPlayer))
+					{
+						return false;
+					};
+				};
 			};
 		};
+		
 		return true;
 	};
 
@@ -1334,11 +1398,13 @@ namespace chess
 		
 		constexpr auto blocked_queen_rating_v = 0.001f;
 		constexpr auto blocked_rook_rating_v  = 0.001f;
+		constexpr auto blocked_bishop_rating_v = 0.001f;
 		
 		constexpr auto pawn_push_rating_v	  = 0.001f;
 
 		constexpr auto castle_ability_rating_v = 0.001f;
 
+		constexpr auto development_rating_v = 0.0005f;
 
 
 
@@ -1396,33 +1462,82 @@ namespace chess
 			break;
 			case Piece::queen:
 			{
-				if (is_queen_blocked(_board, v.position(), v.color()))
+				Rating _diff = 0.0;
+				if (v.color() == Color::white)
 				{
-					const auto _ratingValue = blocked_queen_rating_v;
-					if (v.color() == _forPlayer)
+					if (v.rank() == Rank::r1)
 					{
-						_rating -= _ratingValue;
-					}
-					else
-					{
-						_rating += _ratingValue;
+						_diff = development_rating_v;
 					};
+				}
+				else
+				{
+					if (v.rank() == Rank::r8)
+					{
+						_diff = development_rating_v;
+					};
+				};
+				if (v.color() == _forPlayer)
+				{
+					_rating -= _diff;
+				}
+				else
+				{
+					_rating += _diff;
 				};
 			};
 			break;
 			case Piece::rook:
 			{
-				if (is_rook_blocked(_board, v.position(), v.color()))
+				Rating _diff = 0.0;
+				if (v.color() == Color::white)
 				{
-					const auto _ratingValue = blocked_rook_rating_v;
-					if (v.color() == _forPlayer)
+					if (v.rank() == Rank::r1)
 					{
-						_rating -= _ratingValue;
-					}
-					else
-					{
-						_rating += _ratingValue;
+						_diff = development_rating_v;
 					};
+				}
+				else
+				{
+					if (v.rank() == Rank::r8)
+					{
+						_diff = development_rating_v;
+					};
+				};
+				if (v.color() == _forPlayer)
+				{
+					_rating -= _diff;
+				}
+				else
+				{
+					_rating += _diff;
+				};
+			};
+			break;
+			case Piece::bishop:
+			{
+				Rating _diff = 0.0;
+				if (v.color() == Color::white)
+				{
+					if (v.rank() == Rank::r1)
+					{
+						_diff = development_rating_v;
+					};
+				}
+				else
+				{
+					if (v.rank() == Rank::r8)
+					{
+						_diff = development_rating_v;
+					};
+				};
+				if (v.color() == _forPlayer)
+				{
+					_rating -= _diff;
+				}
+				else
+				{
+					_rating += _diff;
 				};
 			};
 			break;
@@ -1438,6 +1553,12 @@ namespace chess
 			{
 				_rating -= material_value(v.type());
 			};
+		};
+
+		// 50 move rule is a draw
+		if (_board.get_half_move_count() >= 50)
+		{
+			return -1000;
 		};
 
 		return _rating;

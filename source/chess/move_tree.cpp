@@ -94,6 +94,14 @@ namespace chess
 		return n;
 	};
 
+	void MoveTreeNode::show_best_line() const
+	{
+		std::cout << this->move.move << ' ';
+		if (!this->responses.empty())
+		{
+			this->responses.front().show_best_line();
+		};
+	};
 
 
 	// MoveTree
@@ -176,6 +184,10 @@ namespace chess
 		 	const auto _rndNum = _rnd();
 			const auto _rndIndex = _rndNum % (it - this->moves.begin());
 			const auto _rndIter = this->moves.begin() + _rndIndex;
+			std::cout << _rndIter->move.move << ' ';
+			_rndIter->show_best_line();
+			std::cout << std::endl;
+
 			return _rndIter->move.move;
 		};
 	};

@@ -2,10 +2,30 @@ cmake_minimum_required(VERSION 3.12)
 
 project(screepfish)
 
+#
+#	Variables
+#
+
+
+set(_Link
+	httplib
+	jclib
+	nlohmann_json
+	BearLibTerminal
+	lodepng
+	jccli)
+
+
+
+
+#
+#	Machinery
+#
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-add_executable(${PROJECT_NAME} main.cpp)
+add_executable(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/source/main.cpp)
 
 include("tools/cmake/utility.cmake")
 
@@ -41,7 +61,7 @@ add_custom_target(
 )
 
 
-target_link_libraries(${PROJECT_NAME} PRIVATE httplib jclib nlohmann_json BearLibTerminal lodepng)
+target_link_libraries(${PROJECT_NAME} PRIVATE ${_Link})
 target_include_directories(${PROJECT_NAME} PRIVATE source)
 
 if (CLANG STREQUAL "ON")

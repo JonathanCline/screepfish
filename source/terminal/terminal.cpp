@@ -21,10 +21,29 @@ namespace chess
 		_buffer.resize(p - _buffer.data());
 		return _buffer;
 	};
+
+	inline bool is_close_event(int ev)
+	{
+		return ev == TK_CLOSE or ev == TK_ESCAPE;
+	};
+
+	inline auto set_terminal_size_str(unsigned w, unsigned h)
+	{
+		const auto _str = "window.size=" + std::to_string(w) + "x" + std::to_string(h);
+		return _str;
+	};
+	inline void set_terminal_size(unsigned w, unsigned h)
+	{
+		const auto s = set_terminal_size_str(w, h);
+		terminal_set(s.c_str());
+	};
+
+
+
 	
 	void Terminal::wait_for_any_key()
 	{
-		if (terminal_read() == TK_CLOSE)
+		if (const auto ev = terminal_read(); is_close_event(ev))
 		{
 			this->should_close_ = true;
 		};
@@ -35,7 +54,7 @@ namespace chess
 		if (const auto ev = terminal_peek(); ev != 0)
 		{
 			terminal_read();
-			if (ev == TK_CLOSE)
+			if (is_close_event(ev))
 			{
 				return true;
 			};
@@ -290,7 +309,8 @@ namespace chess
 
 		terminal_open();
 
-		terminal_set("window.size=16x8");
+		set_terminal_size(32, 8);
+
 		{
 			const auto s = std::string("font: C:/Windows/fonts/CascadiaMono.ttf, size=")
 				+ std::to_string(this->cw_) + "x" + std::to_string(this->ch_);

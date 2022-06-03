@@ -22,6 +22,8 @@ namespace chess
 		size_t tree_size() const;
 		size_t total_outcomes() const;
 
+		void show_best_line() const;
+
 		MoveTreeNode() = default;
 	};
 

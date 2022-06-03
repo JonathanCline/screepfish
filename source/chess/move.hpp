@@ -96,7 +96,7 @@ namespace chess
 
 	bool is_queen_blocked(const Board& _board, const Position _pos, Color _color);
 	bool is_rook_blocked(const Board& _board, const Position _pos, Color _color);
-
+	bool is_bishop_blocked(const Board& _board, Position _pos, Color _color);
 	
 
 
