@@ -390,7 +390,8 @@ namespace chess
 		{};
 
 	private:
-		rep df_, dr_;
+		rep df_ : 4;
+		rep dr_ : 4;
 	};
 
 
