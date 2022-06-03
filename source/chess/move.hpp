@@ -49,18 +49,13 @@ namespace chess
 	};
 
 
-	bool is_piece_attacked_by_pawn_old(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece);
 	bool is_piece_attacked_by_pawn(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece);
-	
-	bool is_piece_attacked_by_knight_old(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece);
 	bool is_piece_attacked_by_knight(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece);
-	
 	bool is_piece_attacked_by_bishop(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece);
 	bool is_piece_attacked_by_rook(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece);
 	bool is_piece_attacked_by_queen(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece);
 	bool is_piece_attacked_by_king(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece);
 
-	bool is_piece_attacked_old(const chess::Board& _board, const chess::BoardPiece& _piece);
 	bool is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece);
 
 	void get_pawn_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer, const bool _isCheck = false);
@@ -104,6 +99,5 @@ namespace chess
 	bool is_checkmate(const chess::Board& _board, const chess::Color _forPlayer);
 
 	chess::Rating rate_board(const chess::Board& _board, chess::Color _forPlayer);
-	//chess::Rating rate_move(const chess::Board& _board, const chess::Move& _move, chess::Color _forPlayer, const bool _isCheck = false);
 
 };

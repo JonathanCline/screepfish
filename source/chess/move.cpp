@@ -244,64 +244,6 @@ namespace chess
 		// If bit is set, piece is being attacked
 		return _attackingBB.test(_piece.position());
 	};
-	bool is_piece_attacked_by_pawn_old(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
-	{
-		using namespace chess;
-
-		const auto _file = _piece.file();
-		const auto _rank = _piece.rank();
-		const auto _fromFile = _byPiece.file();
-		const auto _fromRank = _byPiece.rank();
-
-		if (_file == _fromFile + 1 || _file == _fromFile - 1)
-		{
-			if (_byPiece.color() == Color::white)
-			{
-				return _rank == _fromRank + 1;
-			}
-			else
-			{
-				return _rank == _fromRank - 1;
-			};
-		};
-
-		return false;
-	};
-
-	bool is_piece_attacked_by_knight_old(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
-	{
-		using namespace chess;
-
-		const auto _position = _byPiece.position();
-		auto _nextPosition = Position();
-		bool _possible = true;
-
-		constexpr auto _deltaPairs = std::array
-		{
-			std::pair{ 1, 2 },
-			std::pair{ 1, -2 },
-
-			std::pair{ 2, 1 },
-			std::pair{ 2, -1 },
-
-			std::pair{ -1, 2 },
-			std::pair{ -1, -2 },
-
-			std::pair{ -2, -1 },
-			std::pair{ -2, 1 },
-		};
-
-		for (const auto& [df, dr] : _deltaPairs)
-		{
-			_nextPosition = trynext(_position, df, dr, _possible);
-			if (_possible && _nextPosition == _piece.position())
-			{
-				return true;
-			};
-		};
-
-		return false;
-	};
 	bool is_piece_attacked_by_knight(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
 	{
 		using namespace chess;
@@ -309,7 +251,6 @@ namespace chess
 		const auto _attackBB = get_knight_attack_squares(_byPiece.position());
 		return _attackBB.test(_piece.position());
 	};
-	
 	bool is_piece_attacked_by_bishop(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
 	{
 		using namespace chess;
@@ -459,62 +400,6 @@ namespace chess
 		return (fd <= 1 && rd <= 1);
 	};
 
-
-	bool is_piece_attacked_old(const chess::Board& _board, const chess::BoardPiece& _piece)
-	{
-		using namespace chess;
-
-		const auto _end = _board.pend();
-		for (auto it = _board.pbegin(); it != _end; ++it)
-		{
-			auto& p = *it;
-			if (p.color() != _piece.color())
-			{
-				switch (p.type())
-				{
-				case PieceType::pawn:
-					if (is_piece_attacked_by_pawn_old(_board, _piece, p))
-					{
-						return true;
-					};
-					break;
-				case PieceType::knight:
-					if (is_piece_attacked_by_knight(_board, _piece, p))
-					{
-						return true;
-					};
-					break;
-				case PieceType::bishop:
-					if (is_piece_attacked_by_bishop(_board, _piece, p))
-					{
-						return true;
-					};
-					break;
-				case PieceType::rook:
-					if (is_piece_attacked_by_rook(_board, _piece, p))
-					{
-						return true;
-					};
-					break;
-				case PieceType::queen:
-					if (is_piece_attacked_by_queen(_board, _piece, p))
-					{
-						return true;
-					};
-					break;
-				case PieceType::king:
-					if (is_piece_attacked_by_king(_board, _piece, p))
-					{
-						return true;
-					};
-					break;
-				default:
-					break;
-				};
-			};
-		};
-		return false;
-	};
 	bool is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece)
 	{
 		using namespace chess;
