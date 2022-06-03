@@ -44,5 +44,5 @@ int main(int _nargs, const char* _vargs[])
 		return 1;
 	};
 
-	return sch::local_game_main(_nargs, _vargs);
+	return sch::lichess_bot_main(_nargs, _vargs);
 };

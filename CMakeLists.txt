@@ -60,6 +60,16 @@ add_custom_target(
 	VERBATIM
 )
 
+# Make data link
+add_custom_target(
+	data_link
+	ALL
+	COMMAND ${MAKE_LINK_SCRIPT} ${CMAKE_CURRENT_SOURCE_DIR}/data ${CMAKE_CURRENT_BINARY_DIR}/data --quiet
+	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+	VERBATIM
+)
+
+
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${_Link})
 target_include_directories(${PROJECT_NAME} PRIVATE source)
