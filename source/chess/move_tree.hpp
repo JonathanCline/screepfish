@@ -14,13 +14,39 @@ namespace chess
 
 	struct MoveTreeNode
 	{
+		using size_type = uint8_t;
+
 		Rating rating() const { return this->rating_; };
 		Rating quick_rating() const { return this->move.rating(); };
 
+		bool empty() const { return this->responses_count_ == 0; };
+		void resize(size_type _size)
+		{
+			this->responses = std::make_unique<MoveTreeNode[]>(_size);
+			this->responses_count_ = _size;
+		};
 
-		std::vector<MoveTreeNode> responses{};
+		size_type size() const { return this->responses_count_; };
+
+		auto begin() { return this->responses.get(); };
+		auto begin() const { return this->responses.get(); };
+		auto end() { return this->begin() + this->size(); };
+		auto end() const { return this->begin() + this->size(); };
+
+		auto& front()
+		{
+			return this->responses[0];
+		};
+		const auto& front() const
+		{
+			return this->responses[0];
+		};
+
+
+		std::unique_ptr<MoveTreeNode[]> responses{};
 		RatedMove move{};
 		Rating rating_ = 0;
+		uint8_t responses_count_ = 0;
 
 		void evaluate_next(const Board& _previousBoard, bool _followChecks = true);
 
@@ -32,6 +58,8 @@ namespace chess
 
 		MoveTreeNode() = default;
 	};
+
+	constexpr static auto q = sizeof(MoveTreeNode);
 
 
 

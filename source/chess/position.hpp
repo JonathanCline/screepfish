@@ -340,6 +340,131 @@ namespace chess
 	std::istream& operator>>(std::istream& _ostr, Rank& _value);
 
 	/**
+	 * @brief Holds an offset as a delta rank, delta file pair.
+	*/
+	class Offset
+	{
+	public:
+		using rep = int8_t;
+
+		constexpr rep delta_rank() const noexcept { return this->dr_; };
+		constexpr rep delta_file() const noexcept { return this->df_; };
+
+		constexpr Offset operator-() const noexcept
+		{
+			return Offset(-this->df_, -this->dr_);
+		};
+
+		friend constexpr inline Offset operator+(const Offset& lhs, const Offset& rhs) noexcept
+		{
+			return Offset
+			(
+				lhs.delta_file() + rhs.delta_file(),
+				lhs.delta_rank() + rhs.delta_rank()
+			);
+		};
+		friend constexpr inline Offset& operator+=(Offset& lhs, const Offset& rhs) noexcept
+		{
+			lhs.df_ += rhs.df_;
+			lhs.dr_ += rhs.dr_;
+			return lhs;
+		};
+		friend constexpr inline Offset operator-(const Offset& lhs, const Offset& rhs) noexcept
+		{
+			return Offset
+			(
+				lhs.delta_file() - rhs.delta_file(),
+				lhs.delta_rank() - rhs.delta_rank()
+			);
+		};
+		friend constexpr inline Offset& operator-=(Offset& lhs, const Offset& rhs) noexcept
+		{
+			lhs.df_ -= rhs.df_;
+			lhs.dr_ -= rhs.dr_;
+			return lhs;
+		};
+
+		constexpr Offset() = default;
+		constexpr Offset(rep _deltaFile, rep _deltaRank) noexcept :
+			df_(_deltaFile), dr_(_deltaRank)
+		{};
+
+	private:
+		rep df_, dr_;
+	};
+
+
+
+	/**
+	 * @brief Holds a direction as a pos/neg rank/file pair.
+	*/
+	class Direction
+	{
+	public:
+		using rep = uint8_t;
+
+		constexpr bool pos_rank() const noexcept
+		{
+			return this->bits_ & 0b01;
+		};
+		constexpr bool pos_file() const noexcept
+		{
+			return this->bits_ & 0b10;
+		};
+		constexpr bool neg_rank() const noexcept
+		{
+			return !this->pos_rank();
+		};
+		constexpr bool neg_file() const noexcept
+		{
+			return !this->pos_file();
+		};
+
+		constexpr Offset offset(int8_t _count) const noexcept
+		{
+			return Offset
+			(
+				((this->pos_file()) ? _count : -_count),
+				((this->pos_rank()) ? _count : -_count)
+			);
+		};
+		constexpr Offset offset() const noexcept
+		{
+			return Offset
+			(
+				((this->pos_file()) ? 1 : -1),
+				((this->pos_rank()) ? 1 : -1)
+			);
+		};
+
+		constexpr Direction operator-() const noexcept
+		{
+			return Direction(~this->bits_);
+		};
+
+		constexpr operator Offset() const noexcept
+		{
+			return this->offset();
+		};
+
+		constexpr Direction() = default;
+		constexpr Direction(bool _posFile, bool _posRank) noexcept :
+			bits_(_posRank | (_posFile << 1))
+		{};
+		constexpr Direction(const Offset& _offset) noexcept :
+			Direction(_offset.delta_file() > 0, _offset.delta_rank() > 0)
+		{};
+
+	private:
+		constexpr explicit Direction(rep _bits) noexcept :
+			bits_(_bits)
+		{};
+
+		rep bits_;
+	};
+
+
+	/**
 	 * @brief Holds a position on a chess board as a file/rank pair
 	*/
 	class Position
@@ -402,6 +527,51 @@ namespace chess
 
 		uint8_t pos_;
 	};
+
+	constexpr Offset operator-(const Position& lhs, const Position& rhs) noexcept
+	{
+		return Offset
+		(
+			jc::to_underlying(lhs.file()) - jc::to_underlying(rhs.file()),
+			jc::to_underlying(lhs.rank()) - jc::to_underlying(rhs.rank())
+		);
+	};
+	
+	constexpr Position operator+(const Position& lhs, const Offset& rhs) noexcept
+	{
+		return Position
+		(
+			lhs.file() + rhs.delta_file(),
+			lhs.rank() + rhs.delta_rank()
+		);
+	};
+	constexpr Position operator+(const Offset& lhs, const Position& rhs) noexcept
+	{
+		return Position
+		(
+			rhs.file() + lhs.delta_file(),
+			rhs.rank() + lhs.delta_rank()
+		);
+	};
+
+	constexpr Position operator-(const Position& lhs, const Offset& rhs) noexcept
+	{
+		return Position
+		(
+			lhs.file() - rhs.delta_file(),
+			lhs.rank() - rhs.delta_rank()
+		);
+	};
+	constexpr Position operator-(const Offset& lhs, const Position& rhs) noexcept
+	{
+		return Position
+		(
+			rhs.file() - lhs.delta_file(),
+			rhs.rank() - lhs.delta_rank()
+		);
+	};
+
+
 
 	constexpr inline auto positions_v = ([]()
 		{

@@ -413,6 +413,7 @@ namespace sch
 			_board.move(Move((File::d, Rank::r2), (File::d, Rank::r4)));
 			if (!is_check(_board, Color::white))
 			{
+				std::cout << _board << std::endl;
 				abort();
 			};
 		};
@@ -589,6 +590,20 @@ namespace sch
 			if (!chess::is_checkmate(_board, Color::white))
 			{
 				// Should be checkmate
+				abort();
+			};
+		};
+
+		// Bishop causing check
+		{
+			auto _board = Board();
+			reset_board(_board);
+			_board.erase_piece((File::f, Rank::r2));
+			_board.move((File::f, Rank::r8), (File::h, Rank::r4));
+
+			if (!is_check(_board, Color::white))
+			{
+				// Should be check
 				abort();
 			};
 		};

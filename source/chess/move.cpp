@@ -266,25 +266,22 @@ namespace chess
 	{
 		using namespace chess;
 
+		// Calculate the offset from the piece to the bishop.
 		const auto _position = _byPiece.position();
-		constexpr auto _directionPairs = std::array
-		{
-			std::pair{  1,  1 },
-			std::pair{ -1,  1 },
-			std::pair{  1, -1 },
-			std::pair{ -1, -1 },
-		};
+		const auto _offset = _piece.position() - _position;
 
-		for (const auto& _direction : _directionPairs)
+		// If both are the same magnitude then the bishop is on the same diagonal.
+		if (abs(_offset.delta_file()) == abs(_offset.delta_rank()))
 		{
-			auto [df, dr] = _direction;
+			const auto _dir = Offset(Direction(_offset));
+
 			auto f = _byPiece.file();
 			auto r = _byPiece.rank();
 
 			while (true)
 			{
-				f += df;
-				r += dr;
+				f += _dir.delta_file();
+				r += _dir.delta_rank();
 				if (f > File::h || r > Rank::r8)
 				{
 					break;
@@ -301,6 +298,7 @@ namespace chess
 				};
 			};
 		};
+
 		return false;
 	};
 	bool is_piece_attacked_by_rook(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)

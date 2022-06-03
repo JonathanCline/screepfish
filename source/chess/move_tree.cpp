@@ -11,7 +11,7 @@ namespace chess
 		const auto _myColor = _board.get_toplay();
 		_board.move(this->move);
 
-		if (this->responses.empty())
+		if (this->empty())
 		{
 			// Get the possible responses
 			std::array<Move, 128> _moveBufferData{};
@@ -22,8 +22,8 @@ namespace chess
 			const auto _moveEnd = _moveBuffer.head();
 
 			// Rate and add to the child nodes
-			this->responses.resize(_moveEnd - _moveBegin);
-			auto it = this->responses.begin();
+			this->resize(_moveEnd - _moveBegin);
+			auto it = this->begin();
 			for (auto p = _moveBegin; p != _moveEnd; ++p)
 			{
 				// Rate the move
@@ -50,29 +50,29 @@ namespace chess
 		else
 		{
 			// Propogate to children
-			for (auto& _child : this->responses)
+			for (auto& _child : *this)
 			{
 				_child.evaluate_next(_board, _followChecks);
 			};
 		};
 
 		// Sort children by rating
-		std::ranges::sort(this->responses, [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
+		std::sort(this->begin(), this->end(), [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
 			{
 				return lhs.rating() > rhs.rating();
 			});
 
 		// Set our rating to show the best opponent response
-		if (!this->responses.empty())
+		if (!this->empty())
 		{
-			this->rating_ = -this->responses.front().rating();
+			this->rating_ = -this->front().rating();
 		};
 	};
 
 	size_t MoveTreeNode::tree_size() const
 	{
-		size_t n = this->responses.size();
-		for (auto& v : this->responses)
+		size_t n = this->size();
+		for (auto& v : *this)
 		{
 			n += v.tree_size();
 		};
@@ -81,9 +81,9 @@ namespace chess
 	size_t MoveTreeNode::total_outcomes() const
 	{
 		size_t n = 0;
-		for (auto& v : this->responses)
+		for (auto& v : *this)
 		{
-			if (v.responses.empty())
+			if (v.empty())
 			{
 				n += 1;
 			}
@@ -98,18 +98,18 @@ namespace chess
 	void MoveTreeNode::show_best_line() const
 	{
 		std::cout << this->move << "(" << this->quick_rating() << ") ";
-		if (!this->responses.empty())
+		if (!this->empty())
 		{
-			this->responses.front().show_best_line();
+			this->front().show_best_line();
 		};
 	};
 
 	std::vector<RatedMove> MoveTreeNode::get_best_line() const
 	{
 		auto v = std::vector<RatedMove>{ this->move };
-		if (!this->responses.empty())
+		if (!this->empty())
 		{
-			auto rv = this->responses.front().get_best_line();
+			auto rv = this->front().get_best_line();
 			v.insert(v.end(), rv.begin(), rv.end());
 		};
 		return v;
@@ -187,7 +187,7 @@ namespace chess
 		{
 			for (auto& v : this->moves)
 			{
-				if (v.responses.empty())
+				if (v.empty())
 				{
 					return v.move;
 				};
