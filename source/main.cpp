@@ -2,6 +2,8 @@
 
 #include "env.hpp"
 
+#include <jclib/cli.hpp>
+
 #include <cstdlib>
 #include <iostream>
 #include <filesystem>
@@ -23,11 +25,13 @@
 
 int main(int _nargs, const char* _vargs[])
 {
-	if (_nargs == 0 || !_vargs || !_vargs[0])
-	{
-		std::cout << "No arguments provided, not even exec path1!\n";
-		exit(1);
-	};
+	auto _parser = jc::ArgumentParser();
+	_parser.add_argument("--perf")
+		.set_help("Runs performance test");
+
+	auto _args = _parser.parse_args(_nargs, _vargs);
+
+
 
 	if (_nargs >= 2 && _vargs[1] == std::string_view("--perf"))
 	{
