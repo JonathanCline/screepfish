@@ -26,7 +26,7 @@ namespace sch
 		(
 			std::string_view("Position Count - Initial"),
 			*chess::parse_fen(chess::standard_start_pos_fen_v),
-			std::vector<size_t>{ 20, 400, 8902, 197'281 }
+			std::vector<size_t>{ 20, 400, 8902, 197'281, 4'865'609 }
 		));
 		_tests.push_back(jc::make_unique<Test_PositionCount>
 		(

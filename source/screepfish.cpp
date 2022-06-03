@@ -657,16 +657,17 @@ namespace sch
 		return _runOnFinish;
 	};
 
-	auto perf_test_part(auto&& _op)
+	template <size_t Runs = 5>
+	auto perf_test_part(auto&& _op, std::chrono::milliseconds _duration = std::chrono::seconds(1))
 	{
 		using namespace chess;
 
-		std::array<size_t, 5> _runs{};
+		std::array<size_t, Runs> _runs{};
 
 		for (auto& r : _runs)
 		{
 			using namespace std::chrono_literals;
-			r = sch::count_runs_within_duration(_op, 1s);
+			r = sch::count_runs_within_duration(_op, _duration);
 		};
 
 		const auto _runsTotal = std::accumulate(_runs.begin(), _runs.end(), (size_t)0);
@@ -679,6 +680,34 @@ namespace sch
 	{
 		using namespace chess;
 
+		// midgame, depth 3 - unique
+		{
+			auto b = *parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
+			const auto fn = [&b]()
+			{
+				auto t = MoveTree();
+				t.board = b;
+				t.build_tree(3);
+			};
+			const auto r = perf_test_part(fn);
+			std::cout << "midgame (d3_unique) - " << r << std::endl;
+		};
+
+		// midgame, depth 3
+		{
+			auto b = *parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
+			const auto fn = [&b]()
+			{
+				auto t = MoveTree();
+				t.board = b;
+				t.evaluate_next();
+				t.evaluate_next();
+				t.evaluate_next();
+			};
+			const auto r = perf_test_part(fn);
+			std::cout << "midgame (d3) - " << r << std::endl;
+		};
+
 		// opening, depth 2
 		{
 			auto b = Board();
@@ -687,8 +716,8 @@ namespace sch
 			{
 				auto t = MoveTree();
 				t.board = b;
-				t.evalulate_next();
-				t.evalulate_next();
+				t.evaluate_next();
+				t.evaluate_next();
 			};
 			const auto r = perf_test_part(fn);
 			std::cout << "opening (d2) - " << r << std::endl;
@@ -701,12 +730,13 @@ namespace sch
 			{
 				auto t = MoveTree();
 				t.board = b;
-				t.evalulate_next();
-				t.evalulate_next();
+				t.evaluate_next();
+				t.evaluate_next();
 			};
 			const auto r = perf_test_part(fn);
 			std::cout << "midgame (d2) - " << r << std::endl;
 		};
+
 	};
 
 	bool local_game(const char* _assetsDirectoryPath, bool _step)

@@ -52,7 +52,7 @@ int main(int _nargs, const char* _vargs[])
 		};
 	};
 
-	if (_perf)
+	;if (_perf)
 	{
 		sch::perf_test();
 		exit(0);

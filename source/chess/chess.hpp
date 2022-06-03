@@ -23,6 +23,7 @@
 #include <optional>
 #include <array>
 #include <span>
+#include <random>
 
 
 namespace chess
@@ -1242,11 +1243,13 @@ namespace chess
 
 	struct ZobristHashTable
 	{
-		std::array<std::array<size_t, 12>, 64> table{};
-		size_t black_to_move{};
+		using type = uint32_t;
+
+		std::array<std::array<type, 12>, 64> table{};
+		type black_to_move{};
 	};
 
-	constexpr auto zobrist_hash_subindex(PieceType p, Color c)
+	inline auto zobrist_hash_subindex(PieceType p, Color c)
 	{
 		size_t _subindex = 0;
 		if (c == Color::white) { _subindex = 1; };
@@ -1262,17 +1265,19 @@ namespace chess
 		return (static_cast<T>(_largeA * _value) + _largeB) % _mod;
 	};
 
-	constexpr auto zobrist_hash_index(File f, Rank r)
+	inline auto zobrist_hash_index(File f, Rank r)
 	{
-		size_t _hash = 0;
+		ZobristHashTable::type _hash = 0;
 		_hash |= ((jc::to_underlying(f) << 3) | jc::to_underlying(r));
 		return _hash;
 	};
 
-	consteval auto zobrist_hash_table()
+	inline auto zobrist_hash_table()
 	{
+		static thread_local std::random_device rnd_dv{};
+		static thread_local std::mt19937 mt{rnd_dv()};
+
 		auto _table = ZobristHashTable{};
-		size_t _pseudoRand = 13136;
 		for (auto& f : files_v)
 		{
 			for (auto& r : ranks_v)
@@ -1286,7 +1291,7 @@ namespace chess
 					for (auto& c : colors_v)
 					{
 						const auto j = zobrist_hash_subindex(p, c);
-						_pseudoRand = pseudorand(_pseudoRand);
+						const auto _pseudoRand = static_cast<ZobristHashTable::type>(mt());
 						const auto _hash = _pseudoRand;
 						_table.table[i][j] = _hash;
 					};
@@ -1294,11 +1299,11 @@ namespace chess
 			};
 		};
 
-		_table.black_to_move = pseudorand(_pseudoRand);
+		_table.black_to_move = pseudorand(static_cast<ZobristHashTable::type>(mt()));
 		return _table;
 	};
 
-	constexpr inline auto zobrist_hash_lookup_table_v =
+	static const inline auto zobrist_hash_lookup_table_v =
 		zobrist_hash_table();
 
 	/**
@@ -1309,7 +1314,7 @@ namespace chess
 	*/
 	inline auto hash(const Board& _board, bool _blackToMove)
 	{
-		size_t _hash = 0;
+		ZobristHashTable::type _hash = 0;
 		if (_blackToMove)
 		{
 			_hash ^= zobrist_hash_lookup_table_v.black_to_move;

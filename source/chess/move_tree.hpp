@@ -4,16 +4,22 @@
 
 #include "move.hpp"
 
+#include "utility/bset.hpp"
+
 #include <set>
 #include <vector>
 #include <random>
+#include <unordered_set>
 
 namespace chess
 {
+	using BoardHashSet = sch::binary_set;
 
 
 	struct MoveTreeNode
 	{
+	public:
+
 		using size_type = uint8_t;
 
 		Rating rating() const { return this->rating_; };
@@ -50,7 +56,9 @@ namespace chess
 		Rating rating_ = 0;
 		uint8_t responses_count_ = 0;
 
+		void evaluate_next(const Board& _previousBoard, BoardHashSet& _hashSet, bool _followChecks = true);
 		void evaluate_next(const Board& _previousBoard, bool _followChecks = true);
+
 
 		size_t tree_size() const;
 		size_t total_outcomes() const;
@@ -73,8 +81,13 @@ namespace chess
 		chess::Board board{}; // initial board state
 		std::vector<MoveTreeNode> moves{}; // moves that can be played from the initial board state
 
+		BoardHashSet hash_set{};
+
+		void evaluate_next();
+		void evaluate_next_unique();
 		void evalulate_next();
-		std::optional<Move> best_move(std::mt19937& _rnd);
+
+		std::optional<RatedMove> best_move(std::mt19937& _rnd);
 		size_t tree_size() const;
 		size_t total_outcomes() const;
 
@@ -82,6 +95,12 @@ namespace chess
 
 		size_t count_unique_positions();
 		size_t count_checks();
+
+		void clear_hashes() { this->hash_set.clear(); };
+
+
+		void build_tree(size_t _depth);
+
 
 		MoveTree() = default;
 

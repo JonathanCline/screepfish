@@ -25,10 +25,7 @@ namespace sch
 
 		auto _tree = chess::MoveTree();
 		_tree.board = _board;
-		for (int n = 0; n != _depth; ++n)
-		{
-			_tree.evalulate_next();
-		};
+		_tree.build_tree((size_t)_depth);
 
 		return _tree;
 	};
@@ -138,6 +135,8 @@ namespace sch
 
 					const auto t0 = _clock.now();
 					auto _tree = this->build_move_tree(_board, _myColor, _depth);
+					std::cout << "Tree hash set size = " << _tree.hash_set.size() << '\n';
+
 
 					const auto t1 = _clock.now();
 					const auto _move = _tree.best_move(this->rnd_);
@@ -183,7 +182,19 @@ namespace sch
 							{
 								const auto _path = _dirPath / ("line" + std::to_string(_lineN++) + ".txt");
 								auto _file = std::ofstream(_path);
+								
+								_file << *_move << " = " << _move->rating() << '\n';
+
 								auto b = _board;
+								for (auto& v : _line)
+								{
+									b.move(v);
+									_file << v << '\n';
+									_file << v.rating() << '\n';
+								};
+								_file << '\n' << '\n';
+								
+								b = _board;
 								for (auto& v : _line)
 								{
 									b.move(v);
