@@ -336,8 +336,8 @@ namespace sch
 					_params.level = 3;
 					_params.days.reset();
 					_params.clock.emplace();
-					_params.clock->set_initial(1min);
-					_params.clock->set_increment(5s);
+					//_params.clock->set_initial(1min);
+					//_params.clock->set_increment(3s);
 					auto _result = this->account_client_.challenge_ai(_params);
 					if (!_result)
 					{
@@ -541,7 +541,6 @@ namespace sch
 				auto _board = Board();
 				reset_board(_board);
 				rt0 = rate_board(_board, Color::white);
-				std::cout << _board << std::endl;
 			};
 
 			{
@@ -565,7 +564,6 @@ namespace sch
 				if (rt0 >= rt1)
 				{
 					std::cout << rt1 << " should be greater than " << rt0 << '\n';
-					std::cout << _board << std::endl;
 					//abort();
 				};
 			};

@@ -279,6 +279,24 @@ namespace chess
 		*/
 		using enum PieceType;
 
+		enum class PieceE : uint8_t
+		{
+			black_pawn   = 0b0010,
+			black_knight = 0b0100,
+			black_bishop = 0b0110,
+			black_rook	 = 0b1000,
+			black_queen  = 0b1010,
+			black_king   = 0b1100,
+
+			white_pawn		= 0b0011,
+			white_knight	= 0b0101,
+			white_bishop	= 0b0111,
+			white_rook		= 0b1001,
+			white_queen		= 0b1011,
+			white_king		= 0b1101,
+		};
+		using enum PieceE;
+
 		/**
 		 * @brief Types of chess pieces.
 		*/
@@ -310,6 +328,14 @@ namespace chess
 		{
 			return Color(this->piece_ & 0x1);
 		};
+
+		constexpr bool is_white() const
+		{
+			return this->piece_ & 0x1;
+		};
+
+		constexpr explicit operator uint8_t() const noexcept { return this->piece_; };
+		constexpr operator PieceE() const noexcept { return PieceE(this->piece_); };
 
 
 		// Compares color AND piece type

@@ -108,15 +108,15 @@ namespace sch
 					const auto& _myColor = this->my_color_;
 					
 					const size_t _pieceCount = _board.pieces().size();
-					auto _depth = 4;
+					auto _depth = 5;
 
 					// Bump depth as many moves will be discarded
 					const bool _isCheck = is_check(_board, _myColor);
 
-					if (_isCheck)
-					{
-						_depth += 1;
-					};
+					//if (_isCheck)
+					//{
+					//	_depth += 1;
+					//};
 					
 					// Bump depth if no queens on board
 					//if (_board.pfind(Piece::queen, Color::white) == _board.pend() && _board.pfind(Piece::queen, Color::black) == _board.pend()
@@ -128,7 +128,7 @@ namespace sch
 					{
 						_depth += 1;
 					}
-					else if (_pieceCount <= 4 && !_isCheck)
+					if (_pieceCount <= 4 && !_isCheck)
 					{
 						_depth += 1;
 					};

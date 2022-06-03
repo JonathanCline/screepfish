@@ -4,6 +4,17 @@
 
 namespace chess
 {
+	namespace
+	{
+		constexpr auto CHECKMATE_RATING = 100000.0f;
+		constexpr auto BLOCKED_QUEEN_RATING = 0.001f;
+		constexpr auto BLOCKED_ROOK_RATING = 0.001f;
+		constexpr auto BLOCKED_BISHOP_RATING = 0.001f;
+		constexpr auto PAWN_PUSH_RATING = 0.001f;
+		constexpr auto CASTLE_ABILITY_RATING = 0.001f;
+		constexpr auto DEVELOPMENT_RATING = 0.0005f;
+	};
+
 
 	inline chess::Position find_next_piece_in_direction(const chess::Board& _board, const chess::Position& _startPos,
 		const int df, const int dr)
@@ -1240,22 +1251,22 @@ namespace chess
 
 
 
-	inline chess::Rating material_value(const chess::PieceType& _piece)
+	constexpr inline chess::Rating material_value(const chess::PieceType& _piece)
 	{
 		switch (_piece)
 		{
 		case chess::PieceType::pawn:
-			return 1;
+			return 1.0f;
 		case chess::PieceType::knight:
-			return 2;
+			return 2.0f;
 		case chess::PieceType::bishop:
-			return 2;
+			return 2.0f;
 		case chess::PieceType::rook:
-			return 5;
+			return 5.0f;
 		case chess::PieceType::queen:
-			return 10;
+			return 10.0f;
 		case chess::PieceType::king:
-			return 1000;
+			return 1000.0f;
 		};
 	};
 
@@ -1273,170 +1284,234 @@ namespace chess
 		7 // rank 8
 	};
 
+	constexpr inline auto make_pawn_promote_ratings(const auto& _distances)
+	{
+		std::array<Rating, 8> o{};
+		auto oi = o.begin();
+		for (auto it = _distances.rbegin(); it != _distances.rend(); ++it)
+		{
+			*oi = ((float)*it / 7.0f) * PAWN_PUSH_RATING;
+			++oi;
+		};
+		return o;
+	};
+
+	template <typename T, size_t LN, size_t RN>
+	constexpr inline auto concat_arrays(std::array<T, LN> lhs, std::array<T, RN> rhs)
+	{
+		auto o = std::array<T, LN + RN>{};
+		auto i = o.begin();
+		for (auto& v : lhs) { *(i++) = v; };
+		for (auto& v : rhs) { *(i++) = v; };
+		return o;
+	};
 
 
-	chess::Rating rate_board(const chess::Board& _board, chess::Color _forPlayer)
+	constexpr inline auto white_pawn_promote_rating_v = make_pawn_promote_ratings(white_distance_to_promote_v);
+	constexpr inline auto black_pawn_promote_rating_v = make_pawn_promote_ratings(black_distance_to_promote_v);
+
+	struct AbsoluteRating
+	{
+	public:
+		using rep = Rating;
+
+		constexpr rep white() const noexcept
+		{
+			return this->val_;
+		};
+		constexpr rep black() const noexcept
+		{
+			return -this->val_;
+		};
+		constexpr rep relative(Color _col) const
+		{
+			if (_col == Color::white)
+			{
+				return this->white();
+			}
+			else
+			{
+				return this->black();
+			};
+		};
+
+		constexpr AbsoluteRating& operator+=(Rating rhs)
+		{
+			this->val_ += rhs;
+			return *this;
+		};
+		constexpr AbsoluteRating& operator-=(Rating rhs)
+		{
+			this->val_ -= rhs;
+			return *this;
+		};
+
+		constexpr AbsoluteRating() = default;
+		constexpr AbsoluteRating(rep _value) noexcept :
+			val_(_value)
+		{};
+
+	private:
+		rep val_;
+	};
+
+
+
+
+	template <chess::Color Player>
+	chess::Rating rate_board(const chess::Board& _board)
 	{
 		using namespace chess;
 
-		constexpr auto checkmate_rating_v	  = 100000.0f;
-		
-		constexpr auto blocked_queen_rating_v = 0.001f;
-		constexpr auto blocked_rook_rating_v  = 0.001f;
-		constexpr auto blocked_bishop_rating_v = 0.001f;
-		
-		constexpr auto pawn_push_rating_v	  = 0.001f;
-
-		constexpr auto castle_ability_rating_v = 0.001f;
-
-		constexpr auto development_rating_v = 0.0005f;
-
-
-
+		constexpr auto& checkmate_rating_v = CHECKMATE_RATING;
+		constexpr auto& blocked_queen_rating_v = BLOCKED_QUEEN_RATING;
+		constexpr auto& blocked_rook_rating_v = BLOCKED_ROOK_RATING;
+		constexpr auto& blocked_bishop_rating_v = BLOCKED_BISHOP_RATING;
+		constexpr auto& pawn_push_rating_v = PAWN_PUSH_RATING;
+		constexpr auto& castle_ability_rating_v = CASTLE_ABILITY_RATING;
+		constexpr auto& development_rating_v = DEVELOPMENT_RATING;
 
 		auto _rating = Rating(0);
 
-		if (is_checkmate(_board, !_forPlayer))
+		if (is_checkmate(_board, !Player))
 		{
 			return checkmate_rating_v;
 		};
 
-		if (_board.get_castle_kingside_flag(_forPlayer))
+		if (_board.get_castle_kingside_flag(Player))
 		{
 			_rating += castle_ability_rating_v;
 		};
-		if (_board.get_castle_queenside_flag(_forPlayer))
+		if (_board.get_castle_queenside_flag(Player))
 		{
 			_rating += castle_ability_rating_v;
 		};
-		if (_board.get_castle_kingside_flag(!_forPlayer))
+		if (_board.get_castle_kingside_flag(!Player))
 		{
 			_rating -= castle_ability_rating_v;
 		};
-		if (_board.get_castle_queenside_flag(!_forPlayer))
+		if (_board.get_castle_queenside_flag(!Player))
 		{
 			_rating -= castle_ability_rating_v;
 		};
 
-		for (auto& v : _board.pieces())
+		const auto _pEnd = _board.pend();
+		for (auto it = _board.pbegin(); it != _pEnd; ++it)
 		{
-			switch (v.type())
+			const auto& v = *it;
+			switch (v)
 			{
-			case Piece::pawn:
+			case Piece::white_pawn:
 			{
-				int _distanceToPromote = 0;
-				if (v.color() == Color::white)
+				if constexpr (Player == Color::white)
 				{
-					_distanceToPromote = white_distance_to_promote_v[(int)v.rank()];
+					_rating += white_pawn_promote_rating_v[jc::to_underlying(v.rank())];
+					_rating += material_value(Piece::pawn);
 				}
 				else
 				{
-					_distanceToPromote = black_distance_to_promote_v[(int)v.rank()];
+					_rating -= white_pawn_promote_rating_v[jc::to_underlying(v.rank())];
+					_rating -= material_value(Piece::pawn);
+				};
+			};
+			break;
+			case Piece::black_pawn:
+			{
+				if constexpr (Player == Color::white)
+				{
+					_rating -= black_pawn_promote_rating_v[jc::to_underlying(v.rank())];
+					_rating -= material_value(Piece::pawn);
+				}
+				else
+				{
+					_rating += black_pawn_promote_rating_v[jc::to_underlying(v.rank())];
+					_rating += material_value(Piece::pawn);
+				};
+			};
+			break;
+
+			case Piece::black_queen: [[fallthrough]];
+			case Piece::black_bishop: [[fallthrough]];
+			case Piece::black_rook:
+			{
+				if (v.rank() != Rank::r8)
+				{
+					if constexpr (Player == Color::white)
+					{
+						_rating -= development_rating_v;
+					}
+					else
+					{
+						_rating += development_rating_v;
+					};
 				};
 
-				const auto _ratingValue = ((float)(7.0f - _distanceToPromote) / 7.0f) * pawn_push_rating_v;
-				if (v.color() == _forPlayer)
+				if constexpr (Player == Color::white)
 				{
-					_rating += _ratingValue;
+					_rating -= material_value(v.type());
 				}
 				else
 				{
-					_rating -= _ratingValue;
+					_rating += material_value(v.type());
 				};
 			};
 			break;
-			case Piece::queen:
+
+			case Piece::black_knight:
 			{
-				Rating _diff = 0.0;
-				if (v.color() == Color::white)
+				if constexpr (Player == Color::white)
 				{
-					if (v.rank() == Rank::r1)
-					{
-						_diff = development_rating_v;
-					};
+					_rating -= material_value(Piece::knight);
 				}
 				else
 				{
-					if (v.rank() == Rank::r8)
-					{
-						_diff = development_rating_v;
-					};
-				};
-				if (v.color() == _forPlayer)
-				{
-					_rating -= _diff;
-				}
-				else
-				{
-					_rating += _diff;
+					_rating += material_value(Piece::knight);
 				};
 			};
 			break;
-			case Piece::rook:
+
+			case Piece::white_queen: [[fallthrough]];
+			case Piece::white_bishop: [[fallthrough]];
+			case Piece::white_rook:
 			{
-				Rating _diff = 0.0;
-				if (v.color() == Color::white)
+				if (v.rank() != Rank::r8)
 				{
-					if (v.rank() == Rank::r1)
+					if constexpr (Player == Color::white)
 					{
-						_diff = development_rating_v;
-					};
-				}
-				else
-				{
-					if (v.rank() == Rank::r8)
+						_rating += development_rating_v;
+					}
+					else
 					{
-						_diff = development_rating_v;
+						_rating -= development_rating_v;
 					};
 				};
-				if (v.color() == _forPlayer)
+				
+				if constexpr (Player == Color::white)
 				{
-					_rating -= _diff;
+					_rating += material_value(v.type());
 				}
 				else
 				{
-					_rating += _diff;
+					_rating -= material_value(v.type());
 				};
 			};
 			break;
-			case Piece::bishop:
+
+			case Piece::white_knight:
 			{
-				Rating _diff = 0.0;
-				if (v.color() == Color::white)
+				if constexpr (Player == Color::white)
 				{
-					if (v.rank() == Rank::r1)
-					{
-						_diff = development_rating_v;
-					};
+					_rating += material_value(Piece::knight);
 				}
 				else
 				{
-					if (v.rank() == Rank::r8)
-					{
-						_diff = development_rating_v;
-					};
-				};
-				if (v.color() == _forPlayer)
-				{
-					_rating -= _diff;
-				}
-				else
-				{
-					_rating += _diff;
+					_rating -= material_value(Piece::knight);
 				};
 			};
 			break;
+
 			default:
 				break;
-			};
-		
-			if (v.color() == _forPlayer)
-			{
-				_rating += material_value(v.type());
-			}
-			else
-			{
-				_rating -= material_value(v.type());
 			};
 		};
 
@@ -1447,6 +1522,19 @@ namespace chess
 		};
 
 		return _rating;
+	};
+
+	chess::Rating rate_board(const chess::Board& _board, chess::Color _forPlayer)
+	{
+		using namespace chess;
+		if (_forPlayer == Color::white)
+		{
+			return rate_board<Color::white>(_board);
+		}
+		else
+		{
+			return rate_board<Color::black>(_board);
+		};
 	};
 
 	chess::Rating rate_move(const chess::Board& _board, const chess::Move& _move, chess::Color _forPlayer, const bool _isCheck)
