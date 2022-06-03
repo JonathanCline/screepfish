@@ -1,5 +1,7 @@
 #include "screepfish.hpp"
 
+#include "tests/tests.hpp"
+
 #include "env.hpp"
 
 #include "engine/engine.hpp"
@@ -333,7 +335,7 @@ namespace sch
 					std::this_thread::sleep_for(std::chrono::seconds(1));
 
 					auto _params = lichess::ChallengeAIParams{};
-					_params.level = 3;
+					_params.level = 4;
 					_params.days.reset();
 					_params.clock.emplace();
 					//_params.clock->set_initial(1min);
@@ -399,10 +401,30 @@ namespace sch
 namespace sch
 {
 
-	bool run_tests()
+	bool run_tests_main()
 	{
-		bool _runOnFinish = true;
+		bool _runOnFinish = false;
 
+		{
+			bool _failed = false;
+			const auto _results = run_tests();
+			for (auto& v : _results)
+			{
+				if (!v)
+				{
+					std::cout << "TEST FAILED " <<
+						v.name() <<
+						"(" << v.result() << ") : " <<
+						v.description() << std::endl;
+					_failed = true;
+				};
+			};
+
+			if (_failed)
+			{
+				return _runOnFinish;
+			};
+		}
 
 
 		using namespace chess;
@@ -425,45 +447,6 @@ namespace sch
 			{
 				abort();
 			};
-		};
-
-		{
-			auto _board = Board();
-			reset_board(_board);
-
-			auto _tree = MoveTree();
-			_tree.board = _board;
-
-			_tree.evalulate_next();
-			if (const auto s = _tree.total_outcomes(); s != 20)
-			{
-				std::cout << "Expected 20, got " << s << '\n';
-				abort();
-			};
-
-			_tree.evalulate_next();
-			if (const auto s = _tree.total_outcomes(); s != 400)
-			{
-				std::cout << "Expected 400, got " << s << '\n';
-				abort();
-			};
-
-			_tree.evalulate_next();
-			if (const auto s = _tree.total_outcomes(); s != 8902)
-			{
-				std::cout << "Expected 8902, got " << s << '\n';
-				std::cout << "  delta = " << (int)s - 8902 << '\n';
-				//abort();
-			};
-
-			_tree.evalulate_next();
-			if (const auto s = _tree.total_outcomes(); s != 197281)
-			{
-				std::cout << "Expected 197281, got " << s << '\n';
-				std::cout << "  delta = " << (int)s - 197281 << '\n';
-				//abort();
-			};
-
 		};
 
 

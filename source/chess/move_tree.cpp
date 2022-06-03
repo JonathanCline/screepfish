@@ -115,6 +115,36 @@ namespace chess
 		return v;
 	};
 
+	void MoveTreeNode::count_duplicates(Board _board, std::set<size_t>& _boards)
+	{
+		// Apply our move.
+		for (auto it = this->begin(); it != this->end(); ++it)
+		{
+			auto& _move = *it;
+			auto b = _board;
+			b.move(_move.move);
+			const auto h = hash(b, b.get_toplay() == Color::black);
+			_boards.insert(h);
+			_move.count_duplicates(b, _boards);
+		};
+	};
+
+	size_t MoveTreeNode::count_checks(Board _board)
+	{
+		size_t n = 0;
+		for (auto& m : *this)
+		{
+			auto b = _board;
+			b.move(m.move);
+			if (is_check(b, Color::white) || is_check(b, Color::black))
+			{
+				++n;
+			};
+			n += m.count_checks(b);
+		};
+		return n;
+	};
+
 
 
 	// MoveTree
@@ -244,4 +274,32 @@ namespace chess
 		return o;
 	};
 
+	size_t MoveTree::count_unique_positions()
+	{
+		auto bs = std::set<size_t>();
+		for (auto& _move : this->moves)
+		{
+			auto b = this->board;
+			b.move(_move.move);
+			bs.insert(hash(b, b.get_toplay() == Color::black));
+			_move.count_duplicates(b, bs);
+		};
+		return bs.size();
+	};
+	
+	size_t MoveTree::count_checks()
+	{
+		size_t n = 0;
+		for (auto& m : this->moves)
+		{
+			auto b = this->board;
+			b.move(m.move);
+			if (is_check(b, Color::white) || is_check(b, Color::black))
+			{
+				++n;
+			};
+			n += m.count_checks(b);
+		};
+		return n;
+	};
 };

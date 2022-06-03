@@ -42,6 +42,8 @@ namespace chess
 			return this->responses[0];
 		};
 
+		void count_duplicates(Board _board, std::set<size_t>& _boards);
+
 
 		std::unique_ptr<MoveTreeNode[]> responses{};
 		RatedMove move{};
@@ -52,6 +54,8 @@ namespace chess
 
 		size_t tree_size() const;
 		size_t total_outcomes() const;
+
+		size_t count_checks(Board _board);
 
 		void show_best_line() const;
 		std::vector<RatedMove> get_best_line() const;
@@ -75,6 +79,9 @@ namespace chess
 		size_t total_outcomes() const;
 
 		std::vector<std::vector<RatedMove>> get_top_lines(size_t _maxCount) const;
+
+		size_t count_unique_positions();
+		size_t count_checks();
 
 		MoveTree() = default;
 

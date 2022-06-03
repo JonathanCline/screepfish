@@ -1020,6 +1020,31 @@ namespace chess
 							this->bcastle_queen_ = false;
 						};
 					};
+				}
+				else if (_to == PieceType::rook)
+				{
+					if (_to.color() == Color::white)
+					{
+						if (_toPos == (File::h, Rank::r1))
+						{
+							this->wcastle_king_ = false;
+						}
+						else if (_toPos == (File::a, Rank::r1))
+						{
+							this->wcastle_queen_ = false;
+						};
+					}
+					else
+					{
+						if (_toPos == (File::h, Rank::r8))
+						{
+							this->bcastle_king_ = false;
+						}
+						else if (_toPos == (File::a, Rank::r8))
+						{
+							this->bcastle_queen_ = false;
+						};
+					};
 				};
 
 				// Half move handling (fifty move rule)

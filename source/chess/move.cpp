@@ -546,7 +546,7 @@ namespace chess
 
 			if (_board.is_empty(_newPosOne))
 			{
-				if (_newPosOne.rank() == Rank::r8 || _newPosOne.rank() == Rank::r1)
+				if (!_doubleDeltaRank && (_newPosOne.rank() == Rank::r8 || _newPosOne.rank() == Rank::r1))
 				{
 					_buffer.write(Move(_position, _newPosOne, PieceType::bishop));
 					_buffer.write(Move(_position, _newPosOne, PieceType::rook));

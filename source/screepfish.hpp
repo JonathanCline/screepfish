@@ -4,7 +4,7 @@
 
 namespace sch
 {
-	bool run_tests();
+	bool run_tests_main();
 
 	void perf_test();
 

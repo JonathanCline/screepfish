@@ -58,7 +58,7 @@ int main(int _nargs, const char* _vargs[])
 		exit(0);
 	};
 
-	if (_tests && !sch::run_tests())
+	if (_tests && !sch::run_tests_main())
 	{
 		return 1;
 	};
