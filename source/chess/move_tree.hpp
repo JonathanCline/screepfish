@@ -27,8 +27,6 @@ namespace chess
 		MoveTreeNode() = default;
 	};
 
-	constexpr auto q = sizeof(MoveTreeNode);
-	
 
 
 
