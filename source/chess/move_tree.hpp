@@ -3,19 +3,24 @@
 /** @file */
 
 #include "move.hpp"
+
 #include <set>
 #include <vector>
 #include <random>
 
 namespace chess
-
 {
+
+
 	struct MoveTreeNode
 	{
+		Rating rating() const { return this->rating_; };
+		Rating quick_rating() const { return this->move.rating(); };
+
+
 		std::vector<MoveTreeNode> responses{};
 		RatedMove move{};
-		Color move_played_by{};
-		size_t hash = 0;
+		Rating rating_ = 0;
 
 		void evaluate_next(const Board& _previousBoard, bool _followChecks = true);
 
@@ -23,6 +28,7 @@ namespace chess
 		size_t total_outcomes() const;
 
 		void show_best_line() const;
+		std::vector<RatedMove> get_best_line() const;
 
 		MoveTreeNode() = default;
 	};
@@ -34,14 +40,13 @@ namespace chess
 	{
 		chess::Board board{}; // initial board state
 		std::vector<MoveTreeNode> moves{}; // moves that can be played from the initial board state
-		Color to_play{}; // who is to play
-
-
 
 		void evalulate_next();
 		std::optional<Move> best_move(std::mt19937& _rnd);
 		size_t tree_size() const;
 		size_t total_outcomes() const;
+
+		std::vector<std::vector<RatedMove>> get_top_lines(size_t _maxCount) const;
 
 		MoveTree() = default;
 

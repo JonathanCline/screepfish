@@ -41,4 +41,18 @@ namespace str
 		return rstrip(lstrip(_str));
 	};
 
-}
+	inline std::string rep(std::string _str, size_t _times)
+	{
+		auto s = std::string{};
+		for (size_t n = 0; n != _times; ++n)
+		{
+			s.append(_str);
+		};
+		return s;
+	};	
+	inline std::string rep(char c, size_t _times)
+	{
+		auto s = std::string(_times, c);
+		return s;
+	};
+};

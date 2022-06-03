@@ -1,6 +1,9 @@
 #include "engine.hpp"
 
+#include "chess/fen.hpp"
 #include "chess/bitboard.hpp"
+
+#include "utility/string.hpp"
 
 #include <array>
 #include <vector>
@@ -9,6 +12,7 @@
 #include <bit>
 #include <iostream>
 #include <chrono>
+#include <fstream>
 
 #include <jclib/functional.h>
 
@@ -21,8 +25,6 @@ namespace sch
 
 		auto _tree = chess::MoveTree();
 		_tree.board = _board;
-		_tree.to_play = _forPlayer;
-
 		for (int n = 0; n != _depth; ++n)
 		{
 			_tree.evalulate_next();
@@ -151,9 +153,49 @@ namespace sch
 					{
 						return std::chrono::duration_cast<std::chrono::duration<double>>(v);
 					};
-
-					//std::cout << "Delta time : " << fn(td) << '(' << fn(tdA) << ", " << fn(tdB) << ")\n";
+					std::cout << "Delta time : " << fn(td) << '(' << fn(tdA) << ", " << fn(tdB) << ")\n";
 					
+					// Log if set
+					if (auto& _loggingDir = this->logging_dir_; _loggingDir)
+					{
+						// Log the text data
+						{
+							namespace fs = std::filesystem;
+							const auto _dirPath = *_loggingDir / ("m" + std::to_string(_board.get_full_move_count()));
+							if (fs::exists(_dirPath))
+							{
+								fs::remove_all(_dirPath);
+							};
+							fs::create_directories(_dirPath);
+
+							// Initial position
+							{
+								const auto _path = _dirPath / "initial.txt";
+								auto _file = std::ofstream(_path);
+								_file << _board << '\n' << '\n';
+								_file << get_fen(_board) << '\n';
+							};
+
+							// Lines
+							const auto _topLines = _tree.get_top_lines(3);
+							size_t _lineN = 0;
+							for (auto& _line : _topLines)
+							{
+								const auto _path = _dirPath / ("line" + std::to_string(_lineN++) + ".txt");
+								auto _file = std::ofstream(_path);
+								auto b = _board;
+								for (auto& v : _line)
+								{
+									b.move(v);
+									_file << v << '\n';
+									_file << v.rating() << '\n' << '\n';
+									_file << b << '\n' << '\n';
+									_file << get_fen(b) << '\n' << '\n' << str::rep('=', 80) << '\n' << '\n';
+								};
+							};
+						};
+					};
+
 					Response _resp{};
 					_resp.move = _move;
 					this->best_move_ = _resp;
@@ -174,10 +216,22 @@ namespace sch
 		std::cout << "Average calculation time = " << _avgDur << '\n';
 	};
 
+	void ScreepFish::set_logging_dir(std::filesystem::path _path)
+	{
+		namespace fs = std::filesystem;
+		if (!fs::exists(_path))
+		{
+			fs::create_directories(_path);
+		};
+
+		const auto lck = std::unique_lock(this->mtx_);
+		this->logging_dir_ = _path;
+	};
 
 	ScreepFish::ScreepFish() :
 		init_barrier_(2),
-		rnd_(std::random_device{}())
+		rnd_(std::random_device{}()),
+		logging_dir_{}
 	{
 		
 	};

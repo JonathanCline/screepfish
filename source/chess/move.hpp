@@ -37,15 +37,36 @@ namespace chess
 		chess::Move* end_;
 	};
 
-	struct RatedMove
+	struct RatedMove : public chess::Move
 	{
+	public:
+
+		constexpr Rating rating() const noexcept { return this->rating_; };
+
 		constexpr auto operator<=>(const RatedMove& rhs) const
 		{
-			return this->rating <=> rhs.rating;
+			return this->rating() <=> rhs.rating();
 		};
 
-		chess::Move move;
-		chess::Rating rating;
+		constexpr RatedMove() = default;
+		constexpr RatedMove(Move _move, Rating _rating) :
+			chess::Move(_move), rating_(_rating)
+		{};
+		constexpr RatedMove(PieceMove _move, Rating _rating) :
+			RatedMove(Move(_move), _rating)
+		{};
+		constexpr RatedMove(PieceMove _move, PieceType _promotion, Rating _rating) :
+			RatedMove(Move(_move, _promotion), _rating)
+		{};
+		constexpr RatedMove(Position _from, Position _to, Rating _rating) :
+			RatedMove(Move(_from, _to), _rating)
+		{};
+		constexpr RatedMove(Position _from, Position _to, PieceType _promotion, Rating _rating) :
+			RatedMove(Move(_from, _to, _promotion), _rating)
+		{};
+
+	private:
+		chess::Rating rating_;
 	};
 
 

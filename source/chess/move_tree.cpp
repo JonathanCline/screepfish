@@ -8,7 +8,8 @@ namespace chess
 	{
 		// Apply our move.
 		auto _board = _previousBoard;
-		_board.move(this->move.move);
+		const auto _myColor = _board.get_toplay();
+		_board.move(this->move);
 
 		if (this->responses.empty())
 		{
@@ -16,7 +17,8 @@ namespace chess
 			std::array<Move, 128> _moveBufferData{};
 			auto _moveBuffer = MoveBuffer(_moveBufferData.data(), _moveBufferData.data() + _moveBufferData.size());
 			const auto _moveBegin = _moveBuffer.head();
-			get_moves(_board, !this->move_played_by, _moveBuffer);
+			const auto _opponentColor = _board.get_toplay();
+			get_moves(_board, _opponentColor, _moveBuffer);
 			const auto _moveEnd = _moveBuffer.head();
 
 			// Rate and add to the child nodes
@@ -27,16 +29,15 @@ namespace chess
 				// Rate the move
 				auto _newBoard = _board;
 				_newBoard.move(*p);
-				//const auto _hash = chess::hash(_newBoard, _newBoard.get_toplay() == Color::black);
-
-				const auto _rating = rate_board(_newBoard, !this->move_played_by);
+				const auto _rating = rate_board(_newBoard, _opponentColor);
 
 				// Assign values
-				it->move_played_by = !this->move_played_by;
 				it->move = RatedMove{ *p, _rating };
+				it->rating_ = _rating;
+
 				//it->hash = _hash;
 
-				if (_followChecks && is_check(_newBoard, it->move_played_by))
+				if (_followChecks && is_check(_newBoard, _myColor))
 				{
 					it->evaluate_next(_board, false);
 				};
@@ -58,13 +59,13 @@ namespace chess
 		// Sort children by rating
 		std::ranges::sort(this->responses, [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
 			{
-				return lhs.move.rating > rhs.move.rating;
+				return lhs.rating() > rhs.rating();
 			});
 
 		// Set our rating to show the best opponent response
 		if (!this->responses.empty())
 		{
-			this->move.rating = -this->responses.front().move.rating;
+			this->rating_ = -this->responses.front().rating();
 		};
 	};
 
@@ -96,12 +97,24 @@ namespace chess
 
 	void MoveTreeNode::show_best_line() const
 	{
-		std::cout << this->move.move << "(" << this->move.rating << ") ";
+		std::cout << this->move << "(" << this->quick_rating() << ") ";
 		if (!this->responses.empty())
 		{
 			this->responses.front().show_best_line();
 		};
 	};
+
+	std::vector<RatedMove> MoveTreeNode::get_best_line() const
+	{
+		auto v = std::vector<RatedMove>{ this->move };
+		if (!this->responses.empty())
+		{
+			auto rv = this->responses.front().get_best_line();
+			v.insert(v.end(), rv.begin(), rv.end());
+		};
+		return v;
+	};
+
 
 
 	// MoveTree
@@ -124,7 +137,7 @@ namespace chess
 			std::array<Move, 128> _moveBufferData{};
 			auto _moveBuffer = MoveBuffer(_moveBufferData.data(), _moveBufferData.data() + _moveBufferData.size());
 			const auto _moveBegin = _moveBuffer.head();
-			get_moves(_board, this->to_play, _moveBuffer);
+			get_moves(_board, _board.get_toplay(), _moveBuffer);
 			const auto _moveEnd = _moveBuffer.head();
 
 			// Rate and add to the child nodes
@@ -135,14 +148,12 @@ namespace chess
 				// Rate the move
 				auto _newBoard = _board;
 				_newBoard.move(*p);
-				const auto _hash = hash(_newBoard, _newBoard.get_toplay() == Color::black);
 			
-				const auto _rating = rate_board(_newBoard, this->to_play);
+				const auto _rating = rate_board(_newBoard, _board.get_toplay());
 
 				// Assign values
-				it->move_played_by = this->to_play;
 				it->move = RatedMove{ *p, _rating };
-				it->hash = _hash;
+				it->rating_ = _rating;
 
 				// Next
 				++it;
@@ -160,7 +171,7 @@ namespace chess
 		// Sort children by rating
 		std::ranges::sort(this->moves, [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
 			{
-				return lhs.move.rating > rhs.move.rating;
+				return lhs.rating() > rhs.rating();
 			});
 
 		++this->depth_counter_;
@@ -178,14 +189,14 @@ namespace chess
 			{
 				if (v.responses.empty())
 				{
-					return v.move.move;
+					return v.move;
 				};
 			};
 
-			auto& _best = this->moves.front().move;
+			auto& _best = this->moves.front();
 			const auto it = std::ranges::find_if(this->moves, [&_best](MoveTreeNode& v)
 				{
-					return v.move.rating != _best.rating;
+					return v.rating() != _best.rating();
 				});
 
 		 	const auto _rndNum = _rnd();
@@ -194,7 +205,7 @@ namespace chess
 			_rndIter->show_best_line();
 			std::cout << std::endl;
 
-			return _rndIter->move.move;
+			return _rndIter->move;
 		};
 	};
 
@@ -220,6 +231,17 @@ namespace chess
 			n = this->moves.size();
 		};
 		return n;
+	};
+
+	std::vector<std::vector<RatedMove>> MoveTree::get_top_lines(size_t _maxCount) const
+	{
+		auto o = std::vector<std::vector<RatedMove>>{};
+		for (size_t n = 0; n != _maxCount; ++n)
+		{
+			if (n >= this->moves.size()) { break; };
+			o.push_back(this->moves.at(n).get_best_line());
+		};
+		return o;
 	};
 
 };

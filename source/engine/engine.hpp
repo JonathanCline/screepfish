@@ -11,7 +11,7 @@
 #include <variant> 
 #include <atomic>
 #include <random>
-
+#include <filesystem>
 
 
 namespace sch
@@ -32,6 +32,7 @@ namespace sch
 		void start(chess::Board _initialBoard, chess::Color _color) final;
 		void stop() final;
 
+		void set_logging_dir(std::filesystem::path _path);
 
 
 		ScreepFish();
@@ -45,6 +46,7 @@ namespace sch
 		mutable std::mutex mtx_;
 
 		std::optional<chess::Response> best_move_;
+		std::optional<std::filesystem::path> logging_dir_{};
 
 		std::jthread thread_;
 

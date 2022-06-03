@@ -211,6 +211,11 @@ namespace sch
 			this->keep_open_ = false;
 		};
 
+		void enable_logging(std::string _executableDirectory)
+		{
+			this->engine_.set_logging_dir(_executableDirectory + "/" + std::string(this->game_id()));
+		};
+
 		GameStream(const char* _token,
 			const std::string& _gameID,
 			const std::string& _playerID) :
@@ -274,6 +279,7 @@ namespace sch
 
 			// Create the new stream
 			this->game_streams_.emplace_back(this->env_.token.c_str(), _event.id, this->account_info_.id);
+			this->game_streams_.back().enable_logging(this->env_.executable_root_path + "/logs");
 		};
 		void game_finish_callback(const lichess::GameFinishEvent& _event)
 		{
@@ -426,7 +432,6 @@ namespace sch
 
 			auto _tree = MoveTree();
 			_tree.board = _board;
-			_tree.to_play = _board.get_toplay();
 
 			_tree.evalulate_next();
 			if (const auto s = _tree.total_outcomes(); s != 20)
@@ -607,7 +612,6 @@ namespace sch
 			{
 				auto t = MoveTree();
 				t.board = b;
-				t.to_play = Color::white;
 				t.evalulate_next();
 				t.evalulate_next();
 			};

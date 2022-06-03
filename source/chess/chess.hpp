@@ -193,6 +193,12 @@ namespace chess
 		};
 
 		constexpr Move() = default;
+		constexpr Move(PieceMove _move) :
+			PieceMove(_move), promotion_(PieceType::queen)
+		{};
+		constexpr Move(PieceMove _move, PieceType _promotion) :
+			PieceMove(_move), promotion_(_promotion)
+		{};
 		constexpr Move(Position _from, Position _to, PieceType _promotion) :
 			PieceMove(_from, _to),
 			promotion_{ _promotion }

@@ -642,20 +642,13 @@ namespace lichess
 	};
 
 	Client::Client(const char* _authToken) :
-		client_("https://lichess.org")
+		client_("https://lichess.org"),
+		opening_explorer_client_("https://explorer.lichess.ovh")
 	{
 		this->client_.set_bearer_token_auth(_authToken);
-		//this->client_.set_logger([](const httplib::Request& _req, const httplib::Response& _res)
-		//	{
-		//		if (_res.has_header("Content-Type") && _res.get_header_value("Content-Type") == "application/json")
-		//		{
-		//			if (!_res.body.empty())
-		//			{
-		//				std::cout << "[DEBUG] " << json::parse(_res.body).dump(1, '\t') << '\n';
-		//			};
-		//		};
-		//	});
 	};
+
+
 };
 
 namespace lichess

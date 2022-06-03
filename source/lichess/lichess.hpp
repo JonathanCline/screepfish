@@ -588,5 +588,7 @@ namespace lichess
 
 	private:
 		httplib::Client client_;
+		httplib::Client opening_explorer_client_;
 	};
+
 };
