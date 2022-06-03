@@ -31,18 +31,44 @@ int main(int _nargs, const char* _vargs[])
 
 	auto _args = _parser.parse_args(_nargs, _vargs);
 
+	bool _perf = false;
+	bool _local = false;
+	bool _tests = true;
 
+	for (int n = 1; n < _nargs; ++n)
+	{
+		const auto _arg = std::string_view(_vargs[n]);
+		if (_arg == "--perf" || _arg == "-p")
+		{
+			_perf = true;
+		}
+		else if (_arg == "--notest")
+		{
+			_tests = false;
+		}
+		else if (_arg == "--local" || _arg == "-l")
+		{
+			_local = true;
+		};
+	};
 
-	if (_nargs >= 2 && _vargs[1] == std::string_view("--perf"))
+	if (_perf)
 	{
 		sch::perf_test();
 		exit(0);
 	};
 
-	if (!sch::run_tests())
+	if (_tests && !sch::run_tests())
 	{
 		return 1;
 	};
 
-	return sch::lichess_bot_main(_nargs, _vargs);
+	if (_local)
+	{
+		return sch::local_game_main(_nargs, _vargs);
+	}
+	else
+	{
+		return sch::lichess_bot_main(_nargs, _vargs);
+	};
 };
