@@ -15,6 +15,7 @@
 
 #include <jclib/functor.h>
 
+#include <array>
 #include <vector>
 #include <utility>
 #include <iostream>
@@ -577,7 +578,9 @@ namespace sch
 	{
 		using namespace chess;
 
-		for (int n = 0; n != 10; ++n)
+		std::array<size_t, 10> _runs{};
+
+		for (auto& r : _runs)
 		{
 			auto b = Board();
 			reset_board(b);
@@ -591,9 +594,12 @@ namespace sch
 			};
 
 			using namespace std::chrono_literals;
-			const auto rt = sch::count_runs_within_duration(fn, 1s);
-			std::cout << "rt : " << rt << '\n';
+			r = sch::count_runs_within_duration(fn, 1s);
 		};
+
+		const auto _runsTotal = std::accumulate(_runs.begin(), _runs.end(), (size_t)0);
+		const auto _runsAvg = _runsTotal / _runs.size();
+		std::cout << "rt : " << _runsAvg << std::endl;
 	};
 
 	bool local_game(const char* _assetsDirectoryPath)
