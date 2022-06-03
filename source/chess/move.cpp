@@ -1171,10 +1171,23 @@ namespace chess
 		using namespace chess;
 
 		const auto& p = _board.get_king(_forPlayer);
+
 		if (p)
 		{
 			// Quick check that an enemy pieces is in one of the threat positions
 			auto _threatPositions = BitBoard(get_threat_positions(p.position()));
+
+			// Grab the friendly positions
+			//const auto _friendlyPositions = (_forPlayer == Color::white) ?
+			//	_board.get_white_piece_bitboard() :
+			//	_board.get_black_piece_bitboard();
+
+			// Grab the enemy positions
+			//const auto _enemyPositions = (_forPlayer == Color::black) ?
+			//	_board.get_white_piece_bitboard() :
+			//	_board.get_black_piece_bitboard();
+
+
 
 			// Remove the enemy king as it will never be a threat
 			_threatPositions.reset(_board.get_king(!_forPlayer).position());
@@ -1182,9 +1195,12 @@ namespace chess
 			if (_forPlayer == Color::white)
 			{
 				// If a piece is directly above us, remove the whole file above the king
-				if (p.rank() != Rank::r8 && _board.has_friendy_piece(next(p.position(), 0, 1), _forPlayer))
+				if (p.rank() != Rank::r8)
 				{
-					_threatPositions &= ~make_file_bits(p.file(), p.rank(), Rank::r8);
+					if (_board.has_friendy_piece(next(p.position(), 0, 1), _forPlayer))
+					{
+						_threatPositions &= ~make_file_bits(p.file(), p.rank(), Rank::r8);
+					};
 				};
 
 				auto _threats = _threatPositions & _board.get_black_piece_bitboard();

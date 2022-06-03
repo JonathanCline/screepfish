@@ -266,6 +266,24 @@ namespace chess
 
 
 
+	enum class PieceE : uint8_t
+	{
+		black_pawn = 0b0010,
+		black_knight = 0b0100,
+		black_bishop = 0b0110,
+		black_rook = 0b1000,
+		black_queen = 0b1010,
+		black_king = 0b1100,
+
+		white_pawn = 0b0011,
+		white_knight = 0b0101,
+		white_bishop = 0b0111,
+		white_rook = 0b1001,
+		white_queen = 0b1011,
+		white_king = 0b1101,
+	};
+
+
 
 	/**
 	 * @brief Represents a chess piece with defined color.
@@ -278,24 +296,9 @@ namespace chess
 		 * @brief Exposes the piece type enum values for use
 		*/
 		using enum PieceType;
-
-		enum class PieceE : uint8_t
-		{
-			black_pawn   = 0b0010,
-			black_knight = 0b0100,
-			black_bishop = 0b0110,
-			black_rook	 = 0b1000,
-			black_queen  = 0b1010,
-			black_king   = 0b1100,
-
-			white_pawn		= 0b0011,
-			white_knight	= 0b0101,
-			white_bishop	= 0b0111,
-			white_rook		= 0b1001,
-			white_queen		= 0b1011,
-			white_king		= 0b1101,
-		};
-		using enum PieceE;
+		
+		using PieceE = PieceE;
+		using enum chess::PieceE;
 
 		/**
 		 * @brief Types of chess pieces.
@@ -399,6 +402,8 @@ namespace chess
 		uint8_t piece_;
 
 	};
+
+	std::ostream& operator<<(std::ostream& _ostr, const Piece& p);
 
 
 
@@ -777,8 +782,26 @@ namespace chess
 
 		void new_piece(Piece _piece, Position _pos)
 		{
+			if (_piece == Piece::white_king && this->pieces_.size() > 1)
+			{
+				const auto o = this->pieces_.front();
+				assert(o != Piece::white_king);
+				this->new_piece(o, o.position());
+				this->pieces_.front() = BoardPiece(_piece, _pos);
+			}
+			else if (_piece == Piece::black_king && this->pieces_.size() > 2)
+			{
+				const auto o = this->pieces_.at(1);
+				assert(o != Piece::black_king);
+				this->new_piece(o, o.position());
+				this->pieces_.at(1) = BoardPiece(_piece, _pos);
+			}
+			else
+			{
+				*this->pend() = BoardPiece(_piece, _pos);
+			};
+			
 			this->pieces_by_pos_.at(this->toindex(_pos)) = _piece;
-			*this->pend() = BoardPiece(_piece, _pos);
 
 			if (_piece.color() == Color::white)
 			{
@@ -802,6 +825,7 @@ namespace chess
 		{
 			return this->get((_file, _rank));
 		};
+
 
 		/**
 		 * @brief Gets the pieces that are on a particular file.
