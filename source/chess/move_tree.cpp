@@ -267,7 +267,7 @@ namespace chess
 
 				// Assign values
 				it->move = RatedMove{ *p, _rating };
-				it->rating_ = _rating;
+				it->set_rating(_rating);
 
 				// Next
 				++it;
@@ -316,7 +316,7 @@ namespace chess
 
 				// Assign values
 				it->move = RatedMove{ *p, _rating };
-				it->rating_ = _rating;
+				it->set_rating(_rating);
 
 				// Next
 				++it;

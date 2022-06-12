@@ -10,6 +10,7 @@
 #include "utility/number.hpp"
 #include "utility/utility.hpp"
 
+#include <jclib/type.h>
 #include <jclib/type_traits.h>
 
 #include <iosfwd>
@@ -80,7 +81,40 @@ namespace chess
 		*/
 		constexpr Position to() const noexcept { return this->to_; };
 
+		/**
+		 * @brief Checks if null.
+		 * @return True if null, false if NOT null.
+		*/
+		constexpr bool is_null() const noexcept
+		{
+			return this->from() == this->to();
+		};
 
+		/**
+		 * @brief Checks if NOT null.
+		 * @return True if NOT null, false if null.
+		*/
+		constexpr explicit operator bool() const
+		{
+			return !this->is_null();
+		};
+
+		constexpr friend bool operator==(const PieceMove& lhs, jc::null_t)
+		{
+			return lhs.is_null();
+		};
+		constexpr friend bool operator==(jc::null_t, const PieceMove& rhs)
+		{
+			return rhs.is_null();
+		};
+		constexpr friend bool operator!=(const PieceMove& lhs, jc::null_t)
+		{
+			return !lhs.is_null();
+		};
+		constexpr friend bool operator!=(jc::null_t, const PieceMove& rhs)
+		{
+			return !rhs.is_null();
+		};
 
 		constexpr PieceMove() = default;
 		constexpr PieceMove(Position _from, Position _to) :
@@ -156,24 +190,6 @@ namespace chess
 	class Move : public PieceMove
 	{
 	public:
-
-		/**
-		 * @brief Checks if null.
-		 * @return True if null, false if NOT null.
-		*/
-		constexpr bool is_null() const noexcept
-		{
-			return this->from() == this->to();
-		};
-		
-		/**
-		 * @brief Checks if NOT null.
-		 * @return True if NOT null, false if null.
-		*/
-		constexpr explicit operator bool() const
-		{
-			return !this->is_null();
-		};
 
 
 

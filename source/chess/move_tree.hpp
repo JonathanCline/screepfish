@@ -19,12 +19,16 @@ namespace chess
 	/**
 	 * @brief Holds a set of responses within a move tree.
 	*/
-	template <typename NodeT>
-	class MoveList
+	template <typename T>
+	requires requires (const T& v, bool b)
+	{
+		b = v;
+	}
+	class NullTerminatedArena
 	{
 	public:
 
-		using value_type = NodeT;
+		using value_type = T;
 
 		using pointer = value_type*;
 		using reference = value_type&;
@@ -33,85 +37,125 @@ namespace chess
 
 		using size_type = uint8_t;
 
-		size_type size() const
+		pointer data() noexcept
 		{
-			return this->responses_count_;
+			return this->data_.get();
 		};
+		const_pointer data() const noexcept
+		{
+			return this->data_.get();
+		};
+
 		bool empty() const
 		{
-			return this->responses_count_ == 0;
+			return !this->data_ || !this->data_[0];
 		};
+
+	private:
+
+		pointer mem_begin()
+		{
+			return this->data();
+		};
+		const_pointer mem_begin() const
+		{
+			return this->data();
+		};
+		pointer mem_end()
+		{
+			return this->begin() + this->size();
+		};
+		const_pointer mem_end() const
+		{
+			return this->begin() + this->size();
+		};
+
+	public:
 
 		using iterator = pointer;
 		using const_iterator = const_pointer;
 
 		iterator begin()
 		{
-			return this->responses_.get();
+			return this->mem_begin();
 		};
 		const_iterator begin() const
 		{
-			return this->responses_.get();
+			return this->mem_begin();
 		};
 		const_iterator cbegin() const
 		{
-			return this->responses_.get();
+			return this->mem_begin();
 		};
 
 		iterator end()
 		{
-			return this->begin() + this->size();
+			return std::find(this->mem_begin(), this->mem_end(), jc::null);
 		};
 		const_iterator end() const
 		{
-			return this->begin() + this->size();
+			return std::find(this->mem_begin(), this->mem_end(), jc::null);
 		};
 		const_iterator cend() const
 		{
-			return this->begin() + this->size();
+			return std::find(this->mem_begin(), this->mem_end(), jc::null);
 		};
-		
+
+		size_type size() const
+		{
+			size_type n = 0;
+			return std::find(this->begin(), this->end(), jc::null) - this->end();
+		};
 		void resize(size_type _size)
 		{
-			this->responses_ = std::make_unique<value_type[]>(_size);
-			this->responses_count_ = _size;
+			if (_size == 0)
+			{
+				this->clear();
+			}
+			else if (this->empty())
+			{
+				this->data_ = std::make_unique<value_type[]>(_size);
+			}
+			else
+			{
+				auto nd = std::make_unique<value_type[]>(_size);
+				std::copy(this->begin(), this->end(), nd.get());
+				this->data_ = std::move(nd);
+			};
 		};
 
 		reference front()
 		{
 			SCREEPFISH_ASSERT(!this->empty());
-			return this->responses_[0];
+			return this->data_[0];
 		};
 		const_reference front() const
 		{
 			SCREEPFISH_ASSERT(!this->empty());
-			return this->responses_[0];
+			return this->data_[0];
 		};
 
 		reference back()
 		{
 			SCREEPFISH_ASSERT(!this->empty());
-			return this->responses_[this->size() - 1];
+			return this->data_[this->size() - 1];
 		};
 		const_reference back() const
 		{
 			SCREEPFISH_ASSERT(!this->empty());
-			return this->responses_[this->size() - 1];
+			return this->data_[this->size() - 1];
 		};
 
 		void clear() noexcept
 		{
-			this->responses_.reset();
-			this->responses_count_ = 0;
+			this->data_.reset();
 		};
 
-		MoveList() = default;
+		NullTerminatedArena() = default;
 
 	private:
 
-		std::unique_ptr<value_type[]> responses_{};
-
-		size_type responses_count_ = 0;
+		std::unique_ptr<value_type[]> data_{};
 	};
 
 
@@ -135,6 +179,8 @@ namespace chess
 			return this->rating_;
 		};
 
+		void set_rating(Rating r) { this->rating_ = r; };
+
 		/**
 		 * @brief Gets the quick rating for the position.
 		 * @return Quick rating.
@@ -145,27 +191,30 @@ namespace chess
 		};
 
 
-		bool empty() const { return this->responses_count_ == 0; };
+		bool empty() const
+		{
+			return this->responses_count_ == 0;
+		};
 		void resize(size_type _size)
 		{
-			this->responses = std::make_unique<MoveTreeNode[]>(_size);
+			this->responses_ = std::make_unique<MoveTreeNode[]>(_size);
 			this->responses_count_ = _size;
 		};
 
 		size_type size() const { return this->responses_count_; };
 
-		auto begin() { return this->responses.get(); };
-		auto begin() const { return this->responses.get(); };
+		auto begin() { return this->responses_.get(); };
+		auto begin() const { return this->responses_.get(); };
 		auto end() { return this->begin() + this->size(); };
 		auto end() const { return this->begin() + this->size(); };
 
 		auto& front()
 		{
-			return this->responses[0];
+			return this->responses_[0];
 		};
 		const auto& front() const
 		{
-			return this->responses[0];
+			return this->responses_[0];
 		};
 
 		void count_duplicates(Board _board, std::set<size_t>& _boards);
@@ -184,9 +233,11 @@ namespace chess
 
 		MoveTreeNode() = default;
 
-
-		std::unique_ptr<MoveTreeNode[]> responses{};
+	private:
+		std::unique_ptr<MoveTreeNode[]> responses_{};
+	public:
 		RatedMove move{};
+	private:
 		Rating rating_ = 0;
 		uint8_t responses_count_ = 0;
 
