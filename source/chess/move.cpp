@@ -1463,52 +1463,6 @@ namespace chess
 	constexpr inline auto white_pawn_promote_rating_v = make_pawn_promote_ratings(white_distance_to_promote_v);
 	constexpr inline auto black_pawn_promote_rating_v = make_pawn_promote_ratings(black_distance_to_promote_v);
 
-	struct AbsoluteRating
-	{
-	public:
-		using rep = Rating;
-
-		constexpr rep white() const noexcept
-		{
-			return this->val_;
-		};
-		constexpr rep black() const noexcept
-		{
-			return -this->val_;
-		};
-		constexpr rep relative(Color _col) const
-		{
-			if (_col == Color::white)
-			{
-				return this->white();
-			}
-			else
-			{
-				return this->black();
-			};
-		};
-
-		constexpr AbsoluteRating& operator+=(Rating rhs)
-		{
-			this->val_ += rhs;
-			return *this;
-		};
-		constexpr AbsoluteRating& operator-=(Rating rhs)
-		{
-			this->val_ -= rhs;
-			return *this;
-		};
-
-		constexpr AbsoluteRating() = default;
-		constexpr AbsoluteRating(rep _value) noexcept :
-			val_(_value)
-		{};
-
-	private:
-		rep val_;
-	};
-
-
 
 
 	template <chess::Color Player>

@@ -2,6 +2,8 @@
 
 /** @file */
 
+#include "piece.hpp"
+#include "rating.hpp"
 #include "bitboard.hpp"
 #include "position.hpp"
 
@@ -30,39 +32,6 @@ namespace chess
 {
 
 
-
-	/**
-	 * @brief Named piece / square colors.
-	*/
-	enum class Color : bool
-	{
-		black,
-		white
-	};
-
-	constexpr inline auto colors_v = std::array
-	{
-		Color::black,
-		Color::white
-	};
-
-
-	/**
-	 * @brief Inverts the given color.
-	 * 
-	 * white -> black
-	 * black -> white
-	 * 
-	 * @param rhs Color to invert.
-	 * @return Inverted (opposite) color.
-	*/
-	constexpr Color operator!(Color rhs) noexcept
-	{
-		return Color(!jc::to_underlying(rhs));
-	};
-
-
-
 	constexpr Color square_color(Position _pos)
 	{
 		const auto a = static_cast<size_t>(_pos);
@@ -80,8 +49,6 @@ namespace chess
 		draw,
 		mate,
 	};
-
-	using Rating = float;
 
 	
 

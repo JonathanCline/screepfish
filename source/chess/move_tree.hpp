@@ -3,6 +3,7 @@
 /** @file */
 
 #include "move.hpp"
+#include "rating.hpp"
 
 #include "utility/bset.hpp"
 
@@ -18,7 +19,7 @@ namespace chess
 	/**
 	 * @brief Holds a set of responses within a move tree.
 	*/
-	struct BasicMoveTreeNode
+	class BasicMoveTreeNode
 	{
 	public:
 
@@ -39,15 +40,15 @@ namespace chess
 
 		iterator begin()
 		{
-			return this->responses.get();
+			return this->responses_.get();
 		};
 		const_iterator begin() const
 		{
-			return this->responses.get();
+			return this->responses_.get();
 		};
 		const_iterator cbegin() const
 		{
-			return this->responses.get();
+			return this->responses_.get();
 		};
 
 		iterator end()
@@ -65,35 +66,35 @@ namespace chess
 		
 		void resize(size_type _size)
 		{
-			this->responses = std::make_unique<value_type[]>(_size);
+			this->responses_ = std::make_unique<value_type[]>(_size);
 			this->responses_count_ = _size;
 		};
 
 		reference front()
 		{
 			SCREEPFISH_ASSERT(!this->empty());
-			return this->responses[0];
+			return this->responses_[0];
 		};
 		const_reference front() const
 		{
 			SCREEPFISH_ASSERT(!this->empty());
-			return this->responses[0];
+			return this->responses_[0];
 		};
 
 		reference back()
 		{
 			SCREEPFISH_ASSERT(!this->empty());
-			return this->responses[this->size() - 1];
+			return this->responses_[this->size() - 1];
 		};
 		const_reference back() const
 		{
 			SCREEPFISH_ASSERT(!this->empty());
-			return this->responses[this->size() - 1];
+			return this->responses_[this->size() - 1];
 		};
 
 		void clear() noexcept
 		{
-			this->responses.reset();
+			this->responses_.reset();
 			this->responses_count_ = 0;
 		};
 
@@ -105,8 +106,19 @@ namespace chess
 		BasicMoveTreeNode() = default;
 
 	private:
-		std::unique_ptr<value_type[]> responses{};
+
+		std::unique_ptr<value_type[]> responses_{};
 		size_type responses_count_ = 0;
+		
+		/**
+		 * @brief A quick to calculate rating for the position.
+		*/
+		AbsoluteRating quick_rating_ = 0_art;
+
+		/**
+		 * @brief A full rating that factors in child branches.
+		*/
+		AbsoluteRating full_rating_ = 0_art;
 	};
 
 
