@@ -744,11 +744,6 @@ namespace sch
 		// TEMPORARY : Output board fen
 		std::cout << get_fen(_board) << std::endl;
 
-
-		// TEMPORARY : Output white attacking squares
-		std::cout << _board.get_white_direct_attacking() << '\n';
-
-
 		// Step, may block depending on terminal configuration
 		_terminal.step();
 	};

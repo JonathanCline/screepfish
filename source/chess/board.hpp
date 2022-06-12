@@ -78,16 +78,16 @@ namespace chess
 		*/
 		void move(const BoardBase& _previousBoard, Move _move);
 
-		BitBoard get_black_direct_attacking() const
+		const BitBoard& get_black_direct_attacking() const
 		{
 			return this->battack_;
 		};
-		BitBoard get_white_direct_attacking() const
+		const BitBoard& get_white_direct_attacking() const
 		{
 			return this->wattack_;
 		};
 		
-		BitBoard get_direct_attacking(Color _player) const
+		const BitBoard& get_direct_attacking(Color _player) const
 		{
 			return (_player == Color::white)? this->get_white_direct_attacking() : this->get_black_direct_attacking();
 		};
@@ -149,7 +149,6 @@ namespace chess
 				(std::get<Ts>(this->extras_).move(_previousBoard, _move), ...);
 			};
 
-
 			template <typename T>
 			auto& get() { return std::get<T>(this->extras_); };
 			template <typename T>
@@ -160,6 +159,43 @@ namespace chess
 		private:
 			std::tuple<Ts...> extras_{};
 		};
+
+		template <>
+		class BoardExtrasImpl<>
+		{
+		public:
+
+			/**
+			 * @brief Resets the extra data to an initial state.
+			*/
+			void clear()
+			{
+			};
+
+			/**
+			 * @brief Syncs the extra data with a new board.
+			 * @param _board Board to sync with.
+			*/
+			void sync(const BoardBase& _board)
+			{
+			};
+
+			/**
+			 * @brief Updates the extra data to reflect a played move.
+			 *
+			 * Move legality is not checked.
+			 *
+			 * @param _previousBoard The previous board state.
+			 * @param _move Move to play.
+			*/
+			void move(const BoardBase& _previousBoard, Move _move)
+			{
+			};
+
+			BoardExtrasImpl() = default;
+
+		private:
+		};
 	};
 
 	/**
@@ -167,7 +203,7 @@ namespace chess
 	*/
 	using BoardExtras = impl::BoardExtrasImpl
 	<
-		BoardPieceAttackData
+		
 	>;
 
 
@@ -407,8 +443,8 @@ namespace chess
 
 		void move(const Move& _move)
 		{
-			this->extra().move(this->board(), _move);
 			this->board().move(_move);
+			this->extra().sync(this->board());
 		};
 
 		void move(const PieceMove& _move)
@@ -483,23 +519,6 @@ namespace chess
 		{
 			return this->board().pieces();
 		};
-
-
-
-		BitBoard get_white_direct_attacking() const
-		{
-			return this->extra().get<BoardPieceAttackData>().get_white_direct_attacking();
-		};
-		BitBoard get_black_direct_attacking() const
-		{
-			return this->extra().get<BoardPieceAttackData>().get_black_direct_attacking();
-		};
-		BitBoard get_direct_attacking(Color _player) const
-		{
-			return this->extra().get<BoardPieceAttackData>().get_direct_attacking(_player);
-		};
-
-
 
 
 		Board() = default;
