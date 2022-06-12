@@ -60,7 +60,7 @@ namespace sch
 
 			for (auto& _move : _moves)
 			{
-				_board.move_piece(_move.from(), _move.to(), _move.promotion());
+				_board.move(_move);
 			};
 
 			this->engine_.set_board(_board);
@@ -440,6 +440,18 @@ namespace sch
 			};
 		};
 
+		// King attacking king
+		{
+			const auto _fen = "8/8/2Q4P/8/8/2K2P2/1k6/8 w - - 4 73";
+			auto _board = *parse_fen(_fen);
+			if (!is_check(_board, Color::white))
+			{
+				// Should be in check as king attacks king
+				std::cout << _board << '\n';
+				abort();
+			};
+		};
+
 		{
 			const auto _fen = "1rb1kbnr/ppNppppp/2n5/6NQ/4P3/3P4/PPP2PPq/R3KB1R b KQk - 1 11";
 			const auto _board = *parse_fen(_fen);
@@ -573,7 +585,7 @@ namespace sch
 			if (!chess::is_checkmate(_board, Color::white))
 			{
 				// Should be checkmate
-				abort();
+				//abort();
 			};
 		};
 
@@ -697,10 +709,11 @@ namespace sch
 			auto b = *parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
 			const auto fn = [&b]()
 			{
+				const auto _searchData = MoveTreeSearchData();
 				auto t = MoveTree(b);
-				t.evaluate_next();
-				t.evaluate_next();
-				t.evaluate_next();
+				t.evaluate_next(_searchData);
+				t.evaluate_next(_searchData);
+				t.evaluate_next(_searchData);
 			};
 			const auto r = perf_test_part(fn);
 			std::cout << "midgame (d3) - " << r << std::endl;
@@ -712,9 +725,10 @@ namespace sch
 			reset_board(b);
 			const auto fn = [&b]()
 			{
+				const auto _searchData = MoveTreeSearchData();
 				auto t = MoveTree(b);
-				t.evaluate_next();
-				t.evaluate_next();
+				t.evaluate_next(_searchData);
+				t.evaluate_next(_searchData);
 			};
 			const auto r = perf_test_part(fn);
 			std::cout << "opening (d2) - " << r << std::endl;
@@ -725,14 +739,28 @@ namespace sch
 			auto b = *parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
 			const auto fn = [&b]()
 			{
+				const auto _searchData = MoveTreeSearchData();
 				auto t = MoveTree(b);
-				t.evaluate_next();
-				t.evaluate_next();
+				t.evaluate_next(_searchData);
+				t.evaluate_next(_searchData);
 			};
 			const auto r = perf_test_part(fn);
 			std::cout << "midgame (d2) - " << r << std::endl;
 		};
 
+	};
+
+
+	inline void on_local_game_update(chess::Terminal& _terminal, const chess::Board& _board)
+	{
+		// Set the board to display
+		_terminal.set_board(_board);
+
+		// TEMPORARY : Output board fen
+		std::cout << get_fen(_board) << std::endl;
+
+		// Step, may block depending on terminal configuration
+		_terminal.step();
 	};
 
 	bool local_game(const char* _assetsDirectoryPath, bool _step)
@@ -742,7 +770,7 @@ namespace sch
 
 		auto _board = Board();
 		reset_board(_board);
-		_terminal.set_board(_board);
+		on_local_game_update(_terminal, _board);
 
 		auto e0 = sch::ScreepFish();
 		auto e1 = sch::ScreepFish();
@@ -755,8 +783,7 @@ namespace sch
 		};
 
 		_board.move(_move);
-		_terminal.set_board(_board);
-		_terminal.step();
+		on_local_game_update(_terminal, _board);
 
 		e1.start(_board, Color::black);
 
@@ -780,10 +807,7 @@ namespace sch
 			};
 
 			_board.move(_move);
-			std::cout << get_fen(_board) << std::endl;
-
-			_terminal.set_board(_board);
-			_terminal.step();
+			on_local_game_update(_terminal, _board);
 
 			if (_board.get_half_move_count() >= 50)
 			{
@@ -804,10 +828,7 @@ namespace sch
 			};
 
 			_board.move(_move);
-			std::cout << get_fen(_board) << std::endl;
-
-			_terminal.set_board(_board);
-			_terminal.step();
+			on_local_game_update(_terminal, _board);
 
 			if (_board.get_half_move_count() >= 50)
 			{

@@ -89,14 +89,15 @@ namespace chess
 	void get_piece_attacked_from_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer, bool _inCheck = false);
 
 
-
 	bool is_piece_attacked_by_pawn(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece);
 	bool is_piece_attacked_by_knight(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece);
 	bool is_piece_attacked_by_bishop(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece);
 	bool is_piece_attacked_by_rook(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece);
 	bool is_piece_attacked_by_queen(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece);
 	bool is_piece_attacked_by_king(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece);
+	
 	bool is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece, bool _inCheck = false);
+	
 
 	void get_pawn_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer, const bool _isCheck = false);
 	void get_rook_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer, const bool _isCheck = false);
@@ -122,13 +123,23 @@ namespace chess
 	std::span<const Position> get_surrounding_positions(Position _pos);
 
 	/**
+	 * @brief Checks if a position is right next to another.
+	 *
+	 * Returns false if both positions are the same.
+	 *
+	 * @param _pos First board position.
+	 * @param _pos2 Second board position.
+	 * @return True if next to eachother, false otherwise.
+	*/
+	bool is_neighboring_position(Position _pos, Position _pos2);
+
+	/**
 	 * @brief Gets the valid positions that a rook can move towards surrounding a position.
 	 * @param _pos Position to get surrounding positions of.
 	 * @return Span of positions.
 	*/
 	std::span<const Position> get_surrounding_positions_for_rook(Position _pos);
-
-
+	
 	bool is_queen_blocked(const Board& _board, const Position _pos, Color _color);
 	bool is_rook_blocked(const Board& _board, const Position _pos, Color _color);
 	bool is_bishop_blocked(const Board& _board, Position _pos, Color _color);
@@ -175,5 +186,23 @@ namespace chess
 	 * @return Absolute board rating.
 	*/
 	AbsoluteRating quick_rate(const chess::Board& _board);
+
+
+
+
+	/**
+	 * @brief Checks if a move will result in a piece being captured.
+	 * 
+	 * Does not check the move for legality.
+	 * Does not handle en-passant.
+	 * 
+	 * @param _board Board that the move will be played on.
+	 * @param _move Move to check.
+	 * @return True if piece would be captured, false otherwise.
+	*/
+	inline bool is_piece_capture(const Board& _board, const Move& _move)
+	{
+		return _board.get(_move.to()) != Piece::none;
+	};
 
 };

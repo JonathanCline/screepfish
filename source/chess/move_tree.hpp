@@ -4,8 +4,10 @@
 
 #include "move.hpp"
 #include "rating.hpp"
+#include "board_hash.hpp"
 
 #include "utility/bset.hpp"
+#include "utility/arena.hpp"
 
 #include <set>
 #include <vector>
@@ -14,159 +16,81 @@
 
 namespace chess
 {
-	using BoardHashSet = sch::binary_set;
+	
+	struct MoveTreeNode;
 
-	/**
-	 * @brief Holds a set of responses within a move tree.
-	*/
-	template <typename T>
-	requires requires (const T& v, bool b)
+	namespace impl
 	{
-		b = v;
-	}
-	class NullTerminatedArena
-	{
-	public:
-
-		using value_type = T;
-
-		using pointer = value_type*;
-		using reference = value_type&;
-		using const_pointer = const value_type*;
-		using const_reference = const value_type&;
-
-		using size_type = uint8_t;
-
-		pointer data() noexcept
+		struct MoveTreeNodeBlockAllocator
 		{
-			return this->data_.get();
+			using value_type = MoveTreeNode;
+			using pointer = value_type*;
+			pointer allocate(size_t n) const;
+			void deallocate(pointer p) const;
 		};
-		const_pointer data() const noexcept
-		{
-			return this->data_.get();
-		};
-
-		bool empty() const
-		{
-			return !this->data_ || !this->data_[0];
-		};
-
-	private:
-
-		pointer mem_begin()
-		{
-			return this->data();
-		};
-		const_pointer mem_begin() const
-		{
-			return this->data();
-		};
-		pointer mem_end()
-		{
-			return this->begin() + this->size();
-		};
-		const_pointer mem_end() const
-		{
-			return this->begin() + this->size();
-		};
-
-	public:
-
-		using iterator = pointer;
-		using const_iterator = const_pointer;
-
-		iterator begin()
-		{
-			return this->mem_begin();
-		};
-		const_iterator begin() const
-		{
-			return this->mem_begin();
-		};
-		const_iterator cbegin() const
-		{
-			return this->mem_begin();
-		};
-
-		iterator end()
-		{
-			return std::find(this->mem_begin(), this->mem_end(), jc::null);
-		};
-		const_iterator end() const
-		{
-			return std::find(this->mem_begin(), this->mem_end(), jc::null);
-		};
-		const_iterator cend() const
-		{
-			return std::find(this->mem_begin(), this->mem_end(), jc::null);
-		};
-
-		size_type size() const
-		{
-			size_type n = 0;
-			return std::find(this->begin(), this->end(), jc::null) - this->end();
-		};
-		void resize(size_type _size)
-		{
-			if (_size == 0)
-			{
-				this->clear();
-			}
-			else if (this->empty())
-			{
-				this->data_ = std::make_unique<value_type[]>(_size);
-			}
-			else
-			{
-				auto nd = std::make_unique<value_type[]>(_size);
-				std::copy(this->begin(), this->end(), nd.get());
-				this->data_ = std::move(nd);
-			};
-		};
-
-		reference front()
-		{
-			SCREEPFISH_ASSERT(!this->empty());
-			return this->data_[0];
-		};
-		const_reference front() const
-		{
-			SCREEPFISH_ASSERT(!this->empty());
-			return this->data_[0];
-		};
-
-		reference back()
-		{
-			SCREEPFISH_ASSERT(!this->empty());
-			return this->data_[this->size() - 1];
-		};
-		const_reference back() const
-		{
-			SCREEPFISH_ASSERT(!this->empty());
-			return this->data_[this->size() - 1];
-		};
-
-		void clear() noexcept
-		{
-			this->data_.reset();
-		};
-
-		NullTerminatedArena() = default;
-
-	private:
-
-		std::unique_ptr<value_type[]> data_{};
 	};
 
 
+	struct MoveTreeProfile
+	{
+		bool follow_checks_ = false;
+		bool follow_captures_ = false;
+
+		MoveTreeProfile() = default;
+	};
+
+
+	/**
+	 * @brief Extra info carried around during the move search part of the move tree evaluation.
+	*/
+	struct MoveTreeSearchData
+	{
+		uint8_t depth_ = 0;
+		uint8_t max_depth_ = 255;
+
+		MoveTreeSearchData with_next_depth() const
+		{
+			auto o = MoveTreeSearchData{*this};
+			++o.depth_;
+			return o;
+		};
+
+		bool can_go_deeper() const
+		{
+			if (this->depth_ + 1 < this->max_depth_)
+			{
+				return true;
+			}
+			else
+			{
+				return false;
+			};
+		};
+
+		bool try_going_deeper()
+		{
+			if (this->can_go_deeper())
+			{
+				++this->depth_;
+				return true;
+			}
+			else
+			{
+				return false;
+			};
+		};
+
+		constexpr MoveTreeSearchData() = default;
+		constexpr explicit MoveTreeSearchData(uint8_t _maxDepth) noexcept :
+			max_depth_(_maxDepth)
+		{};
+	};
 
 	struct MoveTreeNode
 	{
-	private:
+	public:
 
 		void resort_children();
-
-	public:
 
 		using size_type = uint8_t;
 
@@ -179,8 +103,6 @@ namespace chess
 			return this->rating_;
 		};
 
-		void set_rating(Rating r) { this->rating_ = r; };
-
 		/**
 		 * @brief Gets the quick rating for the position.
 		 * @return Quick rating.
@@ -190,37 +112,72 @@ namespace chess
 			return this->move.rating();
 		};
 
+		void set_rating(Rating r)
+		{
+			this->rating_ = r;
+		};
+
+		explicit operator bool() const
+		{
+			return !this->move.is_null();
+		};
+
+
+
+
+		bool was_evaluated() const
+		{
+			return this->responses_.data() != nullptr;
+		};
+		void mark_as_evaluated()
+		{
+			if (!this->was_evaluated())
+			{
+				this->responses_.resize(1, MoveTreeNode{});
+				SCREEPFISH_ASSERT(this->responses_.empty());
+			};
+		};
 
 		bool empty() const
 		{
-			return this->responses_count_ == 0;
+			return this->responses_.empty();
 		};
+
 		void resize(size_type _size)
 		{
-			this->responses_ = std::make_unique<MoveTreeNode[]>(_size);
-			this->responses_count_ = _size;
+			this->responses_.resize(_size);
 		};
 
-		size_type size() const { return this->responses_count_; };
+		void soft_resize(size_type _size)
+		{
+			this->responses_.soft_resize(_size);
+		};
 
-		auto begin() { return this->responses_.get(); };
-		auto begin() const { return this->responses_.get(); };
-		auto end() { return this->begin() + this->size(); };
-		auto end() const { return this->begin() + this->size(); };
+		size_type size() const
+		{
+			return this->responses_.size();
+		};
+
+		auto begin() { return this->responses_.begin(); };
+		auto begin() const { return this->responses_.begin(); };
+		auto end() { return this->responses_.end(); };
+		auto end() const { return this->responses_.end(); };
 
 		auto& front()
 		{
-			return this->responses_[0];
+			return this->responses_.front();
 		};
 		const auto& front() const
 		{
-			return this->responses_[0];
+			return this->responses_.front();
 		};
 
 		void count_duplicates(Board _board, std::set<size_t>& _boards);
-
-		void evaluate_next(const Board& _previousBoard, BoardHashSet& _hashSet, bool _followChecks = true);
-		void evaluate_next(const Board& _previousBoard, bool _followChecks = true);
+		
+		void evaluate_next(const Board& _previousBoard, BoardHashSet& _hashSet,
+			const MoveTreeProfile& _profile, MoveTreeSearchData _data);
+		void evaluate_next(const Board& _previousBoard,
+			const MoveTreeProfile& _profile, MoveTreeSearchData _data);
 
 
 		size_t tree_size() const;
@@ -231,26 +188,33 @@ namespace chess
 		void show_best_line() const;
 		std::vector<RatedMove> get_best_line() const;
 
-		MoveTreeNode() = default;
+		MoveTreeNode()
+		{
+			SCREEPFISH_ASSERT(!this->was_evaluated());
+		};
 
 	private:
-		std::unique_ptr<MoveTreeNode[]> responses_{};
+		sch::NullTerminatedArena<MoveTreeNode, impl::MoveTreeNodeBlockAllocator> responses_{};
+
 	public:
 		RatedMove move{};
 	private:
 		Rating rating_ = 0;
-		uint8_t responses_count_ = 0;
 
 	};
 
 
-
-
 	struct MoveTree
 	{
-		void evaluate_next();
-		void evaluate_next_unique();
-		void evalulate_next();
+	private:
+
+		// Common evaluate next function
+		void evaluate_next(MoveTreeSearchData _searchData, BoardHashSet* _hashSet, const MoveTreeProfile& _profile);
+
+	public:
+		void evaluate_next(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile = MoveTreeProfile());
+		void evaluate_next_unique(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile = MoveTreeProfile());
+		void evalulate_next(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile = MoveTreeProfile());
 
 		std::optional<RatedMove> best_move(std::mt19937& _rnd);
 		size_t tree_size() const;
@@ -263,7 +227,11 @@ namespace chess
 
 		void clear_hashes() { this->hash_set_.clear(); };
 
-		void build_tree(size_t _depth);
+		void build_tree(size_t _depth, size_t _maxExtendedDepth, const MoveTreeProfile& _profile = MoveTreeProfile());
+		void build_tree(size_t _depth, const MoveTreeProfile& _profile = MoveTreeProfile())
+		{
+			return this->build_tree(_depth, _depth + 3, _profile);
+		};
 
 		auto begin() { return this->moves_.begin(); };
 		auto begin() const { return this->moves_.begin(); };
@@ -296,6 +264,17 @@ namespace chess
 	};
 
 
+	/*
+		Before:
+			midgame (d3_unique) - 38
+			midgame (d3) - 48
+			opening (d2) - 10531
+			midgame (d2) - 1641
+	*/
 
+	/*
+		After:
+			
+	*/
 
 };

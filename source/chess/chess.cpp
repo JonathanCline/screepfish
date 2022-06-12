@@ -1,104 +1,68 @@
 #include "chess.hpp"
 
-#include "fen.hpp"
-
-#include <istream>
-#include <ostream>
-#include <string>
-#include <array>
-
-
 namespace chess
 {
-	std::ostream& operator<<(std::ostream& _ostr, const Piece& p)
+	Board& reset_board(Board& _board)
 	{
-		const auto c = piece_to_char(p);
-		_ostr.put(c);
-		return _ostr;
-	};
+		// Clear the board so we can begin anew.
+		_board.clear();
 
-	std::ostream& operator<<(std::ostream& _ostr, const PieceMove& _value)
-	{
-		return _ostr << _value.from() << _value.to();
-	};
+		// Kings in front as they are commonly needed
+		_board.new_piece(PieceType::king, Color::white, (File::e, Rank::r1));
+		_board.new_piece(PieceType::king, Color::black, (File::e, Rank::r8));
 
-	std::ostream& operator<<(std::ostream& _ostr, const Move& _value)
-	{
-		_ostr << _value.from() << _value.to();
-		if (_value.promotion() != PieceType{})
+
+
+		// Set black positions
+
+		// Back row
+		_board.new_piece(PieceType::rook, Color::black, (File::a, Rank::r8));
+		_board.new_piece(PieceType::knight, Color::black, (File::b, Rank::r8));
+		_board.new_piece(PieceType::bishop, Color::black, (File::c, Rank::r8));
+		_board.new_piece(PieceType::queen, Color::black, (File::d, Rank::r8));
+		_board.new_piece(PieceType::bishop, Color::black, (File::f, Rank::r8));
+		_board.new_piece(PieceType::rook, Color::black, (File::h, Rank::r8));
+		_board.new_piece(PieceType::knight, Color::black, (File::g, Rank::r8));
+
+		// Castle flags
+		_board.set_castle_kingside_flag(Color::black, true);
+		_board.set_castle_queenside_flag(Color::black, true);
+
+
+
+
+
+
+		// Set white positions
+
+		// Back row
+		_board.new_piece(PieceType::rook, Color::white, (File::a, Rank::r1));
+		_board.new_piece(PieceType::knight, Color::white, (File::b, Rank::r1));
+		_board.new_piece(PieceType::bishop, Color::white, (File::c, Rank::r1));
+		_board.new_piece(PieceType::queen, Color::white, (File::d, Rank::r1));
+		_board.new_piece(PieceType::bishop, Color::white, (File::f, Rank::r1));
+		_board.new_piece(PieceType::rook, Color::white, (File::h, Rank::r1));
+		_board.new_piece(PieceType::knight, Color::white, (File::g, Rank::r1));
+
+		// Pawns
+		for (auto& _file : files_v)
 		{
-			char c = ' ';
-			switch (_value.promotion())
-			{
-			case PieceType::queen:
-				c = 'q';
-				break;
-			case PieceType::knight:
-				c = 'n';
-				break;
-			case PieceType::rook:
-				c = 'r';
-				break;
-			case PieceType::bishop:
-				c = 'b';
-				break;
-			default:
-				abort();
-			};
-			_ostr << c;
+			_board.new_piece(PieceType::pawn, Color::black, (_file, Rank::r7));
 		};
-		return _ostr;
-	};
-
-	std::ostream& operator<<(std::ostream& _ostr, const Board& _value)
-	{
-		std::array<std::array<char, 8>, 8> _grid{};
-		for (auto& vx : _grid) { std::ranges::fill(vx, ' '); };
-
-		for (auto& _piece : _value.pieces())
+		for (auto& _file : files_v)
 		{
-			const auto f = _piece.file();
-			const auto r = _piece.rank();
-			
-			auto x = jc::to_underlying(f);
-			auto y = jc::to_underlying(r);
-			auto c = ' ';
-
-			switch (_piece.type())
-			{
-			case PieceType::pawn: c = 'P'; break;
-			case PieceType::knight: c = 'N'; break;
-			case PieceType::bishop: c = 'B'; break;
-			case PieceType::rook: c = 'R'; break;
-			case PieceType::queen: c = 'Q'; break;
-			case PieceType::king: c = 'K'; break;
-			default:
-				continue;
-				break;
-			};
-
-			if (_piece.color() == Color::black)
-			{
-				c = static_cast<char>(std::tolower(c));
-			};
-
-			_grid[static_cast<size_t>(7 - y)][x] = c;
+			_board.new_piece(PieceType::pawn, Color::white, (_file, Rank::r2));
 		};
 
-		_ostr << "+-+-+-+-+-+-+-+-+\n";
-		for (auto& vx : _grid)
-		{
-			for (auto& c : vx)
-			{
-				_ostr.put('|');
-				_ostr.put(c);
-			};
-			_ostr.put('|');
-			_ostr.put('\n');
-			_ostr << "+-+-+-+-+-+-+-+-+\n";
-		};
+		// Castle flags
+		_board.set_castle_kingside_flag(Color::white, true);
+		_board.set_castle_queenside_flag(Color::white, true);
 
-		return _ostr;
+
+
+		// Sync
+		_board.sync();
+
+		return _board;
 	};
-
 }
