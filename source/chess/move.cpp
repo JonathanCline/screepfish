@@ -188,6 +188,133 @@ namespace chess
 
 
 
+	constexpr BitBoardCX make_rank_bits(Rank _rank)
+	{
+		auto bb = BitBoardCX();
+		for (auto& v : files_v)
+		{
+			bb.set(v, _rank);
+		};
+		return bb;
+	};
+	constexpr BitBoardCX make_file_bits(File _file)
+	{
+		auto bb = BitBoardCX();
+		for (auto& v : ranks_v)
+		{
+			bb.set(_file, v);
+		};
+		return bb;
+	};
+	constexpr BitBoardCX make_file_bits(File _file, Rank _min, Rank _max)
+	{
+		auto bb = BitBoardCX();
+		for (Rank r = _min; r <= _max; r += 1)
+		{
+			bb.set(_file, r);
+		};
+		return bb;
+	};
+
+	constexpr BitBoardCX make_bits_in_direction(Position _startPos, int df, int dr)
+	{
+		auto bb = BitBoardCX();
+
+		bool _possible = false;
+		auto _nextPos = trynext(_startPos, df, dr, _possible);
+		while (_possible)
+		{
+			bb.set(_nextPos);
+			_nextPos = trynext(_nextPos, df, dr, _possible);
+		};
+		return bb;
+	};
+	constexpr BitBoardCX make_diagonal_bits(Position _pos)
+	{
+		auto bb = BitBoardCX();
+		const auto _directions = std::array
+		{
+			std::pair{ 1, 1 },
+			std::pair{ 1, -1 },
+			std::pair{ -1, 1 },
+			std::pair{ -1, -1 }
+		};
+		for (auto& v : _directions)
+		{
+			bb |= make_bits_in_direction(_pos, v.first, v.second);
+		};
+		return bb;
+	};
+
+
+	consteval BitBoardCX compute_queen_attack_squares(Position _pos)
+	{
+		return	make_rank_bits(_pos.rank()) |
+				make_file_bits(_pos.file()) |
+				make_diagonal_bits(_pos);
+	};
+	consteval auto compute_queen_attack_squares()
+	{
+		auto _bbs = std::array<BitBoardCX, 64>{};
+		for (const auto& _position : positions_v)
+		{
+			_bbs[static_cast<size_t>(_position)] = compute_queen_attack_squares(_position);
+		};
+
+		return _bbs;
+	};
+	constexpr inline auto queen_attack_squares_v = compute_queen_attack_squares();
+	constexpr BitBoardCX get_queen_attack_squares(Position _pos)
+	{
+		return queen_attack_squares_v[static_cast<size_t>(_pos)];
+	};
+
+
+	consteval BitBoardCX compute_bishop_attack_squares(Position _pos)
+	{
+		return make_diagonal_bits(_pos);
+	};
+	consteval auto compute_bishop_attack_squares()
+	{
+		auto _bbs = std::array<BitBoardCX, 64>{};
+		for (const auto& _position : positions_v)
+		{
+			_bbs[static_cast<size_t>(_position)] = compute_bishop_attack_squares(_position);
+		};
+
+		return _bbs;
+	};
+	constexpr inline auto bishop_attack_squares_v = compute_bishop_attack_squares();
+	constexpr BitBoardCX get_bishop_attack_squares(Position _pos)
+	{
+		return bishop_attack_squares_v[static_cast<size_t>(_pos)];
+	};
+
+
+
+	consteval BitBoardCX compute_rook_attack_squares(Position _pos)
+	{
+		return make_rank_bits(_pos.rank()) | make_file_bits(_pos.file());
+	};
+	consteval auto compute_rook_attack_squares()
+	{
+		auto _bbs = std::array<BitBoardCX, 64>{};
+		for (const auto& _position : positions_v)
+		{
+			_bbs[static_cast<size_t>(_position)] = compute_rook_attack_squares(_position);
+		};
+
+		return _bbs;
+	};
+	constexpr inline auto rook_attack_squares_v = compute_rook_attack_squares();
+	constexpr BitBoardCX get_rook_attack_squares(Position _pos)
+	{
+		return rook_attack_squares_v[static_cast<size_t>(_pos)];
+	};
+
+
+
+
 
 	struct Neighbors
 	{
@@ -307,6 +434,15 @@ namespace chess
 
 
 
+	constexpr bool is_straight_line_between(Position p0, Position p1)
+	{
+		// Must be on same file or same rank but not both.
+		return (p0.file() == p1.file()) || (p0.rank() == p1.rank());
+	};
+
+
+
+
 
 	bool is_piece_attacked_by_pawn(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
 	{
@@ -330,6 +466,17 @@ namespace chess
 
 		// Calculate the offset from the piece to the bishop.
 		const auto _position = _byPiece.position();
+
+		// Exit early if the target piece is not on one of the attacking squares.
+		{
+			const auto _targetPos = _piece.position();
+			if (!get_bishop_attack_squares(_position).test(_targetPos))
+			{
+				return false;
+			};
+		};
+
+
 		const auto _offset = _piece.position() - _position;
 
 		// If both are the same magnitude then the bishop is on the same diagonal.
@@ -368,14 +515,13 @@ namespace chess
 		using namespace chess;
 
 		const auto _position = _byPiece.position();
-		const auto _offset = _piece.position() - _position;
 
-		if (!((_offset.delta_rank() == 0) ^ (_offset.delta_file() == 0)))
+		// Exit early if not on same file / rank
+		if (!is_straight_line_between(_position, _piece.position()))
 		{
-			// Not on same file / rank
 			return false;
 		};
-
+		
 		constexpr auto _directionPairs = std::array
 		{
 			std::pair{  0,  1 },
@@ -417,6 +563,16 @@ namespace chess
 		using namespace chess;
 
 		const auto _position = _byPiece.position();
+		
+		// Exit early if the target piece is not on one of the attacking squares.
+		{
+			const auto _targetPos = _piece.position();
+			if (!get_queen_attack_squares(_position).test(_targetPos))
+			{
+				return false;
+			};
+		};
+		
 		auto _nextPosition = Position();
 		bool _possible = true;
 
@@ -532,6 +688,42 @@ namespace chess
 		};
 	};
 
+
+	template <Color C>
+	inline void get_piece_attacked_from_moves(const chess::Board& _board, const BoardPiece& _piece, MoveBuffer& _buffer)
+	{
+		const auto _pend = _board.pend();
+		constexpr auto piece_color_v = C;
+		for (auto it = _board.pbegin(); it != _pend; ++it)
+		{
+			const auto& _otherPiece = *it;
+			switch (_otherPiece)
+			{
+			case Piece(Piece::knight, !piece_color_v):
+				get_piece_attacks_with_knight(_board, _piece, _otherPiece, _buffer);
+				break;
+			case Piece(Piece::bishop, !piece_color_v):
+				get_piece_attacks_with_bishop(_board, _piece, _otherPiece, _buffer);
+				break;
+			case Piece(Piece::rook, !piece_color_v):
+				get_piece_attacks_with_rook(_board, _piece, _otherPiece, _buffer);
+				break;
+			case Piece(Piece::queen, !piece_color_v):
+				get_piece_attacks_with_queen(_board, _piece, _otherPiece, _buffer);
+				break;
+			case Piece(Piece::king, !piece_color_v):
+				get_piece_attacks_with_king(_board, _piece, _otherPiece, _buffer);
+				break;
+			case Piece(Piece::pawn, !piece_color_v):
+				get_piece_attacks_with_pawn(_board, _piece, _otherPiece, _buffer);
+				break;
+			default:
+				break;
+			};
+		};
+	};
+
+
 	void get_piece_attacked_from_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _outBuffer, bool _inCheck)
 	{
 		using namespace chess;
@@ -540,8 +732,10 @@ namespace chess
 		MoveBuffer _buffer{ _bufferData.data(), _bufferData.data() + _bufferData.size() };
 		const auto bb = _buffer.head();
 
+		const auto _pieceColor = _piece.color();
+
 		// Quicker pawn check
-		if (_piece.color() == Color::white)
+		if (_pieceColor == Color::white)
 		{
 			if (_piece.rank() < Rank::r7)
 			{
@@ -585,37 +779,14 @@ namespace chess
 				};
 			};
 		};
-
-		const auto _end = _board.pend();
-		for (auto it = _board.pbegin(); it != _end; ++it)
+		
+		if (_pieceColor == Color::white)
 		{
-			auto& p = *it;
-			if (p.color() != _piece.color())
-			{
-				switch (p.type())
-				{
-				case PieceType::knight:
-					get_piece_attacks_with_knight(_board, _piece, p, _buffer);
-					break;
-				case PieceType::bishop:
-					get_piece_attacks_with_bishop(_board, _piece, p, _buffer);
-					break;
-				case PieceType::rook:
-					get_piece_attacks_with_rook(_board, _piece, p, _buffer);
-					break;
-				case PieceType::queen:
-					get_piece_attacks_with_queen(_board, _piece, p, _buffer);
-					break;
-				case PieceType::king:
-					get_piece_attacks_with_king(_board, _piece, p, _buffer);
-					break;
-				case PieceType::pawn:
-					get_piece_attacks_with_pawn(_board, _piece, p, _buffer);
-					break;
-				default:
-					break;
-				};
-			};
+			get_piece_attacked_from_moves<Color::white>(_board, _piece, _buffer);
+		}
+		else
+		{
+			get_piece_attacked_from_moves<Color::black>(_board, _piece, _buffer);
 		};
 
 		const auto be = _buffer.head();
@@ -1125,66 +1296,6 @@ namespace chess
 
 
 
-	constexpr BitBoardCX make_rank_bits(Rank _rank)
-	{
-		auto bb = BitBoardCX();
-		for (auto& v : files_v)
-		{
-			bb.set(v, _rank);
-		};
-		return bb;
-	};
-	constexpr BitBoardCX make_file_bits(File _file)
-	{
-		auto bb = BitBoardCX();
-		for (auto& v : ranks_v)
-		{
-			bb.set(_file, v);
-		};
-		return bb;
-	};
-	constexpr BitBoardCX make_file_bits(File _file, Rank _min, Rank _max)
-	{
-		auto bb = BitBoardCX();
-		for (Rank r = _min; r <= _max; r += 1)
-		{
-			bb.set(_file, r);
-		};
-		return bb;
-	};
-
-	constexpr BitBoardCX make_bits_in_direction(Position _startPos, int df, int dr)
-	{
-		auto bb = BitBoardCX();
-
-		bool _possible = false;
-		auto _nextPos = trynext(_startPos, df, dr, _possible);
-		while (_possible)
-		{
-			bb.set(_nextPos);
-			_nextPos = trynext(_nextPos, df, dr, _possible);
-		};
-		return bb;
-	};
-	constexpr BitBoardCX make_diagonal_bits(Position _pos)
-	{
-		auto bb = BitBoardCX();
-		const auto _directions = std::array
-		{
-			std::pair{ 1, 1 },
-			std::pair{ 1, -1 },
-			std::pair{ -1, 1 },
-			std::pair{ -1, -1 }
-		};
-		for (auto& v : _directions)
-		{
-			bb |= make_bits_in_direction(_pos, v.first, v.second);
-		};
-		return bb;
-	};
-
-
-
 	consteval BitBoardCX calculate_threat_positions(Position _pos)
 	{
 		auto bb = BitBoardCX();
@@ -1437,10 +1548,6 @@ namespace chess
 
 		// Checkmate
 
-		if (is_checkmate(_board, Player))
-		{
-			return -checkmate_rating_v;
-		};
 		if (is_checkmate(_board, !Player))
 		{
 			return checkmate_rating_v;

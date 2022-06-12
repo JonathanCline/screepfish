@@ -55,7 +55,37 @@ namespace chess
 
 
 
-	void MoveTreeNode::evaluate_next(const Board& _previousBoard, const MoveTreeProfile& _profile)
+
+	inline void follow_move_lines_with_profile(
+		MoveTreeNode& _node,
+		const Board& _previousBoard, const Board& _newBoard, Move _move,
+		const MoveTreeProfile& _profile, MoveTreeSearchData _data)
+	{
+		// Profile aliasing
+		const auto& _followChecks = _profile.follow_checks_;
+		const auto& _followCaptures = _profile.follow_captures_;
+
+		// Follow captures if set.
+		if (_data.can_go_deeper())
+		{
+			// Follow captures if set.
+			if (_followCaptures && is_piece_capture(_previousBoard, _move))
+			{
+				auto _nestedProf = _profile;
+				_nestedProf.follow_captures_ = false;
+				_node.evaluate_next(_previousBoard, _nestedProf, _data.with_next_depth());
+			}
+			// Follow checks if set.
+			else if (_followChecks && is_check(_newBoard, _newBoard.get_toplay()))
+			{
+				_node.evaluate_next(_previousBoard, _profile, _data.with_next_depth());
+			};
+		};
+	};
+
+
+	void MoveTreeNode::evaluate_next(const Board& _previousBoard,
+		const MoveTreeProfile& _profile, MoveTreeSearchData _data)
 	{
 		// Profile aliasing
 		const auto& _followChecks = _profile.follow_checks_;
@@ -67,13 +97,21 @@ namespace chess
 		const auto _myColor = _board.get_toplay();
 		_board.move(this->move);
 
+		const auto _opponentColor = !_myColor;
+
 		if (!this->was_evaluated())
 		{
+			// Bail early on max depth
+			if (!_data.can_go_deeper())
+			{
+				this->mark_as_evaluated();
+				return;
+			};
+
 			// Get the possible responses
 			std::array<Move, 128> _moveBufferData{};
 			const auto _moveBegin = _moveBufferData.data();
 			const auto _moveEnd = fill_possible_moves_buffer(_board, _moveBufferData);
-			const auto _opponentColor = _board.get_toplay();
 
 			// Rate and add to the child nodes
 			this->resize(_moveEnd - _moveBegin);
@@ -92,16 +130,8 @@ namespace chess
 				it->move = RatedMove{ *p, _rating };
 				it->rating_ = _rating;
 
-				// Follow captures if set.
-				if (_followCaptures && is_piece_capture(_board, _move))
-				{
-					it->evaluate_next(_board, _profile);
-				}
-				// Follow checks if set.
-				else if (_followChecks && is_check(_newBoard, _myColor))
-				{
-					it->evaluate_next(_board, _profile);
-				};
+				// Follow lines based on profile.
+				follow_move_lines_with_profile(*it, _board, _newBoard, _move, _profile, _data);
 
 				// Next
 				++it;
@@ -115,11 +145,12 @@ namespace chess
 			// Propogate to children
 			for (auto& _child : *this)
 			{
-				_child.evaluate_next(_board, _profile);
+				_child.evaluate_next(_board, _profile, _data.with_next_depth());
 			};
 		};
 	};
-	void MoveTreeNode::evaluate_next(const Board& _previousBoard, BoardHashSet& _hashSet, const MoveTreeProfile& _profile)
+	void MoveTreeNode::evaluate_next(const Board& _previousBoard, BoardHashSet& _hashSet,
+		const MoveTreeProfile& _profile, MoveTreeSearchData _data)
 	{
 		// Profile aliasing
 		const auto& _followChecks = _profile.follow_checks_;
@@ -131,13 +162,21 @@ namespace chess
 		const auto _myColor = _board.get_toplay();
 		_board.move(_myMove);
 
+		const auto _opponentColor = !_myColor;
+
 		if (!this->was_evaluated())
 		{
+			// Bail early on max depth
+			if (!_data.can_go_deeper())
+			{
+				this->mark_as_evaluated();
+				return;
+			};
+
 			// Get the possible responses
 			std::array<Move, 128> _moveBufferData{};
 			const auto _moveBegin = _moveBufferData.data();
 			const auto _moveEnd = fill_possible_moves_buffer(_board, _moveBufferData);
-			const auto _opponentColor = _board.get_toplay();
 
 			// Rate and add to the child nodes
 			this->resize(_moveEnd - _moveBegin);
@@ -168,16 +207,8 @@ namespace chess
 				it->move = RatedMove{ *p, _rating };
 				it->rating_ = _rating;
 
-				// Follow captures if set.
-				if (_followCaptures && is_piece_capture(_board, _move))
-				{
-					it->evaluate_next(_board, _profile);
-				}
-				// Follow checks if set.
-				else if (_followChecks && is_check(_newBoard, _myColor))
-				{
-					it->evaluate_next(_board, _profile);
-				};
+				// Follow lines based on profile.
+				follow_move_lines_with_profile(*it, _board, _newBoard, _move, _profile, _data);
 
 				// Next
 				++it;
@@ -194,7 +225,7 @@ namespace chess
 			// Propogate to children
 			for (auto& _child : *this)
 			{
-				_child.evaluate_next(_board, _hashSet, _profile);
+				_child.evaluate_next(_board, _hashSet, _profile, _data.with_next_depth());
 			};
 		};
 	};
@@ -285,7 +316,7 @@ namespace chess
 
 
 
-	void MoveTree::evaluate_next(BoardHashSet* _hashSet, const MoveTreeProfile& _profile)
+	void MoveTree::evaluate_next(MoveTreeSearchData _searchData, BoardHashSet* _hashSet, const MoveTreeProfile& _profile)
 	{
 		auto& _board = this->board_;
 		auto& _moves = this->moves_;
@@ -330,11 +361,11 @@ namespace chess
 			{
 				if (_hashSet)
 				{
-					_child.evaluate_next(_board, *_hashSet, _profile);
+					_child.evaluate_next(_board, *_hashSet, _profile, _searchData.with_next_depth());
 				}
 				else
 				{
-					_child.evaluate_next(_board, _profile);
+					_child.evaluate_next(_board, _profile, _searchData.with_next_depth());
 				};
 			};
 		};
@@ -342,20 +373,20 @@ namespace chess
 		++this->depth_counter_;
 	};
 
-	void MoveTree::evaluate_next_unique(const MoveTreeProfile& _profile)
+	void MoveTree::evaluate_next_unique(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile)
 	{
 		auto& _hashSet = this->hash_set_;
-		return this->evaluate_next(&_hashSet, _profile);
+		return this->evaluate_next(_searchData, &_hashSet, _profile);
 	};
-	void MoveTree::evaluate_next(const MoveTreeProfile& _profile)
+	void MoveTree::evaluate_next(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile)
 	{
 		BoardHashSet* _hashSet = nullptr;
-		return this->evaluate_next(_hashSet, _profile);
+		return this->evaluate_next(_searchData, _hashSet, _profile);
 	};
 
-	void MoveTree::evalulate_next(const MoveTreeProfile& _profile)
+	void MoveTree::evalulate_next(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile)
 	{
-		return this->evaluate_next(_profile);
+		return this->evaluate_next(_searchData, _profile);
 	};
 
 
@@ -530,13 +561,16 @@ namespace chess
 		return n;
 	};
 	
-	void MoveTree::build_tree(size_t _depth)
+	void MoveTree::build_tree(size_t _depth, size_t _maxExtendedDepth, const MoveTreeProfile& _profile)
 	{
-		auto& _moves = this->moves_;
-
 		// Reset state
 		this->clear_hashes();
+		auto& _moves = this->moves_;
 		_moves.clear();
+
+		// Additional move tree searching data storage
+		auto _searchData = MoveTreeSearchData();
+		_searchData.max_depth_ = static_cast<uint8_t>(_maxExtendedDepth);
 
 		// Determine whether or not to cull unique
 		if (disable_culling_repeated_positions_v || (_depth <= 3))
@@ -544,7 +578,7 @@ namespace chess
 			// Do not worry about repeated positions - there wont be any
 			for (size_t n = 0; n != _depth; ++n)
 			{
-				this->evaluate_next();
+				this->evaluate_next(_searchData, _profile);
 			};
 		}
 		else
@@ -552,7 +586,7 @@ namespace chess
 			// Watch for repeated positions - this is where we actually benefit from checking
 			for (size_t n = 0; n != _depth; ++n)
 			{
-				this->evaluate_next_unique();
+				this->evaluate_next_unique(_searchData, _profile);
 			};
 		};
 	};

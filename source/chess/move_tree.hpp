@@ -40,6 +40,52 @@ namespace chess
 	};
 
 
+	/**
+	 * @brief Extra info carried around during the move search part of the move tree evaluation.
+	*/
+	struct MoveTreeSearchData
+	{
+		uint8_t depth_ = 0;
+		uint8_t max_depth_ = 255;
+
+		MoveTreeSearchData with_next_depth() const
+		{
+			auto o = MoveTreeSearchData{*this};
+			++o.depth_;
+			return o;
+		};
+
+		bool can_go_deeper() const
+		{
+			if (this->depth_ + 1 < this->max_depth_)
+			{
+				return true;
+			}
+			else
+			{
+				return false;
+			};
+		};
+
+		bool try_going_deeper()
+		{
+			if (this->can_go_deeper())
+			{
+				++this->depth_;
+				return true;
+			}
+			else
+			{
+				return false;
+			};
+		};
+
+		constexpr MoveTreeSearchData() = default;
+		constexpr explicit MoveTreeSearchData(uint8_t _maxDepth) noexcept :
+			max_depth_(_maxDepth)
+		{};
+	};
+
 	struct MoveTreeNode
 	{
 	public:
@@ -128,8 +174,10 @@ namespace chess
 
 		void count_duplicates(Board _board, std::set<size_t>& _boards);
 		
-		void evaluate_next(const Board& _previousBoard, BoardHashSet& _hashSet, const MoveTreeProfile& _profile = MoveTreeProfile());
-		void evaluate_next(const Board& _previousBoard, const MoveTreeProfile& _profile = MoveTreeProfile());
+		void evaluate_next(const Board& _previousBoard, BoardHashSet& _hashSet,
+			const MoveTreeProfile& _profile, MoveTreeSearchData _data);
+		void evaluate_next(const Board& _previousBoard,
+			const MoveTreeProfile& _profile, MoveTreeSearchData _data);
 
 
 		size_t tree_size() const;
@@ -161,12 +209,12 @@ namespace chess
 	private:
 
 		// Common evaluate next function
-		void evaluate_next(BoardHashSet* _hashSet, const MoveTreeProfile& _profile = MoveTreeProfile());
+		void evaluate_next(MoveTreeSearchData _searchData, BoardHashSet* _hashSet, const MoveTreeProfile& _profile);
 
 	public:
-		void evaluate_next(const MoveTreeProfile& _profile = MoveTreeProfile());
-		void evaluate_next_unique(const MoveTreeProfile& _profile = MoveTreeProfile());
-		void evalulate_next(const MoveTreeProfile& _profile = MoveTreeProfile());
+		void evaluate_next(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile = MoveTreeProfile());
+		void evaluate_next_unique(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile = MoveTreeProfile());
+		void evalulate_next(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile = MoveTreeProfile());
 
 		std::optional<RatedMove> best_move(std::mt19937& _rnd);
 		size_t tree_size() const;
@@ -179,7 +227,11 @@ namespace chess
 
 		void clear_hashes() { this->hash_set_.clear(); };
 
-		void build_tree(size_t _depth);
+		void build_tree(size_t _depth, size_t _maxExtendedDepth, const MoveTreeProfile& _profile = MoveTreeProfile());
+		void build_tree(size_t _depth, const MoveTreeProfile& _profile = MoveTreeProfile())
+		{
+			return this->build_tree(_depth, _depth + 3, _profile);
+		};
 
 		auto begin() { return this->moves_.begin(); };
 		auto begin() const { return this->moves_.begin(); };

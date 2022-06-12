@@ -709,10 +709,11 @@ namespace sch
 			auto b = *parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
 			const auto fn = [&b]()
 			{
+				const auto _searchData = MoveTreeSearchData();
 				auto t = MoveTree(b);
-				t.evaluate_next();
-				t.evaluate_next();
-				t.evaluate_next();
+				t.evaluate_next(_searchData);
+				t.evaluate_next(_searchData);
+				t.evaluate_next(_searchData);
 			};
 			const auto r = perf_test_part(fn);
 			std::cout << "midgame (d3) - " << r << std::endl;
@@ -724,9 +725,10 @@ namespace sch
 			reset_board(b);
 			const auto fn = [&b]()
 			{
+				const auto _searchData = MoveTreeSearchData();
 				auto t = MoveTree(b);
-				t.evaluate_next();
-				t.evaluate_next();
+				t.evaluate_next(_searchData);
+				t.evaluate_next(_searchData);
 			};
 			const auto r = perf_test_part(fn);
 			std::cout << "opening (d2) - " << r << std::endl;
@@ -737,9 +739,10 @@ namespace sch
 			auto b = *parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
 			const auto fn = [&b]()
 			{
+				const auto _searchData = MoveTreeSearchData();
 				auto t = MoveTree(b);
-				t.evaluate_next();
-				t.evaluate_next();
+				t.evaluate_next(_searchData);
+				t.evaluate_next(_searchData);
 			};
 			const auto r = perf_test_part(fn);
 			std::cout << "midgame (d2) - " << r << std::endl;

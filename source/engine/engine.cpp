@@ -23,8 +23,12 @@ namespace sch
 	{
 		using namespace chess;
 
+		auto _profile = MoveTreeProfile();
+		_profile.follow_captures_ = true;
+		_profile.follow_checks_ = true;
+
 		auto _tree = chess::MoveTree(_board);
-		_tree.build_tree((size_t)_depth);
+		_tree.build_tree((size_t)_depth, _depth + 1, _profile);
 
 		return _tree;
 	};
@@ -176,6 +180,9 @@ namespace sch
 							{
 								const auto _path = _dirPath / "moves.txt";
 								auto _file = std::ofstream(_path);
+
+								_file << "Total Tree Size : " << _tree.tree_size() << '\n';
+
 								for (auto& _move : _tree)
 								{
 									_file << _move.move << " : " << _move.rating() << " : " << _move.quick_rating() << '\n';

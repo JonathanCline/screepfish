@@ -21,10 +21,13 @@ namespace sch
 
 		TestResult run() final
 		{
+			const auto _searchData = chess::MoveTreeSearchData();
 			auto _tree = chess::MoveTree(this->board_);
+			
+			
 			for (auto& v : this->expected_)
 			{
-				_tree.evalulate_next();
+				_tree.evaluate_next(_searchData);
 				if (const auto t = _tree.total_outcomes(); t != v)
 				{
 					const auto u = _tree.count_unique_positions();
