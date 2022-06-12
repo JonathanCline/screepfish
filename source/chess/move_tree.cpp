@@ -7,7 +7,7 @@ namespace chess
 	/**
 	 * @brief Enables / disables ignoring repeated positions.
 	*/
-	constexpr inline bool disable_culling_repeated_positions_v = false;
+	constexpr inline bool disable_culling_repeated_positions_v = true;
 
 
 
@@ -316,6 +316,79 @@ namespace chess
 
 
 
+
+
+	inline Rating deep_eval(MoveTreeNode& _node)
+	{
+		// If the opponent has no responses, we can just set the rating as the quick rating
+		// and return early. These "ends" of the tree are the basis for the deep evaluation.
+		if (_node.empty())
+		{
+			// Use the quick rating.
+			const auto _rating = _node.quick_rating();
+			_node.set_rating(_rating);
+			return _rating;
+		};
+
+		// Loop through the opponent's responses to the node's move and preform a deep eval for each.
+		bool _hasMoveAfterOpponent = false;
+		for (auto& _opponentResponse : _node)
+		{
+			// Preform a deep evaluation of the opponent's response.
+			const auto _opponentResponseRating = deep_eval(_opponentResponse);
+			if (!_opponentResponse.empty())
+			{
+				_hasMoveAfterOpponent = true;
+			};
+		};
+
+		// Sort the opponent's responses by full rating.
+		_node.resort_children();
+
+		const auto _rating = -_node.front().rating();
+		_node.set_rating(_rating);
+		return _rating;
+	};
+
+
+
+	inline void prune(MoveTreeNode& _node)
+	{
+		if (_node.empty())
+		{
+			return;
+		};
+		
+		_node.resize(1);
+		return;
+
+		std::vector<std::pair<MoveTreeNode*, Rating>> _opponentMovesWithMyBestRating{};
+		for (auto& _opponentResponse : _node)
+		{
+			if (!_opponentResponse.empty())
+			{
+				_opponentResponse.resort_children();
+				_opponentMovesWithMyBestRating.push_back
+				(
+					{ &_opponentResponse, _opponentResponse.front().rating() }
+				);
+			};
+		};
+
+		// Sort by the rating of my responses to the opponent's response.
+		std::ranges::sort(_opponentMovesWithMyBestRating,
+			[](const auto& lhs, const auto& rhs)
+			{
+				return lhs.second > rhs.second;
+			});
+
+
+
+	};
+
+
+
+
 	void MoveTree::evaluate_next(MoveTreeSearchData _searchData, BoardHashSet* _hashSet, const MoveTreeProfile& _profile)
 	{
 		auto& _board = this->board_;
@@ -371,6 +444,17 @@ namespace chess
 		};
 
 		++this->depth_counter_;
+		
+		// TEMPORARY PRUNING TESTING
+		if (_profile.enable_pruning_ && this->depth_counter_ == 4)
+		{
+			for (auto& _move : this->moves_)
+			{
+				deep_eval(_move);
+				prune(_move);
+			};
+		};
+
 	};
 
 	void MoveTree::evaluate_next_unique(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile)
@@ -388,43 +472,6 @@ namespace chess
 	{
 		return this->evaluate_next(_searchData, _profile);
 	};
-
-
-
-
-
-	inline Rating deep_eval(MoveTreeNode& _node)
-	{
-		// If the opponent has no responses, we can just set the rating as the quick rating
-		// and return early. These "ends" of the tree are the basis for the deep evaluation.
-		if (_node.empty())
-		{
-			// Use the quick rating.
-			const auto _rating = _node.quick_rating();
-			_node.set_rating(_rating);
-			return _rating;
-		};
-
-		// Loop through the opponent's responses to the node's move and preform a deep eval for each.
-		bool _hasMoveAfterOpponent = false;
-		for (auto& _opponentResponse : _node)
-		{
-			// Preform a deep evaluation of the opponent's response.
-			const auto _opponentResponseRating = deep_eval(_opponentResponse);
-			if (!_opponentResponse.empty())
-			{
-				_hasMoveAfterOpponent = true;
-			};
-		};
-
-		// Sort the opponent's responses by full rating.
-		_node.resort_children();
-
-		const auto _rating = -_node.front().rating();
-		_node.set_rating(_rating);
-		return _rating;
-	};
-
 
 
 

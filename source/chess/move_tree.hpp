@@ -35,6 +35,7 @@ namespace chess
 	{
 		bool follow_checks_ = false;
 		bool follow_captures_ = false;
+		bool enable_pruning_ = false;
 
 		MoveTreeProfile() = default;
 	};

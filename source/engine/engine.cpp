@@ -23,10 +23,13 @@ namespace sch
 	{
 		using namespace chess;
 
+		// Configure tree profile.
 		auto _profile = MoveTreeProfile();
 		_profile.follow_captures_ = true;
 		_profile.follow_checks_ = true;
+		_profile.enable_pruning_ = true;
 
+		// BUILD THE TREE
 		auto _tree = chess::MoveTree(_board);
 		_tree.build_tree((size_t)_depth, _depth + 1, _profile);
 
@@ -108,7 +111,7 @@ namespace sch
 					const auto& _myColor = this->my_color_;
 					
 					const size_t _pieceCount = _board.pieces().size();
-					auto _depth = 5;
+					auto _depth = 6;
 
 					// Bump depth as many moves will be discarded
 					const bool _isCheck = is_check(_board, _myColor);
