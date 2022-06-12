@@ -4,6 +4,22 @@
 
 namespace chess
 {
+	namespace impl
+	{
+		MoveTreeNodeBlockAllocator::pointer MoveTreeNodeBlockAllocator::allocate(size_t n) const
+		{
+			auto _mem = new value_type[n]{};
+			SCREEPFISH_ASSERT(_mem);
+			return _mem;
+		};
+		void MoveTreeNodeBlockAllocator::deallocate(pointer p) const
+		{
+			SCREEPFISH_ASSERT(p);
+			delete[] p;
+		};
+	};
+
+
 	void MoveTreeNode::resort_children()
 	{
 		// Sort children by rating
@@ -28,7 +44,7 @@ namespace chess
 		const auto _myColor = _board.get_toplay();
 		_board.move(this->move);
 
-		if (this->empty())
+		if (!this->was_evaluated())
 		{
 			// Get the possible responses
 			std::array<Move, 128> _moveBufferData{};
@@ -63,6 +79,8 @@ namespace chess
 				++it;
 			};
 
+			// Ensure we are marked as evaluated
+			this->mark_as_evaluated();
 		}
 		else
 		{
@@ -83,7 +101,7 @@ namespace chess
 		const auto _myColor = _board.get_toplay();
 		_board.move(this->move);
 
-		if (this->empty())
+		if (!this->was_evaluated())
 		{
 			// Get the possible responses
 			std::array<Move, 128> _moveBufferData{};
@@ -132,7 +150,10 @@ namespace chess
 			};
 
 			// Set size to "remove" extra
-			this->responses_count_ = it - this->begin();
+			this->resize(it - this->begin());
+
+			// Ensure we are marked as evaluated
+			this->mark_as_evaluated();
 		}
 		else
 		{

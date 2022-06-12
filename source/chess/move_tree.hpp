@@ -6,6 +6,7 @@
 #include "rating.hpp"
 
 #include "utility/bset.hpp"
+#include "utility/arena.hpp"
 
 #include <set>
 #include <vector>
@@ -15,6 +16,20 @@
 namespace chess
 {
 	using BoardHashSet = sch::binary_set;
+
+
+	struct MoveTreeNode;
+
+	namespace impl
+	{
+		struct MoveTreeNodeBlockAllocator
+		{
+			using value_type = MoveTreeNode;
+			using pointer = value_type*;
+			pointer allocate(size_t n) const;
+			void deallocate(pointer p) const;
+		};
+	};
 
 
 	struct MoveTreeNode
@@ -38,6 +53,13 @@ namespace chess
 
 		void set_rating(Rating r) { this->rating_ = r; };
 
+		explicit operator bool() const
+		{
+			return !this->move.is_null();
+		};
+
+
+
 		/**
 		 * @brief Gets the quick rating for the position.
 		 * @return Quick rating.
@@ -48,30 +70,46 @@ namespace chess
 		};
 
 
+		bool was_evaluated() const
+		{
+			return this->responses_.data() != nullptr;
+		};
+		void mark_as_evaluated()
+		{
+			if (!this->was_evaluated())
+			{
+				this->responses_.resize(1, MoveTreeNode{});
+				SCREEPFISH_ASSERT(this->responses_.empty());
+			};
+		};
+
 		bool empty() const
 		{
-			return this->responses_count_ == 0;
+			return this->responses_.empty();
 		};
+
 		void resize(size_type _size)
 		{
-			this->responses_ = std::make_unique<MoveTreeNode[]>(_size);
-			this->responses_count_ = _size;
+			this->responses_.resize(_size);
 		};
 
-		size_type size() const { return this->responses_count_; };
+		size_type size() const
+		{
+			return this->responses_.size();
+		};
 
-		auto begin() { return this->responses_.get(); };
-		auto begin() const { return this->responses_.get(); };
-		auto end() { return this->begin() + this->size(); };
-		auto end() const { return this->begin() + this->size(); };
+		auto begin() { return this->responses_.begin(); };
+		auto begin() const { return this->responses_.begin(); };
+		auto end() { return this->responses_.end(); };
+		auto end() const { return this->responses_.end(); };
 
 		auto& front()
 		{
-			return this->responses_[0];
+			return this->responses_.front();
 		};
 		const auto& front() const
 		{
-			return this->responses_[0];
+			return this->responses_.front();
 		};
 
 		void count_duplicates(Board _board, std::set<size_t>& _boards);
@@ -88,18 +126,20 @@ namespace chess
 		void show_best_line() const;
 		std::vector<RatedMove> get_best_line() const;
 
-		MoveTreeNode() = default;
+		MoveTreeNode()
+		{
+			SCREEPFISH_ASSERT(!this->was_evaluated());
+		};
 
 	private:
-		std::unique_ptr<MoveTreeNode[]> responses_{};
+		sch::NullTerminatedArena<MoveTreeNode, impl::MoveTreeNodeBlockAllocator> responses_{};
+
 	public:
 		RatedMove move{};
 	private:
 		Rating rating_ = 0;
-		uint8_t responses_count_ = 0;
 
 	};
-
 
 
 

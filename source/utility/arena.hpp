@@ -3,6 +3,7 @@
 /** @file */
 
 #include "utility.hpp"
+#include "utility/block_allocator.hpp"
 
 #include <memory>
 #include <algorithm>
@@ -13,19 +14,21 @@ namespace sch
 	/**
 	 * @brief Holds a set of responses within a move tree.
 	*/
-	template <typename T>
+	template <typename T, typename AllocatorT = sch::block_allocator<T>>
 	class NullTerminatedArena
 	{
 	public:
 
 		using value_type = T;
+		using allocator_type = AllocatorT;
 
 		using pointer = value_type*;
 		using reference = value_type&;
 		using const_pointer = const value_type*;
 		using const_reference = const value_type&;
 
-		using size_type = uint8_t;
+
+		using size_type = size_t;
 
 		pointer data() noexcept
 		{
@@ -38,25 +41,33 @@ namespace sch
 
 		bool empty() const
 		{
-			return !this->data_ || *this->data_;
+			return !this->data_ || !*this->data_;
 		};
+
+		auto allocator() const { return allocator_type{}; };
 
 		void clear() noexcept
 		{
 			if (auto& p = this->data_; p)
 			{
-				delete[] p;
+				this->allocator().deallocate(p);
 				p = nullptr;
 			};
 		};
 
 	private:
 
+		pointer allocate_block(size_type n)
+		{
+			auto _alloc = this->allocator();
+			auto _mem = _alloc.allocate(n + 1);
+			SCREEPFISH_ASSERT(!_mem[n]);
+			return _mem;
+		};
 		void raw_set_mem(size_type s)
 		{
 			SCREEPFISH_ASSERT(!this->data_);
-			this->data_ = new value_type[s];
-			return *this;
+			this->data_ = this->allocate_block(s);
 		};
 
 	public:
@@ -80,26 +91,27 @@ namespace sch
 		iterator end()
 		{
 			auto p = this->begin();
-			for (; p && !*p; ++p) {};
+			for (; p && *p; ++p) {};
 			return p;
 		};
 		const_iterator end() const
 		{
 			auto p = this->begin();
-			for (; p && !*p; ++p) {};
+			for (; p && *p; ++p) {};
 			return p;
 		};
 		const_iterator cend() const
 		{
 			auto p = this->begin();
-			for (; p && !*p; ++p) {};
+			for (; p && *p; ++p) {};
 			return p;
 		};
-
+		
 		size_type size() const
 		{
 			return this->end() - this->begin();
 		};
+
 		void resize(size_type _size)
 		{
 			if (_size == 0)
@@ -108,15 +120,35 @@ namespace sch
 			}
 			else
 			{
-				auto nd = value_type::create(_size);
+				auto nd = this->allocate_block(_size);
 				if (!this->empty())
 				{
-					std::copy(this->begin(),
-						std::min(this->end(), this->begin() + _size),
-						nd);
+					const_pointer sp = this->begin();
+					const const_pointer spe = this->end();
+
+					pointer dp = nd;
+					const const_pointer dpe = dp + _size;
+
+					for (; sp != spe && dp != dpe; ++sp, ++dp)
+					{
+						*dp = *sp;
+					};
 				};
 				this->clear();
 				this->data_ = nd;
+			};
+		};
+		void resize(size_type _size, const_reference _fill)
+		{
+			if (_size == 0)
+			{
+				this->clear();
+			}
+			else
+			{
+				this->clear();
+				this->raw_set_mem(_size);
+				std::fill_n(this->data_, _size, _fill);
 			};
 		};
 
@@ -142,14 +174,19 @@ namespace sch
 			return *(this->data() + this->size() - 1);
 		};
 
-		NullTerminatedArena() = default;
+		NullTerminatedArena() :
+			data_(nullptr)
+		{};
 		NullTerminatedArena(const NullTerminatedArena& other) = delete;
 
 		NullTerminatedArena& operator=(const NullTerminatedArena& other)
 		{
 			this->clear();
-			this->resize(other.size());
-			std::copy(other.begin(), other.end(), this->begin());
+			if (other.data())
+			{
+				this->raw_set_mem(other.size());
+				std::copy(other.begin(), other.end(), this->begin());
+			};
 			return *this;
 		};
 

@@ -104,7 +104,7 @@ namespace sch
 					const auto& _myColor = this->my_color_;
 					
 					const size_t _pieceCount = _board.pieces().size();
-					auto _depth = 4;
+					auto _depth = 5;
 
 					// Bump depth as many moves will be discarded
 					const bool _isCheck = is_check(_board, _myColor);

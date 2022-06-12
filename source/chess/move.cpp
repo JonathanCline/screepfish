@@ -6,7 +6,7 @@ namespace chess
 {
 	namespace
 	{
-		constexpr auto CHECKMATE_RATING = 100000.0f;
+		constexpr auto CHECKMATE_RATING = std::numeric_limits<float>::infinity();
 		constexpr auto BLOCKED_QUEEN_RATING = 0.001f;
 		constexpr auto BLOCKED_ROOK_RATING = 0.001f;
 		constexpr auto BLOCKED_BISHOP_RATING = 0.001f;
