@@ -21,9 +21,7 @@ namespace sch
 
 		TestResult run() final
 		{
-			auto _tree = chess::MoveTree();
-			_tree.board = this->board_;
-			
+			auto _tree = chess::MoveTree(this->board_);
 			for (auto& v : this->expected_)
 			{
 				_tree.evalulate_next();
@@ -36,7 +34,7 @@ namespace sch
 						"\n delta = " + std::to_string((int)v - (int)t) +
 						"\n unique = " + std::to_string(u) +
 						"\n checks = " + std::to_string(_tree.count_checks()) +
-						"\n fen = " + chess::get_fen(_tree.board);
+						"\n fen = " + chess::get_fen(_tree.initial_board());
 					return TestResult(this->name_, -1, s);
 				};
 			};

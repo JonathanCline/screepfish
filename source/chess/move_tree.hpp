@@ -15,9 +15,107 @@ namespace chess
 {
 	using BoardHashSet = sch::binary_set;
 
+	/**
+	 * @brief Holds a set of responses within a move tree.
+	*/
+	struct BasicMoveTreeNode
+	{
+	public:
+
+		using value_type = BasicMoveTreeNode;
+
+		using pointer = value_type*;
+		using reference = value_type&;
+		using const_pointer = const value_type*;
+		using const_reference = const value_type&;
+
+		using size_type = uint8_t;
+
+		size_type size() const { return this->responses_count_; };
+		bool empty() const { return this->responses_count_ == 0; };
+
+		using iterator = pointer;
+		using const_iterator = const_pointer;
+
+		iterator begin()
+		{
+			return this->responses.get();
+		};
+		const_iterator begin() const
+		{
+			return this->responses.get();
+		};
+		const_iterator cbegin() const
+		{
+			return this->responses.get();
+		};
+
+		iterator end()
+		{
+			return this->begin() + this->size();
+		};
+		const_iterator end() const
+		{
+			return this->begin() + this->size();
+		};
+		const_iterator cend() const
+		{
+			return this->begin() + this->size();
+		};
+		
+		void resize(size_type _size)
+		{
+			this->responses = std::make_unique<value_type[]>(_size);
+			this->responses_count_ = _size;
+		};
+
+		reference front()
+		{
+			SCREEPFISH_ASSERT(!this->empty());
+			return this->responses[0];
+		};
+		const_reference front() const
+		{
+			SCREEPFISH_ASSERT(!this->empty());
+			return this->responses[0];
+		};
+
+		reference back()
+		{
+			SCREEPFISH_ASSERT(!this->empty());
+			return this->responses[this->size() - 1];
+		};
+		const_reference back() const
+		{
+			SCREEPFISH_ASSERT(!this->empty());
+			return this->responses[this->size() - 1];
+		};
+
+		void clear() noexcept
+		{
+			this->responses.reset();
+			this->responses_count_ = 0;
+		};
+
+
+
+
+
+
+		BasicMoveTreeNode() = default;
+
+	private:
+		std::unique_ptr<value_type[]> responses{};
+		size_type responses_count_ = 0;
+	};
+
 
 	struct MoveTreeNode
 	{
+	private:
+
+		void resort_children();
+
 	public:
 
 		using size_type = uint8_t;
@@ -71,18 +169,8 @@ namespace chess
 		MoveTreeNode() = default;
 	};
 
-	constexpr static auto q = sizeof(MoveTreeNode);
-
-
-
-
 	struct MoveTree
 	{
-		chess::Board board{}; // initial board state
-		std::vector<MoveTreeNode> moves{}; // moves that can be played from the initial board state
-
-		BoardHashSet hash_set{};
-
 		void evaluate_next();
 		void evaluate_next_unique();
 		void evalulate_next();
@@ -96,16 +184,41 @@ namespace chess
 		size_t count_unique_positions();
 		size_t count_checks();
 
-		void clear_hashes() { this->hash_set.clear(); };
-
+		void clear_hashes() { this->hash_set_.clear(); };
 
 		void build_tree(size_t _depth);
 
+		auto begin() { return this->moves_.begin(); };
+		auto begin() const { return this->moves_.begin(); };
+		auto cbegin() const { return this->moves_.begin(); };
+		auto end() { return this->moves_.end(); };
+		auto end() const { return this->moves_.end(); };
+		auto cend() const { return this->moves_.end(); };
+
+		const chess::Board& initial_board() const
+		{
+			return this->board_;
+		};
+		void set_initial_board(const chess::Board& _board)
+		{
+			this->board_ = _board;
+		};
+
 
 		MoveTree() = default;
+		MoveTree(const chess::Board& _board) :
+			board_(_board)
+		{};
 
+	private:
+
+		chess::Board board_{}; // initial board state
+		std::vector<MoveTreeNode> moves_{}; // moves that can be played from the initial board state
+		BoardHashSet hash_set_{};
 		size_t depth_counter_ = 0;
 	};
+
+
 
 
 };

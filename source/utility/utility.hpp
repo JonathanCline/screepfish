@@ -9,6 +9,11 @@
 	#define SCREEPFISH_UNREACHABLE __builtin_unreachable()
 #endif
 
+#include <cassert>
+
+#define SCREEPFISH_ASSERT(cond) assert(cond)
+
+
 #include <array>
 #include <ranges>
 #include <algorithm>

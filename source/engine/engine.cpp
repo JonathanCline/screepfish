@@ -23,8 +23,7 @@ namespace sch
 	{
 		using namespace chess;
 
-		auto _tree = chess::MoveTree();
-		_tree.board = _board;
+		auto _tree = chess::MoveTree(_board);
 		_tree.build_tree((size_t)_depth);
 
 		return _tree;
@@ -105,7 +104,7 @@ namespace sch
 					const auto& _myColor = this->my_color_;
 					
 					const size_t _pieceCount = _board.pieces().size();
-					auto _depth = 5;
+					auto _depth = 4;
 
 					// Bump depth as many moves will be discarded
 					const bool _isCheck = is_check(_board, _myColor);
@@ -135,8 +134,6 @@ namespace sch
 
 					const auto t0 = _clock.now();
 					auto _tree = this->build_move_tree(_board, _myColor, _depth);
-					std::cout << "Tree hash set size = " << _tree.hash_set.size() << '\n';
-
 
 					const auto t1 = _clock.now();
 					const auto _move = _tree.best_move(this->rnd_);

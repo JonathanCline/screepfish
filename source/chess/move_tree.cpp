@@ -4,6 +4,23 @@
 
 namespace chess
 {
+	void MoveTreeNode::resort_children()
+	{
+		// Sort children by rating
+		std::sort(this->begin(), this->end(), [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
+			{
+				return lhs.rating() > rhs.rating();
+			});
+
+		// Set our rating to show the best opponent response
+		if (!this->empty())
+		{
+			this->rating_ = -this->front().rating();
+		};
+	};
+
+
+
 	void MoveTreeNode::evaluate_next(const Board& _previousBoard, bool _followChecks)
 	{
 		// Apply our move.
@@ -56,17 +73,8 @@ namespace chess
 			};
 		};
 
-		// Sort children by rating
-		std::sort(this->begin(), this->end(), [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
-			{
-				return lhs.rating() > rhs.rating();
-			});
-
-		// Set our rating to show the best opponent response
-		if (!this->empty())
-		{
-			this->rating_ = -this->front().rating();
-		};
+		// Resort children?
+		this->resort_children();
 	};
 	void MoveTreeNode::evaluate_next(const Board& _previousBoard, BoardHashSet& _hashSet, bool _followChecks)
 	{
@@ -135,17 +143,8 @@ namespace chess
 			};
 		};
 
-		// Sort children by rating
-		std::sort(this->begin(), this->end(), [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
-			{
-				return lhs.rating() > rhs.rating();
-			});
-
-		// Set our rating to show the best opponent response
-		if (!this->empty())
-		{
-			this->rating_ = -this->front().rating();
-		};
+		// Resort children?
+		this->resort_children();
 	};
 
 	size_t MoveTreeNode::tree_size() const
@@ -238,10 +237,11 @@ namespace chess
 
 	void MoveTree::evaluate_next_unique()
 	{
-		auto& _hashSet = this->hash_set;
+		auto& _hashSet = this->hash_set_;
+		auto& _board = this->board_;
+		auto& _moves = this->moves_;
 
-		auto& _board = this->board;
-		if (this->moves.empty())
+		if (_moves.empty())
 		{
 			// Get the possible responses
 			std::array<Move, 128> _moveBufferData{};
@@ -251,8 +251,8 @@ namespace chess
 			const auto _moveEnd = _moveBuffer.head();
 
 			// Rate and add to the child nodes
-			this->moves.resize(_moveEnd - _moveBegin);
-			auto it = this->moves.begin();
+			_moves.resize(_moveEnd - _moveBegin);
+			auto it = _moves.begin();
 			for (auto p = _moveBegin; p != _moveEnd; ++p)
 			{
 				// Rate the move
@@ -276,14 +276,14 @@ namespace chess
 		else
 		{
 			// Propogate to children
-			for (auto& _child : this->moves)
+			for (auto& _child : _moves)
 			{
 				_child.evaluate_next(_board, _hashSet, false);
 			};
 		};
 
 		// Sort children by rating
-		std::ranges::sort(this->moves, [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
+		std::ranges::sort(_moves, [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
 			{
 				return lhs.rating() > rhs.rating();
 			});
@@ -292,8 +292,10 @@ namespace chess
 	};
 	void MoveTree::evaluate_next()
 	{
-		auto& _board = this->board;
-		if (this->moves.empty())
+		auto& _board = this->board_;
+		auto& _moves = this->moves_;
+
+		if (_moves.empty())
 		{
 			// Get the possible responses
 			std::array<Move, 128> _moveBufferData{};
@@ -303,8 +305,8 @@ namespace chess
 			const auto _moveEnd = _moveBuffer.head();
 
 			// Rate and add to the child nodes
-			this->moves.resize(_moveEnd - _moveBegin);
-			auto it = this->moves.begin();
+			_moves.resize(_moveEnd - _moveBegin);
+			auto it = _moves.begin();
 			for (auto p = _moveBegin; p != _moveEnd; ++p)
 			{
 				// Rate the move
@@ -323,14 +325,14 @@ namespace chess
 		else
 		{
 			// Propogate to children
-			for (auto& _child : this->moves)
+			for (auto& _child : _moves)
 			{
 				_child.evaluate_next(_board, false);
 			};
 		};
 
 		// Sort children by rating
-		std::ranges::sort(this->moves, [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
+		std::ranges::sort(_moves, [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
 			{
 				return lhs.rating() > rhs.rating();
 			});
@@ -347,13 +349,15 @@ namespace chess
 
 	std::optional<RatedMove> MoveTree::best_move(std::mt19937& _rnd)
 	{
-		if (this->moves.empty())
+		auto& _moves = this->moves_;
+
+		if (_moves.empty())
 		{
 			return std::nullopt;
 		}
 		else
 		{
-			for (auto& v : this->moves)
+			for (auto& v : _moves)
 			{
 				if (v.empty())
 				{
@@ -361,15 +365,15 @@ namespace chess
 				};
 			};
 
-			auto& _best = this->moves.front();
-			const auto it = std::ranges::find_if(this->moves, [&_best](MoveTreeNode& v)
+			auto& _best = _moves.front();
+			const auto it = std::ranges::find_if(_moves, [&_best](MoveTreeNode& v)
 				{
 					return v.rating() != _best.rating();
 				});
 
 		 	const auto _rndNum = _rnd();
-			const auto _rndIndex = _rndNum % (it - this->moves.begin());
-			const auto _rndIter = this->moves.begin() + _rndIndex;
+			const auto _rndIndex = _rndNum % (it - _moves.begin());
+			const auto _rndIter = _moves.begin() + _rndIndex;
 			_rndIter->show_best_line();
 			std::cout << std::endl;
 
@@ -381,8 +385,10 @@ namespace chess
 
 	size_t MoveTree::tree_size() const
 	{
-		size_t n = this->moves.size();
-		for (auto& v : this->moves)
+		auto& _moves = this->moves_;
+
+		size_t n = _moves.size();
+		for (auto& v : _moves)
 		{
 			n += v.tree_size();
 		};
@@ -391,25 +397,33 @@ namespace chess
 
 	size_t MoveTree::total_outcomes() const
 	{
+		auto& _moves = this->moves_;
+
 		size_t n = 0;
-		for (auto& v : this->moves)
+		for (auto& v : _moves)
 		{
 			n += v.total_outcomes();
 		};
+
 		if (n == 0)
 		{
-			n = this->moves.size();
+			n = _moves.size();
 		};
 		return n;
 	};
 
 	std::vector<std::vector<RatedMove>> MoveTree::get_top_lines(size_t _maxCount) const
 	{
+		auto& _moves = this->moves_;
+
 		auto o = std::vector<std::vector<RatedMove>>{};
 		for (size_t n = 0; n != _maxCount; ++n)
 		{
-			if (n >= this->moves.size()) { break; };
-			o.push_back(this->moves.at(n).get_best_line());
+			if (n >= _moves.size())
+			{
+				break;
+			};
+			o.push_back(_moves.at(n).get_best_line());
 		};
 		return o;
 	};
@@ -417,10 +431,13 @@ namespace chess
 
 	size_t MoveTree::count_unique_positions()
 	{
+		auto& _moves = this->moves_;
+		auto& _board = this->board_;
+
 		auto bs = std::set<size_t>();
-		for (auto& _move : this->moves)
+		for (auto& _move : _moves)
 		{
-			auto b = this->board;
+			auto b = _board;
 			b.move(_move.move);
 			bs.insert(hash(b, b.get_toplay() == Color::black));
 			_move.count_duplicates(b, bs);
@@ -430,10 +447,13 @@ namespace chess
 	
 	size_t MoveTree::count_checks()
 	{
+		auto& _moves = this->moves_;
+		auto& _board = this->board_;
+
 		size_t n = 0;
-		for (auto& m : this->moves)
+		for (auto& m : _moves)
 		{
-			auto b = this->board;
+			auto b = _board;
 			b.move(m.move);
 			if (is_check(b, Color::white) || is_check(b, Color::black))
 			{
@@ -446,9 +466,11 @@ namespace chess
 	
 	void MoveTree::build_tree(size_t _depth)
 	{
+		auto& _moves = this->moves_;
+
 		// Reset state
 		this->clear_hashes();
-		this->moves.clear();
+		_moves.clear();
 
 		if (_depth <= 2)
 		{
