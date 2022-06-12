@@ -209,7 +209,7 @@ namespace chess
 
 	};
 
-	constexpr static auto q1 = sizeof(BasicMoveTreeNode);
+	constexpr static auto q1 = sizeof(MoveTreeNodeBase);
 	constexpr static auto q2 = sizeof(MoveTreeNode);
 
 
