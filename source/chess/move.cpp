@@ -4,6 +4,8 @@
 
 #include <iostream>
 
+#include <algorithm>
+
 namespace chess
 {
 	namespace
@@ -187,6 +189,124 @@ namespace chess
 
 
 
+	struct Neighbors
+	{
+		std::array<Position, 8> neighbors{};
+		size_t count = 0;
+
+		std::array<Position, 4> rook_{};
+		size_t rook_count_ = 0;
+
+		std::array<Position, 4> bishop_{};
+		size_t bishop_count_ = 0;
+
+		constexpr std::span<const Position> rook() const
+		{
+			return std::span<const Position>(this->rook_.data(), this->rook_count_);
+		};
+		constexpr std::span<const Position> bishop() const
+		{
+			return std::span<const Position>(this->bishop_.data(), this->bishop_count_);
+		};
+
+		constexpr operator std::span<const Position>() const noexcept
+		{
+			return std::span<const Position>(this->neighbors.data(), this->count);
+		};
+
+		constexpr void append(Position p)
+		{
+			this->neighbors[this->count++] = p;
+		};
+		constexpr void rook_append(Position p)
+		{
+			this->rook_[this->rook_count_++] = p;
+		};
+		constexpr void bishop_append(Position p)
+		{
+			this->bishop_[this->bishop_count_++] = p;
+		};
+
+		constexpr Neighbors() = default;
+	};
+
+	consteval Neighbors find_neighbors(Position _pos)
+	{
+		auto _neighbors = Neighbors();
+
+		constexpr auto _offsets = std::array
+		{
+			std::pair{ 0, 1 },
+			std::pair{ 0, -1 },
+			std::pair{ 1, 0 },
+			std::pair{ -1, 0 },
+			std::pair{ 1, 1 },
+			std::pair{ -1, 1 },
+			std::pair{ 1, -1 },
+			std::pair{ -1, -1 },
+		};
+
+		for (const auto [df, dr] : _offsets)
+		{
+			bool _possible = false;
+			const auto p = trynext(_pos, df, dr, _possible);
+			if (_possible)
+			{
+				_neighbors.append(p);
+				if (df == 0 || dr == 0)
+				{
+					_neighbors.rook_append(p);
+				}
+				else
+				{
+					_neighbors.bishop_append(p);
+				};
+			};
+		};
+
+		return _neighbors;
+	};
+	consteval auto precompute_neighbors()
+	{
+		std::array<Neighbors, 64> o{};
+		auto it = o.begin();
+		for (auto& v : positions_v)
+		{
+			*it = find_neighbors(v);
+			++it;
+		};
+		return o;
+	};
+
+	constexpr inline auto neighbors_v = precompute_neighbors();
+
+
+
+	std::span<const Position> get_surrounding_positions(Position _pos)
+	{
+		return neighbors_v[static_cast<size_t>(_pos)];
+	};
+	
+	bool is_neighboring_position(Position _pos, Position _pos2)
+	{
+		auto& nb = neighbors_v[static_cast<size_t>(_pos)];
+		const auto _end = nb.neighbors.end();
+		return std::find(nb.neighbors.begin(), _end, _pos2) != _end;
+	};
+	
+
+
+	std::span<const Position> get_surrounding_positions_for_rook(Position _pos)
+	{
+		return neighbors_v[static_cast<size_t>(_pos)].rook();
+	};
+	std::span<const Position> get_surrounding_positions_for_bishop(Position _pos)
+	{
+		return neighbors_v[static_cast<size_t>(_pos)].bishop();
+	};
+
+
+
 
 	bool is_piece_attacked_by_pawn(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
 	{
@@ -347,9 +467,7 @@ namespace chess
 	};
 	bool is_piece_attacked_by_king(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
 	{
-		auto fd = std::abs((int)_piece.file() - (int)_byPiece.file());
-		auto rd = std::abs((int)_piece.rank() - (int)_byPiece.rank());
-		return (fd <= 1 && rd <= 1);
+		return is_neighboring_position(_piece.position(), _byPiece.position());
 	};
 
 	bool is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece, bool _inCheck)
@@ -968,114 +1086,6 @@ namespace chess
 
 
 
-	struct Neighbors
-	{
-		std::array<Position, 8> neighbors{};
-		size_t count = 0;
-
-		std::array<Position, 4> rook_{};
-		size_t rook_count_ = 0;
-
-		std::array<Position, 4> bishop_{};
-		size_t bishop_count_ = 0;
-
-		constexpr std::span<const Position> rook() const
-		{
-			return std::span<const Position>(this->rook_.data(), this->rook_count_);
-		};
-		constexpr std::span<const Position> bishop() const
-		{
-			return std::span<const Position>(this->bishop_.data(), this->bishop_count_);
-		};
-
-		constexpr operator std::span<const Position>() const noexcept
-		{
-			return std::span<const Position>(this->neighbors.data(), this->count);
-		};
-
-		constexpr void append(Position p)
-		{
-			this->neighbors[this->count++] = p;
-		};
-		constexpr void rook_append(Position p)
-		{
-			this->rook_[this->rook_count_++] = p;
-		};
-		constexpr void bishop_append(Position p)
-		{
-			this->bishop_[this->bishop_count_++] = p;
-		};
-
-		constexpr Neighbors() = default;
-	};
-
-	consteval Neighbors find_neighbors(Position _pos)
-	{
-		auto _neighbors = Neighbors();
-
-		constexpr auto _offsets = std::array
-		{
-			std::pair{ 0, 1 },
-			std::pair{ 0, -1 },
-			std::pair{ 1, 0 },
-			std::pair{ -1, 0 },
-			std::pair{ 1, 1 },
-			std::pair{ -1, 1 },
-			std::pair{ 1, -1 },
-			std::pair{ -1, -1 },
-		};
-
-		for (const auto [df, dr] : _offsets)
-		{
-			bool _possible = false;
-			const auto p = trynext(_pos, df, dr, _possible);
-			if (_possible)
-			{
-				_neighbors.append(p);
-				if (df == 0 || dr == 0)
-				{
-					_neighbors.rook_append(p);
-				}
-				else
-				{
-					_neighbors.bishop_append(p);
-				};
-			};
-		};
-
-		return _neighbors;
-	};
-	consteval auto precompute_neighbors()
-	{
-		std::array<Neighbors, 64> o{};
-		auto it = o.begin();
-		for (auto& v : positions_v)
-		{
-			*it = find_neighbors(v);
-			++it;
-		};
-		return o;
-	};
-
-	constexpr inline auto neighbors_v = precompute_neighbors();
-
-
-
-	std::span<const Position> get_surrounding_positions(Position _pos)
-	{
-		return neighbors_v[static_cast<size_t>(_pos)];
-	};
-	std::span<const Position> get_surrounding_positions_for_rook(Position _pos)
-	{
-		return neighbors_v[static_cast<size_t>(_pos)].rook();
-	};
-	std::span<const Position> get_surrounding_positions_for_bishop(Position _pos)
-	{
-		return neighbors_v[static_cast<size_t>(_pos)].bishop();
-	};
-
-
-
 	bool is_queen_blocked(const Board& _board, const Position _pos, Color _color)
 	{
 		const auto _spos = get_surrounding_positions(_pos);
@@ -1266,7 +1276,7 @@ namespace chess
 
 
 			// Remove the enemy king as it will never be a threat
-			_threatPositions.reset(_board.get_king(!_forPlayer).position());
+			//_threatPositions.reset(_board.get_king(!_forPlayer).position());
 
 			if (_forPlayer == Color::white)
 			{

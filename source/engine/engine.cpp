@@ -104,7 +104,7 @@ namespace sch
 					const auto& _myColor = this->my_color_;
 					
 					const size_t _pieceCount = _board.pieces().size();
-					auto _depth = 4;
+					auto _depth = 5;
 
 					// Bump depth as many moves will be discarded
 					const bool _isCheck = is_check(_board, _myColor);
@@ -170,6 +170,16 @@ namespace sch
 								auto _file = std::ofstream(_path);
 								_file << _board << '\n' << '\n';
 								_file << get_fen(_board) << '\n';
+							};
+
+							// Top level moves
+							{
+								const auto _path = _dirPath / "moves.txt";
+								auto _file = std::ofstream(_path);
+								for (auto& _move : _tree)
+								{
+									_file << _move.move << " : " << _move.rating() << " : " << _move.quick_rating() << '\n';
+								};
 							};
 
 							// Lines

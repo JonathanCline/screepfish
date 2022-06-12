@@ -123,13 +123,23 @@ namespace chess
 	std::span<const Position> get_surrounding_positions(Position _pos);
 
 	/**
+	 * @brief Checks if a position is right next to another.
+	 *
+	 * Returns false if both positions are the same.
+	 *
+	 * @param _pos First board position.
+	 * @param _pos2 Second board position.
+	 * @return True if next to eachother, false otherwise.
+	*/
+	bool is_neighboring_position(Position _pos, Position _pos2);
+
+	/**
 	 * @brief Gets the valid positions that a rook can move towards surrounding a position.
 	 * @param _pos Position to get surrounding positions of.
 	 * @return Span of positions.
 	*/
 	std::span<const Position> get_surrounding_positions_for_rook(Position _pos);
-
-
+	
 	bool is_queen_blocked(const Board& _board, const Position _pos, Color _color);
 	bool is_rook_blocked(const Board& _board, const Position _pos, Color _color);
 	bool is_bishop_blocked(const Board& _board, Position _pos, Color _color);

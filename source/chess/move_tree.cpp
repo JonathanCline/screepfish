@@ -4,6 +4,13 @@
 
 namespace chess
 {
+	/**
+	 * @brief Enables / disables ignoring repeated positions.
+	*/
+	constexpr inline bool disable_culling_repeated_positions_v = false;
+
+
+
 	namespace impl
 	{
 		MoveTreeNodeBlockAllocator::pointer MoveTreeNodeBlockAllocator::allocate(size_t n) const
@@ -27,12 +34,6 @@ namespace chess
 			{
 				return lhs.rating() > rhs.rating();
 			});
-
-		// Set our rating to show the best opponent response
-		if (!this->empty())
-		{
-			this->rating_ = -this->front().rating();
-		};
 	};
 
 
@@ -351,9 +352,57 @@ namespace chess
 
 
 
+
+
+	inline Rating deep_eval(MoveTreeNode& _node)
+	{
+		// If the opponent has no responses, we can just set the rating as the quick rating
+		// and return early. These "ends" of the tree are the basis for the deep evaluation.
+		if (_node.empty())
+		{
+			// Use the quick rating.
+			const auto _rating = _node.quick_rating();
+			_node.set_rating(_rating);
+			return _rating;
+		};
+
+		// Loop through the opponent's responses to the node's move and preform a deep eval for each.
+		bool _hasMoveAfterOpponent = false;
+		for (auto& _opponentResponse : _node)
+		{
+			// Preform a deep evaluation of the opponent's response.
+			const auto _opponentResponseRating = deep_eval(_opponentResponse);
+			if (!_opponentResponse.empty())
+			{
+				_hasMoveAfterOpponent = true;
+			};
+		};
+
+		// Sort the opponent's responses by full rating.
+		_node.resort_children();
+
+		const auto _rating = -_node.front().rating();
+		_node.set_rating(_rating);
+		return _rating;
+	};
+
+
+
+
+
+
+
+
 	std::optional<RatedMove> MoveTree::best_move(std::mt19937& _rnd)
 	{
 		auto& _moves = this->moves_;
+
+		// Preform a deep evaluation.
+		for (auto& _move : _moves)
+		{
+			deep_eval(_move);
+		};
+
 
 		if (_moves.empty())
 		{
@@ -368,6 +417,11 @@ namespace chess
 					return v.move;
 				};
 			};
+
+			std::ranges::sort(this->moves_, [](auto& lhs, auto& rhs)
+				{
+					return lhs.rating() > rhs.rating();
+				});
 
 			auto& _best = _moves.front();
 			const auto it = std::ranges::find_if(_moves, [&_best](MoveTreeNode& v)
@@ -476,7 +530,8 @@ namespace chess
 		this->clear_hashes();
 		_moves.clear();
 
-		if (_depth <= 2)
+		// Determine whether or not to cull unique
+		if (disable_culling_repeated_positions_v || (_depth <= 3))
 		{
 			// Do not worry about repeated positions - there wont be any
 			for (size_t n = 0; n != _depth; ++n)

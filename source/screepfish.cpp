@@ -440,6 +440,18 @@ namespace sch
 			};
 		};
 
+		// King attacking king
+		{
+			const auto _fen = "8/8/2Q4P/8/8/2K2P2/1k6/8 w - - 4 73";
+			auto _board = *parse_fen(_fen);
+			if (!is_check(_board, Color::white))
+			{
+				// Should be in check as king attacks king
+				std::cout << _board << '\n';
+				abort();
+			};
+		};
+
 		{
 			const auto _fen = "1rb1kbnr/ppNppppp/2n5/6NQ/4P3/3P4/PPP2PPq/R3KB1R b KQk - 1 11";
 			const auto _board = *parse_fen(_fen);

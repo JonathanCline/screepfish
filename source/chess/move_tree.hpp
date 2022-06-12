@@ -34,11 +34,9 @@ namespace chess
 
 	struct MoveTreeNode
 	{
-	private:
+	public:
 
 		void resort_children();
-
-	public:
 
 		using size_type = uint8_t;
 
@@ -51,15 +49,6 @@ namespace chess
 			return this->rating_;
 		};
 
-		void set_rating(Rating r) { this->rating_ = r; };
-
-		explicit operator bool() const
-		{
-			return !this->move.is_null();
-		};
-
-
-
 		/**
 		 * @brief Gets the quick rating for the position.
 		 * @return Quick rating.
@@ -68,6 +57,18 @@ namespace chess
 		{
 			return this->move.rating();
 		};
+
+		void set_rating(Rating r)
+		{
+			this->rating_ = r;
+		};
+
+		explicit operator bool() const
+		{
+			return !this->move.is_null();
+		};
+
+
 
 
 		bool was_evaluated() const
