@@ -192,6 +192,17 @@ namespace chess
 	};
 
 
+	/*
+		Before:
+			midgame (d3_unique) - 38
+			midgame (d3) - 48
+			opening (d2) - 10531
+			midgame (d2) - 1641
+	*/
 
+	/*
+		After:
+			
+	*/
 
 };

@@ -97,9 +97,10 @@ namespace chess
 	void MoveTreeNode::evaluate_next(const Board& _previousBoard, BoardHashSet& _hashSet, bool _followChecks)
 	{
 		// Apply our move.
+		const auto& _myMove = this->move;
 		auto _board = _previousBoard;
 		const auto _myColor = _board.get_toplay();
-		_board.move(this->move);
+		_board.move(_myMove);
 
 		if (!this->was_evaluated())
 		{
