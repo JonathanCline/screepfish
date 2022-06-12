@@ -60,7 +60,7 @@ namespace sch
 
 			for (auto& _move : _moves)
 			{
-				_board.move_piece(_move.from(), _move.to(), _move.promotion());
+				_board.move(_move);
 			};
 
 			this->engine_.set_board(_board);
@@ -735,6 +735,24 @@ namespace sch
 
 	};
 
+
+	inline void on_local_game_update(chess::Terminal& _terminal, const chess::Board& _board)
+	{
+		// Set the board to display
+		_terminal.set_board(_board);
+
+		// TEMPORARY : Output board fen
+		std::cout << get_fen(_board) << std::endl;
+
+
+		// TEMPORARY : Output white attacking squares
+		std::cout << _board.get_white_direct_attacking() << '\n';
+
+
+		// Step, may block depending on terminal configuration
+		_terminal.step();
+	};
+
 	bool local_game(const char* _assetsDirectoryPath, bool _step)
 	{
 		using namespace chess;
@@ -742,7 +760,7 @@ namespace sch
 
 		auto _board = Board();
 		reset_board(_board);
-		_terminal.set_board(_board);
+		on_local_game_update(_terminal, _board);
 
 		auto e0 = sch::ScreepFish();
 		auto e1 = sch::ScreepFish();
@@ -755,8 +773,7 @@ namespace sch
 		};
 
 		_board.move(_move);
-		_terminal.set_board(_board);
-		_terminal.step();
+		on_local_game_update(_terminal, _board);
 
 		e1.start(_board, Color::black);
 
@@ -780,10 +797,7 @@ namespace sch
 			};
 
 			_board.move(_move);
-			std::cout << get_fen(_board) << std::endl;
-
-			_terminal.set_board(_board);
-			_terminal.step();
+			on_local_game_update(_terminal, _board);
 
 			if (_board.get_half_move_count() >= 50)
 			{
@@ -804,10 +818,7 @@ namespace sch
 			};
 
 			_board.move(_move);
-			std::cout << get_fen(_board) << std::endl;
-
-			_terminal.set_board(_board);
-			_terminal.step();
+			on_local_game_update(_terminal, _board);
 
 			if (_board.get_half_move_count() >= 50)
 			{

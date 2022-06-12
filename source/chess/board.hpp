@@ -2,6 +2,7 @@
 
 /** @file */
 
+#include "board_base.hpp"
 
 #include "piece.hpp"
 #include "rating.hpp"
@@ -39,142 +40,228 @@ namespace chess
 	};
 
 	/**
-	 * @brief Represents a chess board by tracking the pieces directly.
+	 * @brief Fufilled by types that can be used to track additional board info.
+	*/
+	template <typename T>
+	concept cx_additional_board_info = requires(T& v, const T& cv, const BoardBase& _board, Move _move)
+	{
+		v.clear();
+		v.sync(_board);
+		v.move(_board, _move);
+	};
+
+	/**
+	 * @brief Provides additional tracking for where pieces are attacking on a chess board.
+	*/
+	class BoardPieceAttackData
+	{
+	public:
+
+		/**
+		 * @brief Resets the attack data to an initial state.
+		*/
+		void clear();
+
+		/**
+		 * @brief Syncs the attack data with a new board.
+		 * @param _board Board to sync with.
+		*/
+		void sync(const BoardBase& _board);
+
+		/**
+		 * @brief Updates the tracked data to reflect a played move.
+		 * 
+		 * Move legality is not checked.
+		 * 
+		 * @param _previousBoard The previous board state.
+		 * @param _move Move to play.
+		*/
+		void move(const BoardBase& _previousBoard, Move _move);
+
+		BitBoard get_black_direct_attacking() const
+		{
+			return this->battack_;
+		};
+		BitBoard get_white_direct_attacking() const
+		{
+			return this->wattack_;
+		};
+		
+		BitBoard get_direct_attacking(Color _player) const
+		{
+			return (_player == Color::white)? this->get_white_direct_attacking() : this->get_black_direct_attacking();
+		};
+
+
+		BoardPieceAttackData() = default;
+
+	private:
+
+		/**
+		 * @brief Where the white pieces are attacking.
+		*/
+		BitBoard wattack_;
+
+		/**
+		 * @brief Where the black pieces are attacking.
+		*/
+		BitBoard battack_;
+
+	};
+
+	namespace impl
+	{
+		/**
+		 * @brief Helper type for holding onto additional board data.
+		*/
+		template <cx_additional_board_info... Ts>
+		class BoardExtrasImpl
+		{
+		public:
+
+			/**
+			 * @brief Resets the extra data to an initial state.
+			*/
+			void clear()
+			{
+				(std::get<Ts>(this->extras_).clear(), ...);
+			};
+
+			/**
+			 * @brief Syncs the extra data with a new board.
+			 * @param _board Board to sync with.
+			*/
+			void sync(const BoardBase& _board)
+			{
+				(std::get<Ts>(this->extras_).sync(_board), ...);
+			};
+
+			/**
+			 * @brief Updates the extra data to reflect a played move.
+			 *
+			 * Move legality is not checked.
+			 *
+			 * @param _previousBoard The previous board state.
+			 * @param _move Move to play.
+			*/
+			void move(const BoardBase& _previousBoard, Move _move)
+			{
+				(std::get<Ts>(this->extras_).move(_previousBoard, _move), ...);
+			};
+
+
+			template <typename T>
+			auto& get() { return std::get<T>(this->extras_); };
+			template <typename T>
+			const auto& get() const { return std::get<T>(this->extras_); };
+
+			BoardExtrasImpl() = default;
+
+		private:
+			std::tuple<Ts...> extras_{};
+		};
+	};
+
+	/**
+	 * @brief Additional board data storage / tracking.
+	*/
+	using BoardExtras = impl::BoardExtrasImpl
+	<
+		BoardPieceAttackData
+	>;
+
+
+	class Board;
+
+	std::ostream& operator<<(std::ostream& _ostr, const Board& _value);
+
+	/**
+	 * @brief Represents a chess board with additional info tracked to hasten evaluation.
 	*/
 	class Board
 	{
 	private:
+		friend std::ostream& operator<<(std::ostream& _ostr, const Board& _value);
 
-		using size_type = uint64_t;
-		constexpr size_type toindex(const Position& _pos) const
-		{
-			return static_cast<size_type>(_pos);
-		};
-		constexpr size_type toindex(File _file, Rank _rank) const
-		{
-			return this->toindex(Position(_file, _rank));
-		};
-
-		constexpr Position topos(size_type _index) const
-		{
-			const auto _rank = Rank(_index & 0b0000'0111);
-			const auto _file = File((_index & 0b0011'1000) >> 3);
-			return Position(_file, _rank);
-		};
-
-		using container_type = std::array<Piece, 64>;
+		auto& board() { return this->board_; };
+		auto& board() const { return this->board_; };
+		auto& extra() { return this->extra_; };
+		auto& extra() const { return this->extra_; };
 
 	public:
-		using iterator = typename container_type::iterator;
-		using const_iterator = typename container_type::const_iterator;
+		using iterator = typename BoardBase::iterator;
+		using const_iterator = typename BoardBase::const_iterator;
 
 		iterator begin() noexcept
 		{
-			return this->pieces_by_pos_.begin();
+			return this->board().begin();
 		};
 		const_iterator begin() const noexcept
 		{
-			return this->pieces_by_pos_.begin();
+			return this->board().begin();
 		};
 		iterator end() noexcept
 		{
-			return this->pieces_by_pos_.end();
+			return this->board().end();
 		};
 		const_iterator end() const noexcept
 		{
-			return this->pieces_by_pos_.end();
-		};
-
-	private:
-
-		// Pieces vec iterator access
-
-		using pcontainer_type = std::array<BoardPiece, 32>;
-
-		enum CastleBit : uint8_t
-		{
-			wking = 0b001,
-			wqueen = 0b010,
-			bking = 0b101,
-			bqueen = 0b110
+			return this->board().end();
 		};
 
 	public:
-		using piterator = typename pcontainer_type::iterator;
-		using const_piterator = typename pcontainer_type::const_iterator;
+		using piterator = typename BoardBase::piterator;
+		using const_piterator = typename BoardBase::const_piterator;
 
 		piterator pbegin() noexcept
 		{
-			return this->pieces_.begin();
+			return this->board().pbegin();
 		};
 		const_piterator pbegin() const noexcept
 		{
-			return this->pieces_.begin();
+			return this->board().pbegin();
 		};
 		piterator pend() noexcept
 		{
-			return std::find(this->pbegin(), this->pieces_.end(), PieceType::none);
+			return this->board().pend();
 		};
 		const_piterator pend() const noexcept
 		{
-			return std::find(this->pbegin(), this->pieces_.end(), PieceType::none);
+			return this->board().pend();
 		};
 
 		auto& pback()
 		{
-			return *(this->pend() - 1);
+			return this->board().pback();
 		};
 		const auto& pback() const
 		{
-			return *(this->pend() - 1);
+			return this->board().pback();
 		};
 
 		// Gets the king piece
 		const BoardPiece& get_white_king() const
 		{
-			return this->pieces_.at(0);
+			return this->board().get_white_king();
 		};
 		const BoardPiece& get_black_king() const
 		{
-			return this->pieces_.at(1);
+			return this->board().get_black_king();
 		};
 		const BoardPiece& get_king(Color _color) const
 		{
-			if (_color == Color::white)
-			{
-				return this->get_white_king();
-			}
-			else
-			{
-				return this->get_black_king();
-			};
+			return this->board().get_king(_color);
 		};
 
 		// find for pieces container
 		piterator pfind(const Piece& _piece)
 		{
-			if (_piece == Piece::black_king)
-			{
-				return this->pbegin() + 1;
-			}
-			else if (_piece == Piece::white_king)
-			{
-				return this->pbegin();
-			};
-			return std::find(this->pbegin(), this->pend(), _piece);
+			return this->board().pfind(_piece);
 		};
 		// find for pieces container
 		const_piterator pfind(const Piece& _piece) const
 		{
-			if (_piece == Piece::black_king)
-			{
-				return this->pbegin() + 1;
-			}
-			else if (_piece == Piece::white_king)
-			{
-				return this->pbegin();
-			};
-			return std::find(this->pbegin(), this->pend(), _piece);
+			return this->board().pfind(_piece);
 		};
 
 		// find for pieces container
@@ -199,130 +286,24 @@ namespace chess
 			return std::find(this->pbegin(), this->pend(), _pos);
 		};
 
-	private:
-
-		void perase(piterator it)
-		{
-			const auto n = this->pend() - this->pbegin();
-
-			if (it == this->pend() - 1)
-			{
-				this->pback() = BoardPiece();
-			}
-			else
-			{
-				const auto b = this->pback();
-				this->pback() = BoardPiece();
-				*it = b;
-			};
-
-			const auto n2 = this->pend() - this->pbegin();
-			if (n2 != (n - 1))
-			{
-				abort();
-			};
-		};
-
-		void erase(const Position& _pos, piterator pIt)
-		{
-			this->pieces_by_pos_.at(this->toindex(_pos)) = Piece{};
-			if (pIt != this->pend())
-			{
-				if (pIt->color() == Color::white)
-				{
-					this->wpieces_.reset(_pos);
-				}
-				else
-				{
-					this->bpieces_.reset(_pos);
-				};
-
-				this->perase(pIt);
-			};
-		};
-		void erase(const Position& _pos)
-		{
-			return this->erase(_pos, this->pfind(_pos));
-		};
-
-
-		void just_move_piece(Position _from, Position _to, piterator pIt)
-		{
-			assert(pIt != this->pend());
-
-			auto& f = this->pieces_by_pos_.at(this->toindex(_from));
-			auto& t = this->pieces_by_pos_.at(this->toindex(_to));
-
-			// Remove old piece bit
-			if (pIt->color() == Color::white)
-			{
-				this->wpieces_.reset(_from);
-			}
-			else
-			{
-				this->bpieces_.reset(_from);
-			};
-
-			// Check if destination position has a piece
-			if (t)
-			{
-				const auto toIt = this->pfind(_to);
-
-				// Remove captured piece bit
-				if (toIt->color() == Color::white)
-				{
-					this->wpieces_.reset(_to);
-				}
-				else
-				{
-					this->bpieces_.reset(_to);
-				};
-				pIt->set_position(_to);
-				this->perase(toIt);
-			}
-			else
-			{
-				pIt->set_position(_to);
-			};
-
-			// Set new piece bit
-			if (pIt->color() == Color::white)
-			{
-				this->wpieces_.set(_to);
-			}
-			else
-			{
-				this->bpieces_.set(_to);
-			};
-
-			t = f;
-			f = Piece{};
-		};
-		void just_move_piece(Position _from, Position _to)
-		{
-			const auto pIt = this->pfind(_from);
-			assert(pIt != this->pend());
-			return this->just_move_piece(_from, _to, pIt);
-		};
-
 	public:
 
 		auto find(Position _pos)
 		{
-			return this->pieces_by_pos_.begin() + this->toindex(_pos);
+			return this->board().find(_pos);
 		};
 		auto find(Position _pos) const
 		{
-			return this->pieces_by_pos_.begin() + this->toindex(_pos);
+			return this->board().find(_pos);
 		};
 
 		iterator find(Piece _piece)
 		{
-			return std::ranges::find(this->pieces_by_pos_, _piece);
+			return this->board().find(_piece);
 		};
 		const_iterator find(Piece _piece) const
 		{
-			return std::ranges::find(this->pieces_by_pos_, _piece);
+			return this->board().find(_piece);
 		};
 
 		iterator find(PieceType _piece, Color _color)
@@ -334,53 +315,19 @@ namespace chess
 			return this->find(Piece(_piece, _color));
 		};
 
-
-
+		void sync() noexcept
+		{
+			this->extra().sync(this->board());
+		};
 		void clear() noexcept
 		{
-			this->pieces_by_pos_.fill(Piece{});
-			this->toplay_ = Color::white;
-			this->castle_bits_ = CastleBit{};
-			this->enpassant_target_.reset();
-			this->fullmove_count_ = 1;
-			this->halfmove_count_ = 0;
-
-			this->pieces_.fill(BoardPiece{});
-			this->bpieces_.reset();
-			this->wpieces_.reset();
+			this->extra().clear();
+			this->board().clear();
 		};
 
 		void new_piece(Piece _piece, Position _pos)
 		{
-			if (_piece == Piece::white_king && this->pieces_.size() > 1)
-			{
-				const auto o = this->pieces_.front();
-				assert(o != Piece::white_king);
-				this->new_piece(o, o.position());
-				this->pieces_.front() = BoardPiece(_piece, _pos);
-			}
-			else if (_piece == Piece::black_king && this->pieces_.size() > 2)
-			{
-				const auto o = this->pieces_.at(1);
-				assert(o != Piece::black_king);
-				this->new_piece(o, o.position());
-				this->pieces_.at(1) = BoardPiece(_piece, _pos);
-			}
-			else
-			{
-				*this->pend() = BoardPiece(_piece, _pos);
-			};
-
-			this->pieces_by_pos_.at(this->toindex(_pos)) = _piece;
-
-			if (_piece.color() == Color::white)
-			{
-				this->wpieces_.set(_pos);
-			}
-			else
-			{
-				this->bpieces_.set(_pos);
-			};
+			return this->board().new_piece(_piece, _pos);
 		};
 		void new_piece(PieceType _piece, Color _color, Position _pos)
 		{
@@ -389,11 +336,11 @@ namespace chess
 
 		Piece get(Position _pos) const
 		{
-			return this->pieces_by_pos_.at(this->toindex(_pos));
+			return this->board().get(_pos);
 		};
 		auto get(File _file, Rank _rank) const
 		{
-			return this->get((_file, _rank));
+			return this->get(Position(_file, _rank));
 		};
 
 
@@ -404,14 +351,7 @@ namespace chess
 		*/
 		std::array<Piece, 8> pieces_on_file(File _file) const
 		{
-			auto o = std::array<Piece, 8>{};
-			auto it = o.begin();
-			for (auto& _rank : ranks_v)
-			{
-				*it = this->pieces_by_pos_.at(this->toindex(_file, _rank));
-				++it;
-			};
-			return o;
+			return this->board().pieces_on_file(_file);
 		};
 
 		/**
@@ -421,14 +361,7 @@ namespace chess
 		*/
 		std::array<Piece, 8> pieces_on_rank(Rank _rank) const
 		{
-			auto o = std::array<Piece, 8>{};
-			auto it = o.begin();
-			for (auto& _file : files_v)
-			{
-				*it = this->pieces_by_pos_.at(this->toindex(_file, _rank));
-				++it;
-			};
-			return o;
+			return this->board().pieces_on_rank(_rank);
 		};
 
 		/**
@@ -437,304 +370,143 @@ namespace chess
 		*/
 		Color get_toplay() const noexcept
 		{
-			return this->toplay_;
+			return this->board().get_toplay();
 		};
 
 		void set_toplay(Color _toplay)
 		{
-			this->toplay_ = _toplay;
+			return this->board().set_toplay(_toplay);
 		};
-
 
 		bool has_enemy_piece(Position _pos, Color _myColor) const
 		{
-			if (const auto p = this->get(_pos); p)
-			{
-				return p.color() != _myColor;
-			}
-			else
-			{
-				return false;
-			};
+			return this->board().has_enemy_piece(_pos, _myColor);
 		};
 		bool has_friendy_piece(Position _pos, Color _myColor) const
 		{
-			if (const auto p = this->get(_pos); p)
-			{
-				return p.color() == _myColor;
-			}
-			else
-			{
-				return false;
-			};
+			return this->board().has_friendy_piece(_pos, _myColor);
 		};
 		bool has_piece(Position _pos) const
 		{
-			return (bool)this->get(_pos);
+			return this->board().has_piece(_pos);
 		};
 		bool has_enemy_piece_or_empty(Position _pos, Color _myColor) const
 		{
-			if (const auto p = this->get(_pos); p)
-			{
-				return p.color() != _myColor;
-			}
-			else
-			{
-				return true;
-			};
+			return this->board().has_enemy_piece_or_empty(_pos, _myColor);
 		};
 		bool is_empty(Position _pos) const
 		{
-			return !this->has_piece(_pos);
+			return this->board().is_empty(_pos);
 		};
-
 
 		void erase_piece(Position _position)
 		{
-			this->erase(_position);
+			this->board().erase_piece(_position);
+			this->sync();
 		};
-		void move_piece(Position _fromPos, Position _toPos, PieceType _promotion = PieceType::none);
+
+		void move(const Move& _move)
+		{
+			this->extra().move(this->board(), _move);
+			this->board().move(_move);
+		};
 
 		void move(const PieceMove& _move)
 		{
-			this->move_piece(_move.from(), _move.to());
-		};
-		void move(const Move& _move)
-		{
-			if (_move)
-			{
-				this->move_piece(_move.from(), _move.to(), _move.promotion());
-			};
+			this->move(Move(_move));
 		};
 		void move(Position _from, Position _to)
 		{
-			this->move_piece(_from, _to);
+			this->move(Move(_from, _to));
 		};
 
 
 		bool has_enpassant_target() const noexcept
 		{
-			return this->enpassant_target_.has_value();
+			return this->board().has_enpassant_target();
 		};
 		Position enpassant_target() const noexcept
 		{
-			return this->enpassant_target_.value();
+			return this->board().enpassant_target();
 		};
 		void set_enpassant_target(Position _pos)
 		{
-			this->enpassant_target_ = _pos;
+			return this->board().set_enpassant_target(_pos);
 		};
 
 		bool get_castle_kingside_flag(Color _player) const
 		{
-			if (_player == Color::white)
-			{
-				return this->castle_bits_ & CastleBit::wking;
-			}
-			else
-			{
-				return this->castle_bits_ & CastleBit::bking;
-			};
+			return this->board().get_castle_kingside_flag(_player);
 		};
 		bool get_castle_queenside_flag(Color _player) const
 		{
-			if (_player == Color::white)
-			{
-				return this->castle_bits_ & CastleBit::wqueen;
-			}
-			else
-			{
-				return this->castle_bits_ & CastleBit::bqueen;
-			};
+			return this->board().get_castle_queenside_flag(_player);
 		};
-
-	private:
-
-		void reset_castle_flag(CastleBit _bits)
-		{
-			this->castle_bits_ = CastleBit(this->castle_bits_ & ~_bits);
-		};
-		void set_castle_flag(CastleBit _bits)
-		{
-			this->castle_bits_ = CastleBit(this->castle_bits_ | _bits);
-		};
-		void set_castle_flag(CastleBit _bits, bool _state)
-		{
-			if (_state)
-			{
-				this->set_castle_flag(_bits);
-			}
-			else
-			{
-				this->reset_castle_flag(_bits);
-			};
-		};
-
-	public:
 
 		void set_castle_kingside_flag(Color _player, bool _flag)
 		{
-			if (_player == Color::white)
-			{
-				this->set_castle_flag(CastleBit::wking, _flag);
-			}
-			else
-			{
-				this->set_castle_flag(CastleBit::bking, _flag);
-			};
+			return this->board().set_castle_kingside_flag(_player, _flag);
 		};
 		void set_castle_queenside_flag(Color _player, bool _flag)
 		{
-			if (_player == Color::white)
-			{
-				this->set_castle_flag(CastleBit::wqueen, _flag);
-			}
-			else
-			{
-				this->set_castle_flag(CastleBit::bqueen, _flag);
-			};
+			return this->board().set_castle_queenside_flag(_player, _flag);
 		};
 
 		uint16_t get_full_move_count() const
 		{
-			return this->fullmove_count_;
+			return this->board().get_full_move_count();
 		};
 		uint16_t get_half_move_count() const
 		{
-			return this->halfmove_count_;
+			return this->board().get_half_move_count();
 		};
 
 		void set_full_move_count(uint16_t _count)
 		{
-			this->fullmove_count_ = _count;
+			return this->board().set_full_move_count(_count);
 		};
 		void set_half_move_count(uint16_t _count)
 		{
-			this->halfmove_count_ = _count;
+			return this->board().set_half_move_count(_count);
 		};
 
 		BitBoard get_black_piece_bitboard() const
 		{
-			return this->bpieces_;
+			return this->board().get_black_piece_bitboard();
 		};
 		BitBoard get_white_piece_bitboard() const
 		{
-			return this->wpieces_;
+			return this->board().get_white_piece_bitboard();
 		};
-
-
 
 		const std::span<const BoardPiece> pieces() const
 		{
-			return std::span<const BoardPiece>(this->pbegin(), this->pend());
+			return this->board().pieces();
 		};
 
 
-		friend std::ostream& operator<<(std::ostream& _ostr, const Board& _value);
+
+		BitBoard get_white_direct_attacking() const
+		{
+			return this->extra().get<BoardPieceAttackData>().get_white_direct_attacking();
+		};
+		BitBoard get_black_direct_attacking() const
+		{
+			return this->extra().get<BoardPieceAttackData>().get_black_direct_attacking();
+		};
+		BitBoard get_direct_attacking(Color _player) const
+		{
+			return this->extra().get<BoardPieceAttackData>().get_direct_attacking(_player);
+		};
+
+
+
 
 		Board() = default;
-
 	private:
-		//container_type pieces_;
-		std::array<Piece, 64> pieces_by_pos_{};
-		std::array<BoardPiece, 32> pieces_{};
-
-		BitBoard bpieces_;
-		BitBoard wpieces_;
-
-		std::optional<Position> enpassant_target_;
-
-		/**
-		 * @brief Half-moves since the last piece capture or pawn advance.
-		*/
-		uint16_t halfmove_count_ = 0;
-
-		/**
-		 * @brief Full-moves played, increments every time black plays.
-		*/
-		uint16_t fullmove_count_ = 1;
-
-		// Castle tracking
-		CastleBit castle_bits_ = CastleBit{};
-
-		/**
-		 * @brief Whos turn it is to play.
-		*/
-		Color toplay_ = Color::white;
-
+		BoardBase board_;
+		BoardExtras extra_;
 	};
 
-	/**
-	 * @brief Fufilled by types that can be used to track additional board info.
-	*/
-	template <typename T>
-	concept cx_additional_board_info = requires(T& v, const T& cv, const Board& _board, Move _move)
-	{
-		v.clear();
-		v.sync(_board);
-		v.move(_board, _move);
-	};
-
-	/**
-	 * @brief Provides additional tracking for where pieces are attacking on a chess board.
-	*/
-	class BoardPieceAttackData
-	{
-	public:
-
-		/**
-		 * @brief Resets the attack data to an initial state.
-		*/
-		void clear()
-		{
-			this->wattack_.reset();
-			this->battack_.reset();
-		};
-
-		/**
-		 * @brief Syncs the attack data with a new board.
-		 * @param _board Board to sync with.
-		*/
-		void sync(const Board& _board)
-		{
-			// Clear old state
-			this->clear();
-
-			// Loop over pieces and set attacking positions
-			const auto pend = _board.pend();
-			for (auto it = _board.pbegin(); it != pend; ++it)
-			{
-
-			};
-		};
-
-		/**
-		 * @brief Updates the tracked data to reflect a played move.
-		 * 
-		 * Move legality is not checked.
-		 * 
-		 * @param _previousBoard The previous board state.
-		 * @param _move Move to play.
-		*/
-		void move(const Board& _previousBoard, Move _move)
-		{
-
-		};
-
-		BoardPieceAttackData() = default;
-
-	private:
-
-		/**
-		 * @brief Where the white pieces are attacking.
-		*/
-		BitBoard wattack_;
-
-		/**
-		 * @brief Where the black pieces are attacking.
-		*/
-		BitBoard battack_;
-
-	};
 
 }
