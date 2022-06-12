@@ -2,6 +2,8 @@
 
 /** @file */
 
+#include "chess/rating.hpp"
+
 #include "chess/chess.hpp"
 
 #include <span>
@@ -133,9 +135,45 @@ namespace chess
 	
 
 
+	/**
+	 * @brief Checks if a player is in check for a given board position.
+	 * @param _board Current board position.
+	 * @param _forPlayer Player to see if is in check.
+	 * @return True if player given is in check, false otherwise.
+	*/
 	bool is_check(const chess::Board& _board, const chess::Color _forPlayer);
+
+	/**
+	 * @brief Checks if a player is in checkmate for a given board position.
+	 * @param _board Current board position.
+	 * @param _forPlayer Player to see if is in checkmate.
+	 * @return True if player given is in checkmate, false otherwise.
+	*/
 	bool is_checkmate(const chess::Board& _board, const chess::Color _forPlayer);
 
-	chess::Rating rate_board(const chess::Board& _board, chess::Color _forPlayer);
+
+
+	/**
+	 * @brief Calculates a quick rating for a board based solely on the current position.
+	 *
+	 * This should be used to quickly calculate a basic value to assign as a rating, but shouldn't
+	 * be used to determine anything more than instantaneous position rating.
+	 * 
+	 * @param _board Board to rate.
+	 * @param _forPlayer Player to rate the board for.
+	 * @return Rating for the given player.
+	*/
+	Rating quick_rate(const chess::Board& _board, chess::Color _forPlayer);
+
+	/**
+	 * @brief Calculates a quick rating for a board based solely on the current position.
+	 *
+	 * This should be used to quickly calculate a basic value to assign as a rating, but shouldn't
+	 * be used to determine anything more than instantaneous position rating.
+	 *
+	 * @param _board Board to rate.
+	 * @return Absolute board rating.
+	*/
+	AbsoluteRating quick_rate(const chess::Board& _board);
 
 };

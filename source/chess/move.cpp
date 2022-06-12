@@ -1368,6 +1368,8 @@ namespace chess
 		};
 		return true;
 	};
+
+
 	bool is_checkmate(const chess::Board& _board, const chess::Color _forPlayer)
 	{
 		using namespace chess;
@@ -1420,6 +1422,8 @@ namespace chess
 			return 10.0f;
 		case chess::PieceType::king:
 			return 1000.0f;
+		default:
+			SCREEPFISH_UNREACHABLE;
 		};
 	};
 
@@ -1466,7 +1470,7 @@ namespace chess
 
 
 	template <chess::Color Player>
-	chess::Rating rate_board(const chess::Board& _board)
+	inline chess::Rating rate_board_for(const chess::Board& _board)
 	{
 		using namespace chess;
 
@@ -1480,10 +1484,18 @@ namespace chess
 
 		auto _rating = Rating(0);
 
+		// Checkmate
+
+		if (is_checkmate(_board, Player))
+		{
+			return -checkmate_rating_v;
+		};
 		if (is_checkmate(_board, !Player))
 		{
 			return checkmate_rating_v;
 		};
+
+		// Castling ability
 
 		if (_board.get_castle_kingside_flag(Player))
 		{
@@ -1501,6 +1513,8 @@ namespace chess
 		{
 			_rating -= castle_ability_rating_v;
 		};
+
+		// Material value + Positional value
 
 		const auto _pEnd = _board.pend();
 		for (auto it = _board.pbegin(); it != _pEnd; ++it)
@@ -1655,22 +1669,38 @@ namespace chess
 		return _rating;
 	};
 
-	chess::Rating rate_board(const chess::Board& _board, chess::Color _forPlayer)
+	
+	template <chess::Color Player>
+	inline AbsoluteRating rate_board(const chess::Board& _board)
+	{
+		return AbsoluteRating(rate_board_for<Player>(_board), Player);
+	};
+
+
+
+
+
+
+	Rating quick_rate(const chess::Board& _board, chess::Color _forPlayer)
 	{
 		using namespace chess;
 		if (_forPlayer == Color::white)
 		{
-			return rate_board<Color::white>(_board);
+			return rate_board_for<Color::white>(_board);
 		}
 		else
 		{
-			return rate_board<Color::black>(_board);
+			return rate_board_for<Color::black>(_board);
 		};
 	};
 
-	chess::Rating rate_move(const chess::Board& _board, const chess::Move& _move, chess::Color _forPlayer, const bool _isCheck)
+	AbsoluteRating quick_rate(const chess::Board& _board)
 	{
-		return rate_board(_board, _forPlayer);
+		// Temporary easy peasy quick rate
+		return AbsoluteRating(rate_board_for<Color::white>(_board));
 	};
+
+
+
 
 };

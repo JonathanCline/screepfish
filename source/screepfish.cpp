@@ -453,9 +453,9 @@ namespace sch
 		{
 			auto _board = Board();
 			reset_board(_board);
-			const auto rt0 = rate_board(_board, Color::white);
+			const auto rt0 = quick_rate(_board, Color::white);
 			_board.move((File::a, Rank::r2), (File::a, Rank::r4));
-			const auto rt1 = rate_board(_board, Color::white);
+			const auto rt1 = quick_rate(_board, Color::white);
 
 			// rt1 should be slightly higher
 			if (rt0 >= rt1)
@@ -524,7 +524,7 @@ namespace sch
 			{
 				auto _board = Board();
 				reset_board(_board);
-				rt0 = rate_board(_board, Color::white);
+				rt0 = quick_rate(_board, Color::white);
 			};
 
 			{
@@ -532,8 +532,8 @@ namespace sch
 				reset_board(_board);
 				_board.erase_piece((File::d, Rank::r2));
 				_board.erase_piece((File::d, Rank::r7));
-				rt1 = rate_board(_board, Color::white);
-				const auto rt1b = rate_board(_board, Color::black);
+				rt1 = quick_rate(_board, Color::white);
+				const auto rt1b = quick_rate(_board, Color::black);
 
 				if (chess::is_queen_blocked(_board, (File::d, Rank::r1), Color::white))
 				{

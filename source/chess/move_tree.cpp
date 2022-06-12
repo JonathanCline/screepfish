@@ -46,7 +46,7 @@ namespace chess
 				// Rate the move
 				auto _newBoard = _board;
 				_newBoard.move(*p);
-				const auto _rating = rate_board(_newBoard, _opponentColor);
+				const auto _rating = quick_rate(_newBoard, _opponentColor);
 
 				// Assign values
 				it->move = RatedMove{ *p, _rating };
@@ -114,7 +114,7 @@ namespace chess
 					_hashSet.insert(h);
 				};
 				
-				const auto _rating = rate_board(_newBoard, _opponentColor);
+				const auto _rating = quick_rate(_newBoard, _opponentColor);
 
 				// Assign values
 				it->move = RatedMove{ *p, _rating };
@@ -263,7 +263,7 @@ namespace chess
 				const auto h = hash(_newBoard, _newBoard.get_toplay() == Color::black);
 				_hashSet.insert(h);
 
-				const auto _rating = rate_board(_newBoard, _board.get_toplay());
+				const auto _rating = quick_rate(_newBoard, _board.get_toplay());
 
 				// Assign values
 				it->move = RatedMove{ *p, _rating };
@@ -312,7 +312,7 @@ namespace chess
 				// Rate the move
 				auto _newBoard = _board;
 				_newBoard.move(*p);
-				const auto _rating = rate_board(_newBoard, _board.get_toplay());
+				const auto _rating = quick_rate(_newBoard, _board.get_toplay());
 
 				// Assign values
 				it->move = RatedMove{ *p, _rating };

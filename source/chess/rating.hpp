@@ -94,6 +94,10 @@ namespace chess
 			value_(_value)
 		{};
 
+		constexpr explicit AbsoluteRating(rep _value, Color _player) noexcept :
+			value_((_player == Color::white)? _value : -_value)
+		{};
+
 	private:
 		rep value_;
 	};
