@@ -1,5 +1,7 @@
 #include "screepfish.hpp"
 
+#include "tests/tests.hpp"
+
 #include "env.hpp"
 
 #include "engine/engine.hpp"
@@ -333,7 +335,7 @@ namespace sch
 					std::this_thread::sleep_for(std::chrono::seconds(1));
 
 					auto _params = lichess::ChallengeAIParams{};
-					_params.level = 3;
+					_params.level = 4;
 					_params.days.reset();
 					_params.clock.emplace();
 					//_params.clock->set_initial(1min);
@@ -399,10 +401,30 @@ namespace sch
 namespace sch
 {
 
-	bool run_tests()
+	bool run_tests_main()
 	{
 		bool _runOnFinish = true;
 
+		{
+			bool _failed = false;
+			const auto _results = run_tests();
+			for (auto& v : _results)
+			{
+				if (!v)
+				{
+					std::cout << "TEST FAILED " <<
+						v.name() <<
+						"(" << v.result() << ") : " <<
+						v.description() << std::endl;
+					_failed = true;
+				};
+			};
+
+			if (_failed && !_runOnFinish)
+			{
+				return _runOnFinish;
+			};
+		}
 
 
 		using namespace chess;
@@ -413,6 +435,7 @@ namespace sch
 			_board.move(Move((File::d, Rank::r2), (File::d, Rank::r4)));
 			if (!is_check(_board, Color::white))
 			{
+				std::cout << _board << std::endl;
 				abort();
 			};
 		};
@@ -426,52 +449,13 @@ namespace sch
 			};
 		};
 
-		{
-			auto _board = Board();
-			reset_board(_board);
-
-			auto _tree = MoveTree();
-			_tree.board = _board;
-
-			_tree.evalulate_next();
-			if (const auto s = _tree.total_outcomes(); s != 20)
-			{
-				std::cout << "Expected 20, got " << s << '\n';
-				abort();
-			};
-
-			_tree.evalulate_next();
-			if (const auto s = _tree.total_outcomes(); s != 400)
-			{
-				std::cout << "Expected 400, got " << s << '\n';
-				abort();
-			};
-
-			_tree.evalulate_next();
-			if (const auto s = _tree.total_outcomes(); s != 8902)
-			{
-				std::cout << "Expected 8902, got " << s << '\n';
-				std::cout << "  delta = " << (int)s - 8902 << '\n';
-				//abort();
-			};
-
-			_tree.evalulate_next();
-			if (const auto s = _tree.total_outcomes(); s != 197281)
-			{
-				std::cout << "Expected 197281, got " << s << '\n';
-				std::cout << "  delta = " << (int)s - 197281 << '\n';
-				//abort();
-			};
-
-		};
-
 
 		{
 			auto _board = Board();
 			reset_board(_board);
-			const auto rt0 = rate_board(_board, Color::white);
+			const auto rt0 = quick_rate(_board, Color::white);
 			_board.move((File::a, Rank::r2), (File::a, Rank::r4));
-			const auto rt1 = rate_board(_board, Color::white);
+			const auto rt1 = quick_rate(_board, Color::white);
 
 			// rt1 should be slightly higher
 			if (rt0 >= rt1)
@@ -540,7 +524,7 @@ namespace sch
 			{
 				auto _board = Board();
 				reset_board(_board);
-				rt0 = rate_board(_board, Color::white);
+				rt0 = quick_rate(_board, Color::white);
 			};
 
 			{
@@ -548,8 +532,8 @@ namespace sch
 				reset_board(_board);
 				_board.erase_piece((File::d, Rank::r2));
 				_board.erase_piece((File::d, Rank::r7));
-				rt1 = rate_board(_board, Color::white);
-				const auto rt1b = rate_board(_board, Color::black);
+				rt1 = quick_rate(_board, Color::white);
+				const auto rt1b = quick_rate(_board, Color::black);
 
 				if (chess::is_queen_blocked(_board, (File::d, Rank::r1), Color::white))
 				{
@@ -593,34 +577,162 @@ namespace sch
 			};
 		};
 
+		// Bishop causing check
+		{
+			auto _board = Board();
+			reset_board(_board);
+			_board.erase_piece((File::f, Rank::r2));
+			_board.move((File::f, Rank::r8), (File::h, Rank::r4));
+
+			if (!is_check(_board, Color::white))
+			{
+				// Should be check
+				abort();
+			};
+		};
+
+		// Rook check
+		{
+			auto _board = *parse_fen("4r3/2bk1p2/8/PbP5/1P5p/5P2/1R5P/1N2K2R w K - 11 39");
+			if (!is_check(_board, Color::white))
+			{
+				// Should be check
+				std::cout << _board << std::endl;
+				abort();
+			};
+
+			_board.move((File::b, Rank::r2), (File::d, Rank::r2));
+			if (!is_piece_attacked_by_rook(_board,
+				_board.get_white_king(),
+				*_board.pfind((File::e, Rank::r8))
+			))
+			{
+				auto _data = std::array<Move, 32>{};
+				auto _buffer = MoveBuffer(_data);
+				get_rook_moves(_board, *_board.pfind((File::e, Rank::r8)), _buffer);
+				for (auto bp = _data.data(); bp != _buffer.head(); ++bp)
+				{
+					std::cout << *bp << std::endl;
+				};
+				std::cout << _board << std::endl;
+				abort();
+			};
+
+			if (!is_piece_attacked(_board, _board.get_white_king()))
+			{
+				// Should be check
+				std::cout << _board << std::endl;
+				abort();
+			};
+
+			if (!is_check(_board, Color::white))
+			{
+				// Should be check
+				std::cout << _board << std::endl;
+				abort();
+			};
+
+			auto _data = std::array<Move, 32>{};
+			auto _buffer = MoveBuffer(_data);
+			const auto b0 = _buffer.head();
+			get_moves(_board, Color::white, _buffer);
+			const auto b1 = _buffer.head();
+
+			for (auto bp = b0; bp != b1; ++bp)
+			{
+				std::cout << *bp << std::endl;
+
+				auto nb = _board;
+				nb.move(*bp);
+				if (is_check(nb, Color::white))
+				{
+					// Should NEVER be check
+					std::cout << nb << std::endl;
+					abort();
+				};
+			};
+			
+		};
+
 		return _runOnFinish;
+	};
+
+	template <size_t Runs = 5>
+	auto perf_test_part(auto&& _op, std::chrono::milliseconds _duration = std::chrono::seconds(1))
+	{
+		using namespace chess;
+
+		std::array<size_t, Runs> _runs{};
+
+		for (auto& r : _runs)
+		{
+			using namespace std::chrono_literals;
+			r = sch::count_runs_within_duration(_op, _duration);
+		};
+
+		const auto _runsTotal = std::accumulate(_runs.begin(), _runs.end(), (size_t)0);
+		const auto _runsAvg = _runsTotal / _runs.size();
+		return _runsAvg;
+		std::cout << "rt : " << _runsAvg << std::endl;
 	};
 
 	void perf_test()
 	{
 		using namespace chess;
 
-		std::array<size_t, 10> _runs{};
+		// midgame, depth 3 - unique
+		{
+			auto b = *parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
+			const auto fn = [&b]()
+			{
+				auto t = MoveTree(b);
+				t.build_tree(3);
+			};
+			const auto r = perf_test_part(fn);
+			std::cout << "midgame (d3_unique) - " << r << std::endl;
+		};
 
-		for (auto& r : _runs)
+		// midgame, depth 3
+		{
+			auto b = *parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
+			const auto fn = [&b]()
+			{
+				auto t = MoveTree(b);
+				t.evaluate_next();
+				t.evaluate_next();
+				t.evaluate_next();
+			};
+			const auto r = perf_test_part(fn);
+			std::cout << "midgame (d3) - " << r << std::endl;
+		};
+
+		// opening, depth 2
 		{
 			auto b = Board();
 			reset_board(b);
 			const auto fn = [&b]()
 			{
-				auto t = MoveTree();
-				t.board = b;
-				t.evalulate_next();
-				t.evalulate_next();
+				auto t = MoveTree(b);
+				t.evaluate_next();
+				t.evaluate_next();
 			};
-
-			using namespace std::chrono_literals;
-			r = sch::count_runs_within_duration(fn, 1s);
+			const auto r = perf_test_part(fn);
+			std::cout << "opening (d2) - " << r << std::endl;
 		};
 
-		const auto _runsTotal = std::accumulate(_runs.begin(), _runs.end(), (size_t)0);
-		const auto _runsAvg = _runsTotal / _runs.size();
-		std::cout << "rt : " << _runsAvg << std::endl;
+		// midgame, depth 2
+		{
+			auto b = *parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
+			const auto fn = [&b]()
+			{
+				auto t = MoveTree(b);
+				t.evaluate_next();
+				t.evaluate_next();
+			};
+			const auto r = perf_test_part(fn);
+			std::cout << "midgame (d2) - " << r << std::endl;
+		};
+
 	};
 
 	bool local_game(const char* _assetsDirectoryPath, bool _step)
@@ -710,7 +822,7 @@ namespace sch
 
 
 
-	int local_game_main(int _nargs, const char* _vargs[])
+	int local_game_main(int _nargs, const char* const* _vargs)
 	{
 		const auto p = (std::filesystem::path(_vargs[0]).parent_path() / "assets" / "chess").generic_string();
 		std::cout << p << '\n';
@@ -739,7 +851,7 @@ namespace sch
 		return 0;
 	};
 
-	int lichess_bot_main(int _nargs, const char* _vargs[])
+	int lichess_bot_main(int _nargs, const char* const* _vargs)
 	{
 		// Renable when lichess lets us play the AI
 		const auto _env = sch::load_env(_vargs[0]);

@@ -2,6 +2,8 @@
 
 /** @file */
 
+#include "piece.hpp"
+#include "rating.hpp"
 #include "bitboard.hpp"
 #include "position.hpp"
 
@@ -23,43 +25,11 @@
 #include <optional>
 #include <array>
 #include <span>
+#include <random>
 
 
 namespace chess
 {
-
-
-
-	/**
-	 * @brief Named piece / square colors.
-	*/
-	enum class Color : bool
-	{
-		black,
-		white
-	};
-
-	constexpr inline auto colors_v = std::array
-	{
-		Color::black,
-		Color::white
-	};
-
-
-	/**
-	 * @brief Inverts the given color.
-	 * 
-	 * white -> black
-	 * black -> white
-	 * 
-	 * @param rhs Color to invert.
-	 * @return Inverted (opposite) color.
-	*/
-	constexpr Color operator!(Color rhs) noexcept
-	{
-		return Color(!jc::to_underlying(rhs));
-	};
-
 
 
 	constexpr Color square_color(Position _pos)
@@ -79,8 +49,6 @@ namespace chess
 		draw,
 		mate,
 	};
-
-	using Rating = float;
 
 	
 
@@ -266,6 +234,24 @@ namespace chess
 
 
 
+	enum class PieceE : uint8_t
+	{
+		black_pawn = 0b0010,
+		black_knight = 0b0100,
+		black_bishop = 0b0110,
+		black_rook = 0b1000,
+		black_queen = 0b1010,
+		black_king = 0b1100,
+
+		white_pawn = 0b0011,
+		white_knight = 0b0101,
+		white_bishop = 0b0111,
+		white_rook = 0b1001,
+		white_queen = 0b1011,
+		white_king = 0b1101,
+	};
+
+
 
 	/**
 	 * @brief Represents a chess piece with defined color.
@@ -278,24 +264,9 @@ namespace chess
 		 * @brief Exposes the piece type enum values for use
 		*/
 		using enum PieceType;
-
-		enum class PieceE : uint8_t
-		{
-			black_pawn   = 0b0010,
-			black_knight = 0b0100,
-			black_bishop = 0b0110,
-			black_rook	 = 0b1000,
-			black_queen  = 0b1010,
-			black_king   = 0b1100,
-
-			white_pawn		= 0b0011,
-			white_knight	= 0b0101,
-			white_bishop	= 0b0111,
-			white_rook		= 0b1001,
-			white_queen		= 0b1011,
-			white_king		= 0b1101,
-		};
-		using enum PieceE;
+		
+		using PieceE = PieceE;
+		using enum chess::PieceE;
 
 		/**
 		 * @brief Types of chess pieces.
@@ -399,6 +370,8 @@ namespace chess
 		uint8_t piece_;
 
 	};
+
+	std::ostream& operator<<(std::ostream& _ostr, const Piece& p);
 
 
 
@@ -551,14 +524,51 @@ namespace chess
 			return *(this->pend() - 1);
 		};
 
+		// Gets the king piece
+		const BoardPiece& get_white_king() const
+		{
+			return this->pieces_.at(0);
+		};
+		const BoardPiece& get_black_king() const
+		{
+			return this->pieces_.at(1);
+		};
+		const BoardPiece& get_king(Color _color) const
+		{
+			if (_color == Color::white)
+			{
+				return this->get_white_king();
+			}
+			else
+			{
+				return this->get_black_king();
+			};
+		};
+
 		// find for pieces container
 		piterator pfind(const Piece& _piece)
 		{
+			if (_piece == Piece::black_king)
+			{
+				return this->pbegin() + 1;
+			}
+			else if (_piece == Piece::white_king)
+			{
+				return this->pbegin();
+			};
 			return std::find(this->pbegin(), this->pend(), _piece);
 		};
 		// find for pieces container
 		const_piterator pfind(const Piece& _piece) const
 		{
+			if (_piece == Piece::black_king)
+			{
+				return this->pbegin() + 1;
+			}
+			else if (_piece == Piece::white_king)
+			{
+				return this->pbegin();
+			};
 			return std::find(this->pbegin(), this->pend(), _piece);
 		};
 
@@ -740,8 +750,26 @@ namespace chess
 
 		void new_piece(Piece _piece, Position _pos)
 		{
+			if (_piece == Piece::white_king && this->pieces_.size() > 1)
+			{
+				const auto o = this->pieces_.front();
+				assert(o != Piece::white_king);
+				this->new_piece(o, o.position());
+				this->pieces_.front() = BoardPiece(_piece, _pos);
+			}
+			else if (_piece == Piece::black_king && this->pieces_.size() > 2)
+			{
+				const auto o = this->pieces_.at(1);
+				assert(o != Piece::black_king);
+				this->new_piece(o, o.position());
+				this->pieces_.at(1) = BoardPiece(_piece, _pos);
+			}
+			else
+			{
+				*this->pend() = BoardPiece(_piece, _pos);
+			};
+			
 			this->pieces_by_pos_.at(this->toindex(_pos)) = _piece;
-			*this->pend() = BoardPiece(_piece, _pos);
 
 			if (_piece.color() == Color::white)
 			{
@@ -765,6 +793,7 @@ namespace chess
 		{
 			return this->get((_file, _rank));
 		};
+
 
 		/**
 		 * @brief Gets the pieces that are on a particular file.
@@ -959,6 +988,31 @@ namespace chess
 							this->bcastle_queen_ = false;
 						};
 					};
+				}
+				else if (_to == PieceType::rook)
+				{
+					if (_to.color() == Color::white)
+					{
+						if (_toPos == (File::h, Rank::r1))
+						{
+							this->wcastle_king_ = false;
+						}
+						else if (_toPos == (File::a, Rank::r1))
+						{
+							this->wcastle_queen_ = false;
+						};
+					}
+					else
+					{
+						if (_toPos == (File::h, Rank::r8))
+						{
+							this->bcastle_king_ = false;
+						}
+						else if (_toPos == (File::a, Rank::r8))
+						{
+							this->bcastle_queen_ = false;
+						};
+					};
 				};
 
 				// Half move handling (fifty move rule)
@@ -983,15 +1037,15 @@ namespace chess
 				*this->pfind(_fromPos) = _promotion;
 			};
 
-			if (_oldEnpassantTarget && *_oldEnpassantTarget == _toPos)
+			if (_oldEnpassantTarget && *_oldEnpassantTarget == _toPos &&
+				it->type() == Piece::pawn)
 			{
-				if (_toPos.rank() == Rank::r6)
+				const auto _enemyPos = (_toPos == Rank::r6) ?
+					(_toPos.file(), Rank::r5) :
+					(_toPos.file(), Rank::r4);
+				if (this->pfind(_enemyPos)->color() != it->color())
 				{
-					this->erase((_toPos.file(), Rank::r5));
-				}
-				else
-				{
-					this->erase((_toPos.file(), Rank::r4));
+					this->erase(_enemyPos);
 				};
 			};
 
@@ -1156,11 +1210,13 @@ namespace chess
 
 	struct ZobristHashTable
 	{
-		std::array<std::array<size_t, 12>, 64> table{};
-		size_t black_to_move{};
+		using type = uint32_t;
+
+		std::array<std::array<type, 12>, 64> table{};
+		type black_to_move{};
 	};
 
-	constexpr auto zobrist_hash_subindex(PieceType p, Color c)
+	inline auto zobrist_hash_subindex(PieceType p, Color c)
 	{
 		size_t _subindex = 0;
 		if (c == Color::white) { _subindex = 1; };
@@ -1176,17 +1232,19 @@ namespace chess
 		return (static_cast<T>(_largeA * _value) + _largeB) % _mod;
 	};
 
-	constexpr auto zobrist_hash_index(File f, Rank r)
+	inline auto zobrist_hash_index(File f, Rank r)
 	{
-		size_t _hash = 0;
+		ZobristHashTable::type _hash = 0;
 		_hash |= ((jc::to_underlying(f) << 3) | jc::to_underlying(r));
 		return _hash;
 	};
 
-	consteval auto zobrist_hash_table()
+	inline auto zobrist_hash_table()
 	{
+		static thread_local std::random_device rnd_dv{};
+		static thread_local std::mt19937 mt{rnd_dv()};
+
 		auto _table = ZobristHashTable{};
-		size_t _pseudoRand = 13136;
 		for (auto& f : files_v)
 		{
 			for (auto& r : ranks_v)
@@ -1200,7 +1258,7 @@ namespace chess
 					for (auto& c : colors_v)
 					{
 						const auto j = zobrist_hash_subindex(p, c);
-						_pseudoRand = pseudorand(_pseudoRand);
+						const auto _pseudoRand = static_cast<ZobristHashTable::type>(mt());
 						const auto _hash = _pseudoRand;
 						_table.table[i][j] = _hash;
 					};
@@ -1208,11 +1266,11 @@ namespace chess
 			};
 		};
 
-		_table.black_to_move = pseudorand(_pseudoRand);
+		_table.black_to_move = pseudorand(static_cast<ZobristHashTable::type>(mt()));
 		return _table;
 	};
 
-	constexpr inline auto zobrist_hash_lookup_table_v =
+	static const inline auto zobrist_hash_lookup_table_v =
 		zobrist_hash_table();
 
 	/**
@@ -1223,7 +1281,7 @@ namespace chess
 	*/
 	inline auto hash(const Board& _board, bool _blackToMove)
 	{
-		size_t _hash = 0;
+		ZobristHashTable::type _hash = 0;
 		if (_blackToMove)
 		{
 			_hash ^= zobrist_hash_lookup_table_v.black_to_move;

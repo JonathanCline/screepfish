@@ -79,7 +79,7 @@ namespace chess
 	constexpr bool trynext(File& _file, int _count = 1)
 	{
 		auto _newFile = File(jc::to_underlying(_file) + _count);
-		if (_newFile > File::h)
+		if (_newFile > File::h) JCLIB_UNLIKELY
 		{
 			return false;
 		}
@@ -270,7 +270,7 @@ namespace chess
 	constexpr bool trynext(Rank& _rank, int _count = 1)
 	{
 		auto _newRank = Rank(jc::to_underlying(_rank) + _count);
-		if (_newRank > Rank::r8)
+		if (_newRank > Rank::r8) JCLIB_UNLIKELY
 		{
 			return false;
 		}
@@ -340,6 +340,238 @@ namespace chess
 	std::istream& operator>>(std::istream& _ostr, Rank& _value);
 
 	/**
+	 * @brief Holds an offset as a delta rank, delta file pair.
+	*/
+	class Offset
+	{
+	public:
+		using rep = int8_t;
+
+		constexpr rep delta_rank() const noexcept { return this->dr_; };
+		constexpr rep delta_file() const noexcept { return this->df_; };
+
+		constexpr Offset operator-() const noexcept
+		{
+			return Offset(-this->df_, -this->dr_);
+		};
+
+		friend constexpr inline Offset operator+(const Offset& lhs, const Offset& rhs) noexcept
+		{
+			return Offset
+			(
+				lhs.delta_file() + rhs.delta_file(),
+				lhs.delta_rank() + rhs.delta_rank()
+			);
+		};
+		friend constexpr inline Offset& operator+=(Offset& lhs, const Offset& rhs) noexcept
+		{
+			lhs.df_ += rhs.df_;
+			lhs.dr_ += rhs.dr_;
+			return lhs;
+		};
+		friend constexpr inline Offset operator-(const Offset& lhs, const Offset& rhs) noexcept
+		{
+			return Offset
+			(
+				lhs.delta_file() - rhs.delta_file(),
+				lhs.delta_rank() - rhs.delta_rank()
+			);
+		};
+		friend constexpr inline Offset& operator-=(Offset& lhs, const Offset& rhs) noexcept
+		{
+			lhs.df_ -= rhs.df_;
+			lhs.dr_ -= rhs.dr_;
+			return lhs;
+		};
+
+		constexpr Offset() = default;
+		constexpr Offset(rep _deltaFile, rep _deltaRank) noexcept :
+			df_(_deltaFile), dr_(_deltaRank)
+		{};
+
+	private:
+		rep df_ : 4;
+		rep dr_ : 4;
+	};
+
+
+
+
+	enum class DirectionBit : uint8_t
+	{
+		n = 0,
+
+		u = 0b0001,
+		l = 0b0010,
+		d = 0b0100,
+		r = 0b1000,
+
+		ul = 0b0011,
+		dl = 0b0110,
+		dr = 0b1100,
+		ur = 0b1001,
+	};
+	constexpr DirectionBit operator|(DirectionBit lhs, DirectionBit rhs)
+	{
+		return DirectionBit(jc::to_underlying(lhs) | jc::to_underlying(rhs));
+	};
+	constexpr DirectionBit operator&(DirectionBit lhs, DirectionBit rhs)
+	{
+		return DirectionBit(jc::to_underlying(lhs) & jc::to_underlying(rhs));
+	};
+
+
+
+
+	/**
+	 * @brief Holds a direction as a pos/neg rank/file pair.
+	*/
+	class Direction
+	{
+	public:
+
+		using Dir = DirectionBit;
+		using enum DirectionBit;
+
+	private:
+
+		constexpr static DirectionBit make_dir(int8_t df, int8_t dr)
+		{
+			auto fDir = Dir{};
+			auto rDir = Dir{};
+
+			if (df < 0)
+			{
+				fDir = Dir::l;
+			}
+			else if (df > 0)
+			{
+				fDir = Dir::r;
+			};
+
+			if (dr < 0)
+			{
+				rDir = Dir::d;
+			}
+			else if (dr > 0)
+			{
+				rDir = Dir::u;
+			};
+
+			return rDir | fDir;
+		};
+		constexpr static DirectionBit opposite(DirectionBit _dir)
+		{
+			switch (_dir)
+			{
+			case Dir::n: return Dir::n;
+			case Dir::d: return Dir::u;
+			case Dir::u: return Dir::d;
+			case Dir::l: return Dir::r;
+			case Dir::r: return Dir::l;
+			case Dir::dl: return Dir::ur;
+			case Dir::dr: return Dir::ul;
+			case Dir::ul: return Dir::dr;
+			case Dir::ur: return Dir::dl;
+			};
+		};
+
+	public:
+		using rep = uint8_t;
+
+		constexpr int8_t delta_rank() const
+		{
+			switch (this->dir_)
+			{
+			case Dir::u: [[fallthrough]];
+			case Dir::ul: [[fallthrough]];
+			case Dir::ur:
+				return 1;
+			case Dir::d: [[fallthrough]];
+			case Dir::dl: [[fallthrough]];
+			case Dir::dr:
+				return -1;
+			default:
+				return 0;
+			};
+		};
+		constexpr int8_t delta_file() const
+		{
+			switch (this->dir_)
+			{
+			case Dir::l: [[fallthrough]];
+			case Dir::ul: [[fallthrough]];
+			case Dir::dl:
+				return -1;
+			case Dir::r: [[fallthrough]];
+			case Dir::ur: [[fallthrough]];
+			case Dir::dr:
+				return 1;
+			default:
+				return 0;
+			};
+		};
+
+		constexpr bool pos_rank() const noexcept
+		{
+			return (this->dir_ & Dir::u) != Dir::n;
+		};
+		constexpr bool pos_file() const noexcept
+		{
+			return (this->dir_ & Dir::r) != Dir::n;
+		};
+		constexpr bool neg_rank() const noexcept
+		{
+			return (this->dir_ & Dir::d) != Dir::n;
+		};
+		constexpr bool neg_file() const noexcept
+		{
+			return (this->dir_ & Dir::l) != Dir::n;
+		};
+
+		constexpr Offset offset(int8_t _count) const noexcept
+		{
+			return Offset(this->delta_file() * _count, this->delta_rank() * _count);
+		};
+		constexpr Offset offset() const noexcept
+		{
+			return Offset(this->delta_file(), this->delta_rank());
+		};
+
+		constexpr Direction operator-() const noexcept
+		{
+			return Direction(this->opposite(this->dir_));
+		};
+
+		constexpr operator Dir() const noexcept
+		{
+			return this->dir_;
+		};
+
+		constexpr operator Offset() const noexcept
+		{
+			return this->offset();
+		};
+
+		constexpr Direction() = default;
+		constexpr Direction(Dir _dir) noexcept :
+			dir_(_dir)
+		{};
+		constexpr Direction(int8_t _fileOff, int8_t _rankOff) noexcept :
+			Direction(make_dir(_fileOff, _rankOff))
+		{};
+		constexpr Direction(const Offset& _offset) noexcept :
+			Direction(make_dir(_offset.delta_file(), _offset.delta_rank()))
+		{};
+
+	private:
+
+		Dir dir_;
+	};
+
+
+
+	/**
 	 * @brief Holds a position on a chess board as a file/rank pair
 	*/
 	class Position
@@ -379,6 +611,40 @@ namespace chess
 		constexpr bool operator==(const Position& rhs) const noexcept = default;
 		constexpr bool operator!=(const Position& rhs) const noexcept = default;
 
+		friend constexpr inline bool operator==(const Position& lhs, File rhs) noexcept
+		{
+			return lhs.file() == rhs;
+		};
+		friend constexpr inline bool operator==(const Position& lhs, Rank rhs) noexcept
+		{
+			return lhs.rank() == rhs;
+		};
+		friend constexpr inline bool operator==(File lhs, const Position& rhs) noexcept
+		{
+			return lhs == rhs.file();
+		};
+		friend constexpr inline bool operator==(Rank lhs, const Position& rhs) noexcept
+		{
+			return lhs == rhs.rank();
+		};
+
+		friend constexpr inline bool operator!=(const Position& lhs, File rhs) noexcept
+		{
+			return lhs.file() != rhs;
+		};
+		friend constexpr inline bool operator!=(const Position& lhs, Rank rhs) noexcept
+		{
+			return lhs.rank() != rhs;
+		};
+		friend constexpr inline bool operator!=(File lhs, const Position& rhs) noexcept
+		{
+			return lhs != rhs.file();
+		};
+		friend constexpr inline bool operator!=(Rank lhs, const Position& rhs) noexcept
+		{
+			return lhs != rhs.rank();
+		};
+
 		constexpr Position() noexcept = default;
 		constexpr Position(File _file, Rank _rank) noexcept :
 			pos_(concat(_file, _rank))
@@ -402,6 +668,51 @@ namespace chess
 
 		uint8_t pos_;
 	};
+
+	constexpr Offset operator-(const Position& lhs, const Position& rhs) noexcept
+	{
+		return Offset
+		(
+			jc::to_underlying(lhs.file()) - jc::to_underlying(rhs.file()),
+			jc::to_underlying(lhs.rank()) - jc::to_underlying(rhs.rank())
+		);
+	};
+	
+	constexpr Position operator+(const Position& lhs, const Offset& rhs) noexcept
+	{
+		return Position
+		(
+			lhs.file() + rhs.delta_file(),
+			lhs.rank() + rhs.delta_rank()
+		);
+	};
+	constexpr Position operator+(const Offset& lhs, const Position& rhs) noexcept
+	{
+		return Position
+		(
+			rhs.file() + lhs.delta_file(),
+			rhs.rank() + lhs.delta_rank()
+		);
+	};
+
+	constexpr Position operator-(const Position& lhs, const Offset& rhs) noexcept
+	{
+		return Position
+		(
+			lhs.file() - rhs.delta_file(),
+			lhs.rank() - rhs.delta_rank()
+		);
+	};
+	constexpr Position operator-(const Offset& lhs, const Position& rhs) noexcept
+	{
+		return Position
+		(
+			rhs.file() - lhs.delta_file(),
+			rhs.rank() - lhs.delta_rank()
+		);
+	};
+
+
 
 	constexpr inline auto positions_v = ([]()
 		{
@@ -451,10 +762,10 @@ namespace chess
 	constexpr Position trynext(Position _position, int _dFile, int _dRank, bool& _possible)
 	{
 		const auto _newFile = trynext(_position.file(), _dFile, _possible);
-		if (!_possible) { return _position; };
+		if (!_possible) JCLIB_UNLIKELY { return _position; };
 
 		const auto _newRank = trynext(_position.rank(), _dRank, _possible);
-		if (!_possible) { return _position; };
+		if (!_possible) JCLIB_UNLIKELY { return _position; };
 
 		return Position(_newFile, _newRank);
 	};

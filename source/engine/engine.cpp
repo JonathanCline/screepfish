@@ -23,12 +23,8 @@ namespace sch
 	{
 		using namespace chess;
 
-		auto _tree = chess::MoveTree();
-		_tree.board = _board;
-		for (int n = 0; n != _depth; ++n)
-		{
-			_tree.evalulate_next();
-		};
+		auto _tree = chess::MoveTree(_board);
+		_tree.build_tree((size_t)_depth);
 
 		return _tree;
 	};
@@ -108,7 +104,7 @@ namespace sch
 					const auto& _myColor = this->my_color_;
 					
 					const size_t _pieceCount = _board.pieces().size();
-					auto _depth = 5;
+					auto _depth = 4;
 
 					// Bump depth as many moves will be discarded
 					const bool _isCheck = is_check(_board, _myColor);
@@ -183,7 +179,19 @@ namespace sch
 							{
 								const auto _path = _dirPath / ("line" + std::to_string(_lineN++) + ".txt");
 								auto _file = std::ofstream(_path);
+								
+								_file << *_move << " = " << _move->rating() << '\n';
+
 								auto b = _board;
+								for (auto& v : _line)
+								{
+									b.move(v);
+									_file << v << '\n';
+									_file << v.rating() << '\n';
+								};
+								_file << '\n' << '\n';
+								
+								b = _board;
 								for (auto& v : _line)
 								{
 									b.move(v);

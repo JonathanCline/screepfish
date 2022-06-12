@@ -1,5 +1,7 @@
 #include "chess.hpp"
 
+#include "fen.hpp"
+
 #include <istream>
 #include <ostream>
 #include <string>
@@ -8,6 +10,12 @@
 
 namespace chess
 {
+	std::ostream& operator<<(std::ostream& _ostr, const Piece& p)
+	{
+		const auto c = piece_to_char(p);
+		_ostr.put(c);
+		return _ostr;
+	};
 
 	std::ostream& operator<<(std::ostream& _ostr, const PieceMove& _value)
 	{

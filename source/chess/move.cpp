@@ -12,7 +12,7 @@ namespace chess
 		constexpr auto BLOCKED_BISHOP_RATING = 0.001f;
 		constexpr auto PAWN_PUSH_RATING = 0.001f;
 		constexpr auto CASTLE_ABILITY_RATING = 0.001f;
-		constexpr auto DEVELOPMENT_RATING = 0.0005f;
+		constexpr auto DEVELOPMENT_RATING = 0.005f;
 	};
 
 
@@ -245,6 +245,7 @@ namespace chess
 
 
 
+
 	bool is_piece_attacked_by_pawn(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
 	{
 		using namespace chess;
@@ -258,7 +259,6 @@ namespace chess
 	bool is_piece_attacked_by_knight(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
 	{
 		using namespace chess;
-		
 		const auto _attackBB = get_knight_attack_squares(_byPiece.position());
 		return _attackBB.test(_piece.position());
 	};
@@ -266,25 +266,22 @@ namespace chess
 	{
 		using namespace chess;
 
+		// Calculate the offset from the piece to the bishop.
 		const auto _position = _byPiece.position();
-		constexpr auto _directionPairs = std::array
-		{
-			std::pair{  1,  1 },
-			std::pair{ -1,  1 },
-			std::pair{  1, -1 },
-			std::pair{ -1, -1 },
-		};
+		const auto _offset = _piece.position() - _position;
 
-		for (const auto& _direction : _directionPairs)
+		// If both are the same magnitude then the bishop is on the same diagonal.
+		if (abs(_offset.delta_file()) == abs(_offset.delta_rank()))
 		{
-			auto [df, dr] = _direction;
+			const auto _dir = Offset(Direction(_offset));
+
 			auto f = _byPiece.file();
 			auto r = _byPiece.rank();
 
 			while (true)
 			{
-				f += df;
-				r += dr;
+				f += _dir.delta_file();
+				r += _dir.delta_rank();
 				if (f > File::h || r > Rank::r8)
 				{
 					break;
@@ -301,6 +298,7 @@ namespace chess
 				};
 			};
 		};
+
 		return false;
 	};
 	bool is_piece_attacked_by_rook(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
@@ -308,6 +306,14 @@ namespace chess
 		using namespace chess;
 
 		const auto _position = _byPiece.position();
+		const auto _offset = _piece.position() - _position;
+
+		if (!((_offset.delta_rank() == 0) ^ (_offset.delta_file() == 0)))
+		{
+			// Not on same file / rank
+			return false;
+		};
+
 		constexpr auto _directionPairs = std::array
 		{
 			std::pair{  0,  1 },
@@ -382,16 +388,9 @@ namespace chess
 						return true;
 					};
 
-					if (_board.has_friendy_piece(_nextPosition, _byPiece.color()))
+					if (!_board.is_empty(_nextPosition))
 					{
 						break;
-					}
-					else
-					{
-						if (_board.has_enemy_piece(_nextPosition, _byPiece.color()))
-						{
-							break;
-						};
 					};
 				}
 				else
@@ -411,26 +410,95 @@ namespace chess
 		return (fd <= 1 && rd <= 1);
 	};
 
-	bool is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece)
+	bool is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece, bool _inCheck)
+	{
+		std::array<Move, 64> _data{};
+		auto _buffer = MoveBuffer(_data);
+		const auto bp = _buffer.head();
+
+		get_piece_attacked_from_moves(_board, _piece, _buffer, _inCheck);
+		if (_buffer.head() != bp)
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		};
+	};
+
+
+
+	void get_piece_attacks_with_pawn(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece, MoveBuffer& _buffer)
+	{
+		if (is_piece_attacked_by_pawn(_board, _piece, _byPiece))
+		{
+			_buffer.write(_byPiece.position(), _piece.position());
+		};
+	};
+	void get_piece_attacks_with_knight(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece, MoveBuffer& _buffer)
+	{
+		if (is_piece_attacked_by_knight(_board, _piece, _byPiece))
+		{
+			_buffer.write(_byPiece.position(), _piece.position());
+		};
+	};
+	void get_piece_attacks_with_bishop(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece, MoveBuffer& _buffer)
+	{
+		if (is_piece_attacked_by_bishop(_board, _piece, _byPiece))
+		{
+			_buffer.write(_byPiece.position(), _piece.position());
+		};
+	};
+	void get_piece_attacks_with_rook(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece, MoveBuffer& _buffer)
+	{
+		if (is_piece_attacked_by_rook(_board, _piece, _byPiece))
+		{
+			_buffer.write(_byPiece.position(), _piece.position());
+		};
+	};
+	void get_piece_attacks_with_queen(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece, MoveBuffer& _buffer)
+	{
+		if (is_piece_attacked_by_queen(_board, _piece, _byPiece))
+		{
+			_buffer.write(_byPiece.position(), _piece.position());
+		};
+	};
+	void get_piece_attacks_with_king(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece, MoveBuffer& _buffer)
+	{
+		if (is_piece_attacked_by_king(_board, _piece, _byPiece))
+		{
+			_buffer.write(_byPiece.position(), _piece.position());
+		};
+	};
+
+	void get_piece_attacked_from_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _outBuffer, bool _inCheck)
 	{
 		using namespace chess;
 
+		std::array<Move, 32> _bufferData{};
+		MoveBuffer _buffer{ _bufferData.data(), _bufferData.data() + _bufferData.size() };
+		const auto bb = _buffer.head();
+
+		// Quicker pawn check
 		if (_piece.color() == Color::white)
 		{
 			if (_piece.rank() < Rank::r7)
 			{
 				if (_piece.file() != File::a)
 				{
-					if (_board.get(next(_piece.position(), -1, 1)) == Piece(Piece::pawn, Color::black))
+					const auto np = next(_piece.position(), -1, 1);
+					if (_board.get(np) == Piece(Piece::pawn, Color::black))
 					{
-						return true;
+						_buffer.write(np, _piece.position());
 					};
 				};
 				if (_piece.file() != File::h)
 				{
-					if (_board.get(next(_piece.position(), 1, 1)) == Piece(Piece::pawn, Color::black))
+					const auto np = next(_piece.position(), 1, 1);
+					if (_board.get(np) == Piece(Piece::pawn, Color::black))
 					{
-						return true;
+						_buffer.write(np, _piece.position());
 					};
 				};
 			};
@@ -441,16 +509,18 @@ namespace chess
 			{
 				if (_piece.file() != File::a)
 				{
-					if (_board.get(next(_piece.position(), -1, -1)) == Piece(Piece::pawn, Color::white))
+					const auto np = next(_piece.position(), -1, -1);
+					if (_board.get(np) == Piece(Piece::pawn, Color::white))
 					{
-						return true;
+						_buffer.write(np, _piece.position());
 					};
 				};
 				if (_piece.file() != File::h)
 				{
-					if (_board.get(next(_piece.position(), 1, -1)) == Piece(Piece::pawn, Color::white))
+					const auto np = next(_piece.position(), 1, -1);
+					if (_board.get(np) == Piece(Piece::pawn, Color::white))
 					{
-						return true;
+						_buffer.write(np, _piece.position());
 					};
 				};
 			};
@@ -465,42 +535,42 @@ namespace chess
 				switch (p.type())
 				{
 				case PieceType::knight:
-					if (is_piece_attacked_by_knight(_board, _piece, p))
-					{
-						return true;
-					};
+					get_piece_attacks_with_knight(_board, _piece, p, _buffer);
 					break;
 				case PieceType::bishop:
-					if (is_piece_attacked_by_bishop(_board, _piece, p))
-					{
-						return true;
-					};
+					get_piece_attacks_with_bishop(_board, _piece, p, _buffer);
 					break;
 				case PieceType::rook:
-					if (is_piece_attacked_by_rook(_board, _piece, p))
-					{
-						return true;
-					};
+					get_piece_attacks_with_rook(_board, _piece, p, _buffer);
 					break;
 				case PieceType::queen:
-					if (is_piece_attacked_by_queen(_board, _piece, p))
-					{
-						return true;
-					};
+					get_piece_attacks_with_queen(_board, _piece, p, _buffer);
 					break;
 				case PieceType::king:
-					if (is_piece_attacked_by_king(_board, _piece, p))
-					{
-						return true;
-					};
+					get_piece_attacks_with_king(_board, _piece, p, _buffer);
+					break;
+				case PieceType::pawn:
+					get_piece_attacks_with_pawn(_board, _piece, p, _buffer);
 					break;
 				default:
 					break;
 				};
 			};
 		};
-		return false;
+
+		const auto be = _buffer.head();
+		for (auto bp = bb; bp != be; ++bp)
+		{
+			auto b = _board;
+			b.move(*bp);
+
+			if (_piece.type() == Piece::king || !is_check(b, !_piece.color()))
+			{
+				_outBuffer.write(*bp);
+			};
+		};
 	};
+
 
 
 
@@ -548,7 +618,7 @@ namespace chess
 
 			if (_board.is_empty(_newPosOne))
 			{
-				if (_newPosOne.rank() == Rank::r8 || _newPosOne.rank() == Rank::r1)
+				if (!_doubleDeltaRank && (_newPosOne.rank() == Rank::r8 || _newPosOne.rank() == Rank::r1))
 				{
 					_buffer.write(Move(_position, _newPosOne, PieceType::bishop));
 					_buffer.write(Move(_position, _newPosOne, PieceType::rook));
@@ -681,6 +751,7 @@ namespace chess
 			std::pair{ -1,  0 },
 			std::pair{ -1,  1 },
 			std::pair{  0, -1 },
+
 			std::pair{  0,  1 },
 			std::pair{  1, -1 },
 			std::pair{  1,  0 },
@@ -696,7 +767,7 @@ namespace chess
 			};
 		};
 
-		if (_board.get_castle_kingside_flag(_piece.color()))
+		if (can_castle_kingside(_board, _piece.color()))
 		{
 			Position _dest{};
 			if (_piece.color() == Color::white)
@@ -707,15 +778,9 @@ namespace chess
 			{
 				_dest = Position(File::g, Rank::r8);
 			};
-
-			if (_board.is_empty((File::f, _dest.rank()))
-				&& _board.is_empty((File::g, _dest.rank()))
-				&& can_castle_kingside(_board, _piece.color()))
-			{
-				_buffer.write(_position, _dest);
-			};
+			_buffer.write(_position, _dest);
 		}
-		if (_board.get_castle_queenside_flag(_piece.color()))
+		if (can_castle_queenside(_board, _piece.color()))
 		{
 			Position _dest{};
 			if (_piece.color() == Color::white)
@@ -726,14 +791,7 @@ namespace chess
 			{
 				_dest = Position(File::c, Rank::r8);
 			};
-
-			if (_board.is_empty((File::d, _dest.rank()))
-				&& _board.is_empty((File::c, _dest.rank()))
-				&& _board.is_empty((File::b, _dest.rank()))
-				&& can_castle_queenside(_board, _piece.color()))
-			{
-				_buffer.write(_position, _dest);
-			};
+			_buffer.write(_position, _dest);
 		};
 	};
 	void get_bishop_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer, const bool _isCheck)
@@ -869,23 +927,98 @@ namespace chess
 			return false;
 		};
 
-		if (is_check(_board, _player))
+		// Check the squares that castling would occur across.
 		{
-			return false;
+			auto _checkSquares = std::array<Position, 2>{};
+			if (_player == Color::white)
+			{
+				_checkSquares[0] = (File::f, Rank::r1);
+				_checkSquares[1] = (File::g, Rank::r1);
+			}
+			else
+			{
+				_checkSquares[0] = (File::f, Rank::r8);
+				_checkSquares[1] = (File::g, Rank::r8);
+			};
+
+			// Cannot castle through other pieces.
+			for (auto& v : _checkSquares)
+			{
+				if (!_board.is_empty(v))
+				{
+					return false;
+				};
+			};
+
+			// Cannot castle out of check
+			if (is_check(_board, _player))
+			{
+				return false;
+			};
+
+			// Cannot castle through / into check
+			for (auto& v : _checkSquares)
+			{
+				auto b = _board;
+				b.move(b.get_king(_player).position(), v);
+				if (is_check(b, _player))
+				{
+					return false;
+				};
+			};
 		};
 
 		return true;
 	};
 	bool can_castle_queenside(const chess::Board& _board, chess::Color _player)
 	{
-		if (!_board.get_castle_kingside_flag(_player))
+		if (!_board.get_castle_queenside_flag(_player))
 		{
 			return false;
 		};
 
-		if (is_check(_board, _player))
+		// Check the squares that castling would occur across.
 		{
-			return false;
+			auto _checkSquares = std::array<Position, 3>{};
+			if (_player == Color::white)
+			{
+				_checkSquares[0] = (File::d, Rank::r1);
+				_checkSquares[1] = (File::c, Rank::r1);
+				_checkSquares[2] = (File::b, Rank::r1);
+			}
+			else
+			{
+				_checkSquares[0] = (File::d, Rank::r8);
+				_checkSquares[1] = (File::c, Rank::r8);
+				_checkSquares[2] = (File::b, Rank::r8);
+			};
+
+			// Cannot castle through other pieces.
+			for (auto& v : _checkSquares)
+			{
+				if (!_board.is_empty(v))
+				{
+					return false;
+				};
+			};
+
+			// Cannot castle out of check
+			if (is_check(_board, _player))
+			{
+				return false;
+			};
+
+			// Cannot castle through / into check
+			for (size_t n = 0; n != 2; ++n)
+			{
+				auto& v = _checkSquares[n];
+				auto b = _board;
+				b.move(b.get_king(_player).position(), v);
+				if (is_check(b, _player))
+				{
+					return false;
+				};
+			};
 		};
 
 		return true;
@@ -1172,17 +1305,37 @@ namespace chess
 	{
 		using namespace chess;
 
-		auto p = _board.pfind(chess::PieceType::king, _forPlayer);
-		if (p != _board.pend())
+		const auto& p = _board.get_king(_forPlayer);
+
+		if (p)
 		{
 			// Quick check that an enemy pieces is in one of the threat positions
-			auto _threatPositions = BitBoard(get_threat_positions(p->position()));
+			auto _threatPositions = BitBoard(get_threat_positions(p.position()));
+
+			// Grab the friendly positions
+			//const auto _friendlyPositions = (_forPlayer == Color::white) ?
+			//	_board.get_white_piece_bitboard() :
+			//	_board.get_black_piece_bitboard();
+
+			// Grab the enemy positions
+			//const auto _enemyPositions = (_forPlayer == Color::black) ?
+			//	_board.get_white_piece_bitboard() :
+			//	_board.get_black_piece_bitboard();
+
+
+
+			// Remove the enemy king as it will never be a threat
+			_threatPositions.reset(_board.get_king(!_forPlayer).position());
+
 			if (_forPlayer == Color::white)
 			{
 				// If a piece is directly above us, remove the whole file above the king
-				if (p->rank() != Rank::r8 && _board.has_friendy_piece(next(p->position(), 0, 1), _forPlayer))
+				if (p.rank() != Rank::r8)
 				{
-					_threatPositions &= ~make_file_bits(p->file(), p->rank(), Rank::r8);
+					if (_board.has_friendy_piece(next(p.position(), 0, 1), _forPlayer))
+					{
+						_threatPositions &= ~make_file_bits(p.file(), p.rank(), Rank::r8);
+					};
 				};
 
 				auto _threats = _threatPositions & _board.get_black_piece_bitboard();
@@ -1196,11 +1349,11 @@ namespace chess
 			else
 			{
 				// If a piece is directly below us, remove the whole file below the king
-				if (p->rank() != Rank::r1 && _board.has_friendy_piece(next(p->position(), 0, -1), _forPlayer))
+				if (p.rank() != Rank::r1 && _board.has_friendy_piece(next(p.position(), 0, -1), _forPlayer))
 				{
-					_threatPositions &= ~make_file_bits(p->file(), Rank::r1, p->rank());
+					_threatPositions &= ~make_file_bits(p.file(), Rank::r1, p.rank());
 				};
-				_board.pieces_on_file(p->file());
+				_board.pieces_on_file(p.file());
 
 				auto _threats = _threatPositions & _board.get_white_piece_bitboard();
 				if (_threats.none())
@@ -1211,10 +1364,12 @@ namespace chess
 				};
 			};
 
-			return is_piece_attacked(_board, *p);
+			return is_piece_attacked(_board, p);
 		};
 		return true;
 	};
+
+
 	bool is_checkmate(const chess::Board& _board, const chess::Color _forPlayer)
 	{
 		using namespace chess;
@@ -1267,6 +1422,8 @@ namespace chess
 			return 10.0f;
 		case chess::PieceType::king:
 			return 1000.0f;
+		default:
+			SCREEPFISH_UNREACHABLE;
 		};
 	};
 
@@ -1310,56 +1467,10 @@ namespace chess
 	constexpr inline auto white_pawn_promote_rating_v = make_pawn_promote_ratings(white_distance_to_promote_v);
 	constexpr inline auto black_pawn_promote_rating_v = make_pawn_promote_ratings(black_distance_to_promote_v);
 
-	struct AbsoluteRating
-	{
-	public:
-		using rep = Rating;
-
-		constexpr rep white() const noexcept
-		{
-			return this->val_;
-		};
-		constexpr rep black() const noexcept
-		{
-			return -this->val_;
-		};
-		constexpr rep relative(Color _col) const
-		{
-			if (_col == Color::white)
-			{
-				return this->white();
-			}
-			else
-			{
-				return this->black();
-			};
-		};
-
-		constexpr AbsoluteRating& operator+=(Rating rhs)
-		{
-			this->val_ += rhs;
-			return *this;
-		};
-		constexpr AbsoluteRating& operator-=(Rating rhs)
-		{
-			this->val_ -= rhs;
-			return *this;
-		};
-
-		constexpr AbsoluteRating() = default;
-		constexpr AbsoluteRating(rep _value) noexcept :
-			val_(_value)
-		{};
-
-	private:
-		rep val_;
-	};
-
-
 
 
 	template <chess::Color Player>
-	chess::Rating rate_board(const chess::Board& _board)
+	inline chess::Rating rate_board_for(const chess::Board& _board)
 	{
 		using namespace chess;
 
@@ -1373,10 +1484,18 @@ namespace chess
 
 		auto _rating = Rating(0);
 
+		// Checkmate
+
+		if (is_checkmate(_board, Player))
+		{
+			return -checkmate_rating_v;
+		};
 		if (is_checkmate(_board, !Player))
 		{
 			return checkmate_rating_v;
 		};
+
+		// Castling ability
 
 		if (_board.get_castle_kingside_flag(Player))
 		{
@@ -1394,6 +1513,8 @@ namespace chess
 		{
 			_rating -= castle_ability_rating_v;
 		};
+
+		// Material value + Positional value
 
 		const auto _pEnd = _board.pend();
 		for (auto it = _board.pbegin(); it != _pEnd; ++it)
@@ -1510,6 +1631,30 @@ namespace chess
 			};
 			break;
 
+			case Piece::white_king:
+			{
+				if constexpr (Player == Color::white)
+				{
+					_rating += material_value(Piece::king);
+				}
+				else
+				{
+					_rating -= material_value(Piece::king);
+				};
+			};
+			break; 
+			case Piece::black_king:
+			{
+				if constexpr (Player == Color::white)
+				{
+					_rating -= material_value(Piece::king);
+				}
+				else
+				{
+					_rating += material_value(Piece::king);
+				};
+			};
+			break;
 			default:
 				break;
 			};
@@ -1524,22 +1669,38 @@ namespace chess
 		return _rating;
 	};
 
-	chess::Rating rate_board(const chess::Board& _board, chess::Color _forPlayer)
+	
+	template <chess::Color Player>
+	inline AbsoluteRating rate_board(const chess::Board& _board)
+	{
+		return AbsoluteRating(rate_board_for<Player>(_board), Player);
+	};
+
+
+
+
+
+
+	Rating quick_rate(const chess::Board& _board, chess::Color _forPlayer)
 	{
 		using namespace chess;
 		if (_forPlayer == Color::white)
 		{
-			return rate_board<Color::white>(_board);
+			return rate_board_for<Color::white>(_board);
 		}
 		else
 		{
-			return rate_board<Color::black>(_board);
+			return rate_board_for<Color::black>(_board);
 		};
 	};
 
-	chess::Rating rate_move(const chess::Board& _board, const chess::Move& _move, chess::Color _forPlayer, const bool _isCheck)
+	AbsoluteRating quick_rate(const chess::Board& _board)
 	{
-		return rate_board(_board, _forPlayer);
+		// Temporary easy peasy quick rate
+		return AbsoluteRating(rate_board_for<Color::white>(_board));
 	};
+
+
+
 
 };
