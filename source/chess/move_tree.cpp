@@ -37,9 +37,31 @@ namespace chess
 	};
 
 
-
-	void MoveTreeNode::evaluate_next(const Board& _previousBoard, bool _followChecks)
+	template <size_t Max = 128>
+	inline auto fill_possible_moves_buffer(const Board& _board, std::array<Move, Max>& _bufferData)
 	{
+		// Get the possible responses
+		auto _moveBuffer = MoveBuffer
+		(
+			_bufferData.data(),
+			_bufferData.data() + _bufferData.size()
+		);
+		
+		const auto _moveBegin = _moveBuffer.head();
+		const auto _opponentColor = _board.get_toplay();
+		get_moves(_board, _opponentColor, _moveBuffer);
+		return _moveBuffer.head();
+	};
+
+
+
+	void MoveTreeNode::evaluate_next(const Board& _previousBoard, const MoveTreeProfile& _profile)
+	{
+		// Profile aliasing
+		const auto& _followChecks = _profile.follow_checks_;
+		const auto& _followCaptures = _profile.follow_captures_;
+
+
 		// Apply our move.
 		auto _board = _previousBoard;
 		const auto _myColor = _board.get_toplay();
@@ -49,31 +71,36 @@ namespace chess
 		{
 			// Get the possible responses
 			std::array<Move, 128> _moveBufferData{};
-			auto _moveBuffer = MoveBuffer(_moveBufferData.data(), _moveBufferData.data() + _moveBufferData.size());
-			const auto _moveBegin = _moveBuffer.head();
+			const auto _moveBegin = _moveBufferData.data();
+			const auto _moveEnd = fill_possible_moves_buffer(_board, _moveBufferData);
 			const auto _opponentColor = _board.get_toplay();
-			get_moves(_board, _opponentColor, _moveBuffer);
-			const auto _moveEnd = _moveBuffer.head();
 
 			// Rate and add to the child nodes
 			this->resize(_moveEnd - _moveBegin);
 			auto it = this->begin();
 			for (auto p = _moveBegin; p != _moveEnd; ++p)
 			{
-				// Rate the move
+				// Apply the move to the board with our move played.
+				const auto& _move = *p;
 				auto _newBoard = _board;
-				_newBoard.move(*p);
+				_newBoard.move(_move);
+
+				// Lightning fast rating.
 				const auto _rating = quick_rate(_newBoard, _opponentColor);
 
 				// Assign values
 				it->move = RatedMove{ *p, _rating };
 				it->rating_ = _rating;
 
-				//it->hash = _hash;
-
-				if (_followChecks && is_check(_newBoard, _myColor))
+				// Follow captures if set.
+				if (_followCaptures && is_piece_capture(_board, _move))
 				{
-					it->evaluate_next(_board, false);
+					it->evaluate_next(_board, _profile);
+				}
+				// Follow checks if set.
+				else if (_followChecks && is_check(_newBoard, _myColor))
+				{
+					it->evaluate_next(_board, _profile);
 				};
 
 				// Next
@@ -88,12 +115,16 @@ namespace chess
 			// Propogate to children
 			for (auto& _child : *this)
 			{
-				_child.evaluate_next(_board, _followChecks);
+				_child.evaluate_next(_board, _profile);
 			};
 		};
 	};
-	void MoveTreeNode::evaluate_next(const Board& _previousBoard, BoardHashSet& _hashSet, bool _followChecks)
+	void MoveTreeNode::evaluate_next(const Board& _previousBoard, BoardHashSet& _hashSet, const MoveTreeProfile& _profile)
 	{
+		// Profile aliasing
+		const auto& _followChecks = _profile.follow_checks_;
+		const auto& _followCaptures = _profile.follow_captures_;
+
 		// Apply our move.
 		const auto& _myMove = this->move;
 		auto _board = _previousBoard;
@@ -104,21 +135,20 @@ namespace chess
 		{
 			// Get the possible responses
 			std::array<Move, 128> _moveBufferData{};
-			auto _moveBuffer = MoveBuffer(_moveBufferData.data(), _moveBufferData.data() + _moveBufferData.size());
-			const auto _moveBegin = _moveBuffer.head();
+			const auto _moveBegin = _moveBufferData.data();
+			const auto _moveEnd = fill_possible_moves_buffer(_board, _moveBufferData);
 			const auto _opponentColor = _board.get_toplay();
-			get_moves(_board, _opponentColor, _moveBuffer);
-			const auto _moveEnd = _moveBuffer.head();
 
 			// Rate and add to the child nodes
 			this->resize(_moveEnd - _moveBegin);
 			auto it = this->begin();
 			for (auto p = _moveBegin; p != _moveEnd; ++p)
 			{
-				// Rate the move
+				// Apply the move to the board with our move played.
+				const auto& _move = *p;
 				auto _newBoard = _board;
-				_newBoard.move(*p);
-				
+				_newBoard.move(_move);
+
 				// Ensure this is a unique position.
 				const auto h = hash(_newBoard, _newBoard.get_toplay() == Color::black);
 				if (_hashSet.contains(h))
@@ -130,18 +160,23 @@ namespace chess
 				{
 					_hashSet.insert(h);
 				};
-				
+
+				// Lightning fast rating.
 				const auto _rating = quick_rate(_newBoard, _opponentColor);
 
 				// Assign values
 				it->move = RatedMove{ *p, _rating };
 				it->rating_ = _rating;
 
-				//it->hash = _hash;
-
-				if (_followChecks && is_check(_newBoard, _myColor))
+				// Follow captures if set.
+				if (_followCaptures && is_piece_capture(_board, _move))
 				{
-					it->evaluate_next(_board, false);
+					it->evaluate_next(_board, _profile);
+				}
+				// Follow checks if set.
+				else if (_followChecks && is_check(_newBoard, _myColor))
+				{
+					it->evaluate_next(_board, _profile);
 				};
 
 				// Next
@@ -159,7 +194,7 @@ namespace chess
 			// Propogate to children
 			for (auto& _child : *this)
 			{
-				_child.evaluate_next(_board, _hashSet, _followChecks);
+				_child.evaluate_next(_board, _hashSet, _profile);
 			};
 		};
 	};
@@ -250,11 +285,8 @@ namespace chess
 
 
 
-
-
-	void MoveTree::evaluate_next_unique()
+	void MoveTree::evaluate_next(BoardHashSet* _hashSet, const MoveTreeProfile& _profile)
 	{
-		auto& _hashSet = this->hash_set_;
 		auto& _board = this->board_;
 		auto& _moves = this->moves_;
 
@@ -262,10 +294,8 @@ namespace chess
 		{
 			// Get the possible responses
 			std::array<Move, 128> _moveBufferData{};
-			auto _moveBuffer = MoveBuffer(_moveBufferData.data(), _moveBufferData.data() + _moveBufferData.size());
-			const auto _moveBegin = _moveBuffer.head();
-			get_moves(_board, _board.get_toplay(), _moveBuffer);
-			const auto _moveEnd = _moveBuffer.head();
+			const auto _moveBegin = _moveBufferData.data();
+			const auto _moveEnd = fill_possible_moves_buffer(_board, _moveBufferData);
 
 			// Rate and add to the child nodes
 			_moves.resize(_moveEnd - _moveBegin);
@@ -277,8 +307,11 @@ namespace chess
 				_newBoard.move(*p);
 
 				// Ensure this is registered as unique position
-				const auto h = hash(_newBoard, _newBoard.get_toplay() == Color::black);
-				_hashSet.insert(h);
+				if (_hashSet)
+				{
+					const auto h = hash(_newBoard, _newBoard.get_toplay() == Color::black);
+					_hashSet->insert(h);
+				};
 
 				const auto _rating = quick_rate(_newBoard, _board.get_toplay());
 
@@ -295,59 +328,34 @@ namespace chess
 			// Propogate to children
 			for (auto& _child : _moves)
 			{
-				_child.evaluate_next(_board, _hashSet, false);
-			};
-		};
-
-		++this->depth_counter_;
-	};
-	void MoveTree::evaluate_next()
-	{
-		auto& _board = this->board_;
-		auto& _moves = this->moves_;
-
-		if (_moves.empty())
-		{
-			// Get the possible responses
-			std::array<Move, 128> _moveBufferData{};
-			auto _moveBuffer = MoveBuffer(_moveBufferData.data(), _moveBufferData.data() + _moveBufferData.size());
-			const auto _moveBegin = _moveBuffer.head();
-			get_moves(_board, _board.get_toplay(), _moveBuffer);
-			const auto _moveEnd = _moveBuffer.head();
-
-			// Rate and add to the child nodes
-			_moves.resize(_moveEnd - _moveBegin);
-			auto it = _moves.begin();
-			for (auto p = _moveBegin; p != _moveEnd; ++p)
-			{
-				// Rate the move
-				auto _newBoard = _board;
-				_newBoard.move(*p);
-				const auto _rating = quick_rate(_newBoard, _board.get_toplay());
-
-				// Assign values
-				it->move = RatedMove{ *p, _rating };
-				it->set_rating(_rating);
-
-				// Next
-				++it;
-			};
-		}
-		else
-		{
-			// Propogate to children
-			for (auto& _child : _moves)
-			{
-				_child.evaluate_next(_board, false);
+				if (_hashSet)
+				{
+					_child.evaluate_next(_board, *_hashSet, _profile);
+				}
+				else
+				{
+					_child.evaluate_next(_board, _profile);
+				};
 			};
 		};
 
 		++this->depth_counter_;
 	};
 
-	void MoveTree::evalulate_next()
+	void MoveTree::evaluate_next_unique(const MoveTreeProfile& _profile)
 	{
-		return this->evaluate_next();
+		auto& _hashSet = this->hash_set_;
+		return this->evaluate_next(&_hashSet, _profile);
+	};
+	void MoveTree::evaluate_next(const MoveTreeProfile& _profile)
+	{
+		BoardHashSet* _hashSet = nullptr;
+		return this->evaluate_next(_hashSet, _profile);
+	};
+
+	void MoveTree::evalulate_next(const MoveTreeProfile& _profile)
+	{
+		return this->evaluate_next(_profile);
 	};
 
 

@@ -187,4 +187,22 @@ namespace chess
 	*/
 	AbsoluteRating quick_rate(const chess::Board& _board);
 
+
+
+
+	/**
+	 * @brief Checks if a move will result in a piece being captured.
+	 * 
+	 * Does not check the move for legality.
+	 * Does not handle en-passant.
+	 * 
+	 * @param _board Board that the move will be played on.
+	 * @param _move Move to check.
+	 * @return True if piece would be captured, false otherwise.
+	*/
+	inline bool is_piece_capture(const Board& _board, const Move& _move)
+	{
+		return _board.get(_move.to()) != Piece::none;
+	};
+
 };

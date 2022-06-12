@@ -31,6 +31,15 @@ namespace chess
 	};
 
 
+	struct MoveTreeProfile
+	{
+		bool follow_checks_ = false;
+		bool follow_captures_ = false;
+
+		MoveTreeProfile() = default;
+	};
+
+
 	struct MoveTreeNode
 	{
 	public:
@@ -118,9 +127,9 @@ namespace chess
 		};
 
 		void count_duplicates(Board _board, std::set<size_t>& _boards);
-
-		void evaluate_next(const Board& _previousBoard, BoardHashSet& _hashSet, bool _followChecks = true);
-		void evaluate_next(const Board& _previousBoard, bool _followChecks = true);
+		
+		void evaluate_next(const Board& _previousBoard, BoardHashSet& _hashSet, const MoveTreeProfile& _profile = MoveTreeProfile());
+		void evaluate_next(const Board& _previousBoard, const MoveTreeProfile& _profile = MoveTreeProfile());
 
 
 		size_t tree_size() const;
@@ -149,9 +158,15 @@ namespace chess
 
 	struct MoveTree
 	{
-		void evaluate_next();
-		void evaluate_next_unique();
-		void evalulate_next();
+	private:
+
+		// Common evaluate next function
+		void evaluate_next(BoardHashSet* _hashSet, const MoveTreeProfile& _profile = MoveTreeProfile());
+
+	public:
+		void evaluate_next(const MoveTreeProfile& _profile = MoveTreeProfile());
+		void evaluate_next_unique(const MoveTreeProfile& _profile = MoveTreeProfile());
+		void evalulate_next(const MoveTreeProfile& _profile = MoveTreeProfile());
 
 		std::optional<RatedMove> best_move(std::mt19937& _rnd);
 		size_t tree_size() const;
