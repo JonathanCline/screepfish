@@ -142,7 +142,6 @@ namespace chess
 	};
 
 
-
 	struct MoveTree
 	{
 		void evaluate_next();
