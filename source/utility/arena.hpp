@@ -152,6 +152,14 @@ namespace sch
 			};
 		};
 
+		void soft_resize(size_type _size)
+		{
+			if (this->data_)
+			{
+				this->data_[_size] = value_type{};
+			};
+		};
+
 		reference front()
 		{
 			SCREEPFISH_ASSERT(!this->empty());

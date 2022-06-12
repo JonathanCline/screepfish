@@ -93,6 +93,11 @@ namespace chess
 			this->responses_.resize(_size);
 		};
 
+		void soft_resize(size_type _size)
+		{
+			this->responses_.soft_resize(_size);
+		};
+
 		size_type size() const
 		{
 			return this->responses_.size();

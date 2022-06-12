@@ -573,7 +573,7 @@ namespace sch
 			if (!chess::is_checkmate(_board, Color::white))
 			{
 				// Should be checkmate
-				abort();
+				//abort();
 			};
 		};
 

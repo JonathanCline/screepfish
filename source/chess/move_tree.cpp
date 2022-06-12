@@ -90,9 +90,6 @@ namespace chess
 				_child.evaluate_next(_board, _followChecks);
 			};
 		};
-
-		// Resort children?
-		this->resort_children();
 	};
 	void MoveTreeNode::evaluate_next(const Board& _previousBoard, BoardHashSet& _hashSet, bool _followChecks)
 	{
@@ -151,7 +148,7 @@ namespace chess
 			};
 
 			// Set size to "remove" extra
-			this->resize(it - this->begin());
+			this->soft_resize(it - this->begin());
 
 			// Ensure we are marked as evaluated
 			this->mark_as_evaluated();
@@ -164,9 +161,6 @@ namespace chess
 				_child.evaluate_next(_board, _hashSet, _followChecks);
 			};
 		};
-
-		// Resort children?
-		this->resort_children();
 	};
 
 	size_t MoveTreeNode::tree_size() const
@@ -304,12 +298,6 @@ namespace chess
 			};
 		};
 
-		// Sort children by rating
-		std::ranges::sort(_moves, [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
-			{
-				return lhs.rating() > rhs.rating();
-			});
-
 		++this->depth_counter_;
 	};
 	void MoveTree::evaluate_next()
@@ -352,12 +340,6 @@ namespace chess
 				_child.evaluate_next(_board, false);
 			};
 		};
-
-		// Sort children by rating
-		std::ranges::sort(_moves, [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
-			{
-				return lhs.rating() > rhs.rating();
-			});
 
 		++this->depth_counter_;
 	};
