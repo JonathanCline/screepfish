@@ -826,7 +826,7 @@ namespace sch
 
 
 
-	int local_game_main(int _nargs, const char* _vargs[])
+	int local_game_main(int _nargs, const char* const* _vargs)
 	{
 		const auto p = (std::filesystem::path(_vargs[0]).parent_path() / "assets" / "chess").generic_string();
 		std::cout << p << '\n';
@@ -855,7 +855,7 @@ namespace sch
 		return 0;
 	};
 
-	int lichess_bot_main(int _nargs, const char* _vargs[])
+	int lichess_bot_main(int _nargs, const char* const* _vargs)
 	{
 		// Renable when lichess lets us play the AI
 		const auto _env = sch::load_env(_vargs[0]);

@@ -2,8 +2,16 @@
 
 #include "env.hpp"
 
-#include <jclib/cli.hpp>
 
+// Add the custom executable arguments header if present
+#if __has_include("_exec_args.hpp")
+	#include "_exec_args.hpp"
+#endif
+
+#include "utility/utility.hpp"
+
+#include <jclib/cli.hpp>
+#include <span>
 #include <cstdlib>
 #include <iostream>
 #include <filesystem>
@@ -23,21 +31,15 @@
 */
 
 
-int main(int _nargs, const char* _vargs[])
+int rmain(std::span<const char* const> _vargs)
 {
-	auto _parser = jc::ArgumentParser();
-	_parser.add_argument("--perf")
-		.set_help("Runs performance test");
-
-	auto _args = _parser.parse_args(_nargs, _vargs);
-
 	bool _perf = false;
 	bool _local = false;
 	bool _tests = true;
 
-	for (int n = 1; n < _nargs; ++n)
+	for (const auto& _varg : _vargs)
 	{
-		const auto _arg = std::string_view(_vargs[n]);
+		const auto _arg = std::string_view(_varg);
 		if (_arg == "--perf" || _arg == "-p")
 		{
 			_perf = true;
@@ -52,7 +54,7 @@ int main(int _nargs, const char* _vargs[])
 		};
 	};
 
-	;if (_perf)
+	if (_perf)
 	{
 		sch::perf_test();
 		exit(0);
@@ -65,10 +67,26 @@ int main(int _nargs, const char* _vargs[])
 
 	if (_local)
 	{
-		return sch::local_game_main(_nargs, _vargs);
+		return sch::local_game_main((int)_vargs.size(), _vargs.data());
 	}
 	else
 	{
-		return sch::lichess_bot_main(_nargs, _vargs);
+		return sch::lichess_bot_main((int)_vargs.size(), _vargs.data());
 	};
+};
+
+
+
+int main(int _nargs, const char* const* _vargs)
+{
+	std::span<const char* const> _args{};
+
+#ifdef _SCREEPFISH_EXEC_ARGS
+	const auto _customArgs = sch::prepend_array(executable_args, _vargs[0]);
+	_args = std::span<const char* const>(_customArgs);
+#else
+	_args = std::span<const char* const>(_vargs, _nargs);
+#endif
+
+	return rmain(_args);
 };
