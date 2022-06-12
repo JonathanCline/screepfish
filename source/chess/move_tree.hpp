@@ -4,6 +4,7 @@
 
 #include "move.hpp"
 #include "rating.hpp"
+#include "board_hash.hpp"
 
 #include "utility/bset.hpp"
 #include "utility/arena.hpp"
@@ -15,9 +16,7 @@
 
 namespace chess
 {
-	using BoardHashSet = sch::binary_set;
-
-
+	
 	struct MoveTreeNode;
 
 	namespace impl
