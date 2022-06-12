@@ -19,11 +19,12 @@ namespace chess
 	/**
 	 * @brief Holds a set of responses within a move tree.
 	*/
-	class MoveTreeNodeBase
+	template <typename NodeT>
+	class MoveList
 	{
 	public:
 
-		using value_type = MoveTreeNodeBase;
+		using value_type = NodeT;
 
 		using pointer = value_type*;
 		using reference = value_type&;
@@ -104,47 +105,13 @@ namespace chess
 			this->responses_count_ = 0;
 		};
 
-
-
-
-		/**
-		 * @brief Gets the full rating for the position - factoring in child nodes.
-		 * @return Full rating.
-		*/
-		AbsoluteRating rating() const
-		{
-			return this->full_rating_;
-		};
-
-		/**
-		 * @brief Gets the quick rating for the position.
-		 * @return Quick rating.
-		*/
-		AbsoluteRating quick_rating() const
-		{
-			return this->quick_rating_;
-		};
-
-
-
-		MoveTreeNodeBase() = default;
+		MoveList() = default;
 
 	private:
 
 		std::unique_ptr<value_type[]> responses_{};
 
 		size_type responses_count_ = 0;
-		
-		/**
-		 * @brief A quick to calculate rating for the position.
-		*/
-		AbsoluteRating quick_rating_ = 0_art;
-
-		/**
-		 * @brief A full rating that factors in child branches.
-		*/
-		AbsoluteRating full_rating_ = 0_art;
-
 	};
 
 
@@ -159,8 +126,24 @@ namespace chess
 
 		using size_type = uint8_t;
 
-		Rating rating() const { return this->rating_; };
-		Rating quick_rating() const { return this->move.rating(); };
+		/**
+		 * @brief Gets the full rating for the position - factoring in child nodes.
+		 * @return Full rating.
+		*/
+		Rating rating() const
+		{
+			return this->rating_;
+		};
+
+		/**
+		 * @brief Gets the quick rating for the position.
+		 * @return Quick rating.
+		*/
+		Rating quick_rating() const
+		{
+			return this->move.rating();
+		};
+
 
 		bool empty() const { return this->responses_count_ == 0; };
 		void resize(size_type _size)
@@ -209,8 +192,6 @@ namespace chess
 
 	};
 
-	constexpr static auto q1 = sizeof(MoveTreeNodeBase);
-	constexpr static auto q2 = sizeof(MoveTreeNode);
 
 
 

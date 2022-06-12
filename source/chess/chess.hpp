@@ -150,10 +150,32 @@ namespace chess
 		PieceType::king,
 	};
 
-
+	/**
+	 * @brief Holds a move from one position to another along with promotion info.
+	*/
 	class Move : public PieceMove
 	{
 	public:
+
+		/**
+		 * @brief Checks if null.
+		 * @return True if null, false if NOT null.
+		*/
+		constexpr bool is_null() const noexcept
+		{
+			return this->from() == this->to();
+		};
+		
+		/**
+		 * @brief Checks if NOT null.
+		 * @return True if NOT null, false if null.
+		*/
+		constexpr explicit operator bool() const
+		{
+			return !this->is_null();
+		};
+
+
 
 		constexpr PieceType promotion() const
 		{
