@@ -19,11 +19,11 @@ namespace chess
 	/**
 	 * @brief Holds a set of responses within a move tree.
 	*/
-	class BasicMoveTreeNode
+	class MoveTreeNodeBase
 	{
 	public:
 
-		using value_type = BasicMoveTreeNode;
+		using value_type = MoveTreeNodeBase;
 
 		using pointer = value_type*;
 		using reference = value_type&;
@@ -32,8 +32,14 @@ namespace chess
 
 		using size_type = uint8_t;
 
-		size_type size() const { return this->responses_count_; };
-		bool empty() const { return this->responses_count_ == 0; };
+		size_type size() const
+		{
+			return this->responses_count_;
+		};
+		bool empty() const
+		{
+			return this->responses_count_ == 0;
+		};
 
 		using iterator = pointer;
 		using const_iterator = const_pointer;
@@ -101,13 +107,32 @@ namespace chess
 
 
 
+		/**
+		 * @brief Gets the full rating for the position - factoring in child nodes.
+		 * @return Full rating.
+		*/
+		AbsoluteRating rating() const
+		{
+			return this->full_rating_;
+		};
+
+		/**
+		 * @brief Gets the quick rating for the position.
+		 * @return Quick rating.
+		*/
+		AbsoluteRating quick_rating() const
+		{
+			return this->quick_rating_;
+		};
 
 
-		BasicMoveTreeNode() = default;
+
+		MoveTreeNodeBase() = default;
 
 	private:
 
 		std::unique_ptr<value_type[]> responses_{};
+
 		size_type responses_count_ = 0;
 		
 		/**
@@ -119,7 +144,9 @@ namespace chess
 		 * @brief A full rating that factors in child branches.
 		*/
 		AbsoluteRating full_rating_ = 0_art;
+
 	};
+
 
 
 	struct MoveTreeNode
@@ -160,12 +187,6 @@ namespace chess
 
 		void count_duplicates(Board _board, std::set<size_t>& _boards);
 
-
-		std::unique_ptr<MoveTreeNode[]> responses{};
-		RatedMove move{};
-		Rating rating_ = 0;
-		uint8_t responses_count_ = 0;
-
 		void evaluate_next(const Board& _previousBoard, BoardHashSet& _hashSet, bool _followChecks = true);
 		void evaluate_next(const Board& _previousBoard, bool _followChecks = true);
 
@@ -179,7 +200,19 @@ namespace chess
 		std::vector<RatedMove> get_best_line() const;
 
 		MoveTreeNode() = default;
+
+
+		std::unique_ptr<MoveTreeNode[]> responses{};
+		RatedMove move{};
+		Rating rating_ = 0;
+		uint8_t responses_count_ = 0;
+
 	};
+
+	constexpr static auto q1 = sizeof(BasicMoveTreeNode);
+	constexpr static auto q2 = sizeof(MoveTreeNode);
+
+
 
 	struct MoveTree
 	{
