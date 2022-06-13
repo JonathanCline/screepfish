@@ -2,6 +2,14 @@
 
 #include "env.hpp"
 
+#include "nn/net.hpp"
+
+#include "chess/fen.hpp"
+#include "chess/chess.hpp"
+#include "chess/board.hpp"
+#include "chess/move_tree.hpp"
+
+#include <fstream>
 
 // Add the custom executable arguments header if present
 #if __has_include("_exec_args.hpp")
@@ -31,8 +39,29 @@
 */
 
 
+
+inline auto make_chess_board_nn_inputs(const chess::Board& _board)
+{
+	std::array<nn::SimpleNeuron::value_type, 64> _inputValues{};
+	for (auto& _pos : chess::positions_v)
+	{
+		const auto _piece = _board.get(_pos);
+		if (_piece)
+		{
+			const auto _sig = chess::piece_signature_value(_piece.type());
+			_inputValues.at(static_cast<size_t>(_pos)) = nn::sigmoid(
+				(_piece.color() == chess::Color::white) ? _sig : -_sig
+			);
+		};
+	};
+	return _inputValues;
+};
+
+
+
 int rmain(std::span<const char* const> _vargs)
 {
+	
 	bool _perf = false;
 	bool _local = false;
 	bool _tests = true;

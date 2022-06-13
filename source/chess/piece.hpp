@@ -263,6 +263,7 @@ namespace chess
 
 
 
+
 	enum class PieceE : uint8_t
 	{
 		black_pawn = 0b0010,
@@ -401,6 +402,21 @@ namespace chess
 	};
 
 	std::ostream& operator<<(std::ostream& _ostr, const Piece& p);
+
+
+	constexpr float piece_signature_value(const PieceType& _piece)
+	{
+		switch (_piece)
+		{
+		case Piece::pawn: return 0.1f;
+		case Piece::knight: return 0.2f;
+		case Piece::bishop: return 0.3f;
+		case Piece::rook: return 0.4;
+		case Piece::queen: return 0.7;
+		case Piece::king: return 1.0f;
+		default: return 0.0f;
+		};
+	};
 
 
 

@@ -299,7 +299,9 @@ namespace chess
 		void evaluate_next(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile = MoveTreeProfile());
 		void evalulate_next(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile = MoveTreeProfile());
 
-		std::optional<RatedMove> best_move(std::mt19937& _rnd);
+		std::optional<RatedMove> best_move();
+		std::optional<RatedMove> best_move(std::mt19937& _rnd) { return this->best_move(); };
+
 		size_t tree_size() const;
 		size_t total_outcomes() const;
 

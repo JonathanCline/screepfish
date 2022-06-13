@@ -575,7 +575,7 @@ namespace chess
 
 
 
-	std::optional<RatedMove> MoveTree::best_move(std::mt19937& _rnd)
+	std::optional<RatedMove> MoveTree::best_move()
 	{
 		auto& _moves = this->moves_;
 
@@ -598,7 +598,7 @@ namespace chess
 
 			auto& _best = _moves.front();
 			auto o = _best.move;
-			o = RatedMove(o.from(), o.to(), o.rating());
+			o = RatedMove(o.from(), o.to(), _best.player_rating());
 			return o;
 		};
 	};
