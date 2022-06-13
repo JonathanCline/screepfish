@@ -13,7 +13,7 @@
 
 #include "utility/perf.hpp"
 
-#include "terminal/terminal.hpp"
+#include "terminal/board_view_terminal.hpp"
 
 #include <jclib/functor.h>
 
@@ -787,7 +787,7 @@ namespace sch
 	};
 
 
-	inline void on_local_game_update(chess::Terminal& _terminal, const chess::Board& _board)
+	inline void on_local_game_update(chess::BoardViewTerminal& _terminal, const chess::Board& _board)
 	{
 		// Set the board to display
 		_terminal.set_board(_board);
@@ -802,7 +802,7 @@ namespace sch
 	bool local_game(const char* _assetsDirectoryPath, bool _step)
 	{
 		using namespace chess;
-		auto _terminal = chess::Terminal(_assetsDirectoryPath, _step);
+		auto _terminal = chess::BoardViewTerminal(_assetsDirectoryPath, _step);
 
 		auto _board = Board();
 		reset_board(_board);

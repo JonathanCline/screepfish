@@ -4,6 +4,8 @@
 
 #include "nn/net.hpp"
 
+#include "terminal/terminal.hpp"
+
 #include "chess/fen.hpp"
 #include "chess/chess.hpp"
 #include "chess/board.hpp"
@@ -23,6 +25,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <filesystem>
+#include <thread>
 
 /*
 	Initial:
@@ -61,6 +64,44 @@ inline auto make_chess_board_nn_inputs(const chess::Board& _board)
 
 int rmain(std::span<const char* const> _vargs)
 {
+	{
+		namespace tm = sch::tm;
+		
+		auto _terminal = tm::Terminal();
+		_terminal.open();
+
+
+
+		auto _btn = _terminal.add_button(2, 2, 8, 8);
+		_btn->label_ = "Test";
+		_btn->draw();
+		_btn->on_mouse_event_ = [&_terminal](tm::Button& _button, int _mouseButton, int _state)
+		{
+			if (_state == 0)
+			{
+				_button.pressed_ = false;
+			}
+			else
+			{
+				_button.pressed_ = true;
+			};
+			_button.draw();
+		};
+		
+
+		while (!_terminal.should_close())
+		{
+			_terminal.update();
+
+
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		};
+
+		_terminal.close();
+
+		return 0;
+	}
+
 	
 	bool _perf = false;
 	bool _local = false;
