@@ -108,6 +108,7 @@ namespace chess
 					};
 				};
 			}
+			// Enpassant handling
 			else if (_from.type() == PieceType::pawn)
 			{
 				if (_from.color() == Color::white)
@@ -238,6 +239,9 @@ namespace chess
 
 		// Swap to play flag
 		this->toplay_ = !this->toplay_;
+
+		// Set the played move as the last move
+		this->set_last_move(_move);
 	};
 }
 

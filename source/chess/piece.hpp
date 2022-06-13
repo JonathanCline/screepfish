@@ -108,9 +108,29 @@ namespace chess
 		};
 
 		constexpr PieceMove() = default;
+		
 		constexpr PieceMove(Position _from, Position _to) :
 			from_(_from), to_(_to)
 		{};
+
+		/**
+		 * @brief Constructs a null move.
+		 * @param nt jclib null tag type.
+		*/
+		constexpr PieceMove(jc::null_t nt) noexcept :
+			from_{}, to_{}
+		{};
+
+		/**
+		 * @brief Sets the move to null.
+		 * @param nt jclib null tag type.
+		 * @return Reference to this.
+		*/
+		constexpr PieceMove& operator=(jc::null_t nt) noexcept
+		{
+			this->to_ = this->from_;
+			return *this;
+		};
 
 	private:
 
@@ -203,6 +223,25 @@ namespace chess
 		constexpr Move(Position _from, Position _to) :
 			Move(_from, _to, PieceType{})
 		{};
+
+		/**
+		 * @brief Constructs a null move.
+		 * @param nt jclib null tag type.
+		*/
+		constexpr Move(jc::null_t nt) noexcept :
+			PieceMove(nt)
+		{};
+
+		/**
+		 * @brief Sets the move to null.
+		 * @param nt jclib null tag type.
+		 * @return Reference to this.
+		*/
+		constexpr Move& operator=(jc::null_t nt) noexcept
+		{
+			PieceMove::operator=(nt);
+			return *this;
+		};
 
 	private:
 		PieceType promotion_;
@@ -411,8 +450,8 @@ namespace chess
 		case Piece::pawn: return 0.1f;
 		case Piece::knight: return 0.2f;
 		case Piece::bishop: return 0.3f;
-		case Piece::rook: return 0.4;
-		case Piece::queen: return 0.7;
+		case Piece::rook: return 0.4f;
+		case Piece::queen: return 0.7f;
 		case Piece::king: return 1.0f;
 		default: return 0.0f;
 		};

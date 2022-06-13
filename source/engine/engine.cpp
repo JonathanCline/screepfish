@@ -263,7 +263,7 @@ namespace sch
 		{
 			_avgDur += std::chrono::duration_cast<dur>(v);
 		};
-		_avgDur /= _times.size();
+		_avgDur /= static_cast<dur::rep>(_times.size());
 
 		std::cout << "Average calculation time = " << _avgDur << '\n';
 	};

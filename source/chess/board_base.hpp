@@ -341,6 +341,8 @@ namespace chess
 			this->pieces_.fill(BoardPiece{});
 			this->bpieces_.reset();
 			this->wpieces_.reset();
+
+			this->last_move_ = jc::null;
 		};
 
 		void new_piece(Piece _piece, Position _pos)
@@ -609,6 +611,28 @@ namespace chess
 			return this->wpieces_;
 		};
 
+	private:
+		
+		/**
+		 * @brief Sets a move as the last played move.
+		 * @param _move Last played move.
+		*/
+		void set_last_move(const Move& _move)
+		{
+			this->last_move_ = _move;
+		};
+
+	public:
+
+		/**
+		 * @brief Gets the last move that was played.
+		 * @return The last move played, or a null move if no moves have been played.
+		*/
+		Move last_move() const
+		{
+			return this->last_move_;
+		};
+
 
 
 		const std::span<const BoardPiece> pieces() const
@@ -628,6 +652,11 @@ namespace chess
 
 		BitBoard bpieces_;
 		BitBoard wpieces_;
+
+		/**
+		 * @brief Holds the last move that was played on the board.
+		*/
+		Move last_move_{};
 
 		std::optional<Position> enpassant_target_;
 

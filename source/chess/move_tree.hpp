@@ -200,7 +200,7 @@ namespace chess
 
 		size_type size() const
 		{
-			return this->responses_.size();
+			return static_cast<size_type>(this->responses_.size());
 		};
 
 		auto begin()
