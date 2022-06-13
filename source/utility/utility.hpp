@@ -37,3 +37,12 @@ namespace sch
 	};
 
 };
+
+
+#ifdef _MSC_VER
+#define SCREEPFISH_BREAK() __debugbreak()
+#else
+#include <csignal>
+#define SCREEPFISH_BREAK() { ::raise(SIGBREAK); }
+#endif
+

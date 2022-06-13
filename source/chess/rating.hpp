@@ -4,6 +4,7 @@
 
 #include "piece.hpp"
 
+#include <iosfwd>
 #include <compare>
 
 namespace chess
@@ -102,6 +103,8 @@ namespace chess
 		rep value_;
 	};
 
+
+	std::ostream& operator<<(std::ostream& _ostr, const AbsoluteRating& _value);
 
 
 	consteval AbsoluteRating operator""_art(long double v)

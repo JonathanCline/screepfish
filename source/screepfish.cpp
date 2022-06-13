@@ -719,6 +719,42 @@ namespace sch
 			std::cout << "midgame (d3) - " << r << std::endl;
 		};
 
+		// midgame, depth 4, check/capture following
+		{
+			auto b = *parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
+			const auto fn = [&b]()
+			{
+				auto _profile = MoveTreeProfile{};
+				_profile.enable_pruning_ = false;
+				_profile.follow_captures_ = true;
+				_profile.follow_checks_ = true;
+
+				// Build tree
+				auto t = MoveTree(b);
+				t.build_tree(4, 4 + 1, _profile);
+			};
+			const auto r = perf_test_part<2>(fn, std::chrono::seconds(4));
+			std::cout << "midgame (d4, check/capture) - " << r << std::endl;
+		};
+
+		// midgame, depth 4, pruning + check/capture following
+		{
+			auto b = *parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
+			const auto fn = [&b]()
+			{
+				auto _profile = MoveTreeProfile{};
+				_profile.enable_pruning_	= true;
+				_profile.follow_captures_	= true;
+				_profile.follow_checks_		= true;
+
+				// Build tree
+				auto t = MoveTree(b);
+				t.build_tree(4, 4 + 1, _profile);
+			};
+			const auto r = perf_test_part<2>(fn, std::chrono::seconds(4));
+			std::cout << "midgame (d4, pruning + check/capture) - " << r << std::endl;
+		};
+
 		// opening, depth 2
 		{
 			auto b = Board();

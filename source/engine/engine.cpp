@@ -23,10 +23,13 @@ namespace sch
 	{
 		using namespace chess;
 
+		// Configure tree profile.
 		auto _profile = MoveTreeProfile();
 		_profile.follow_captures_ = true;
 		_profile.follow_checks_ = true;
+		_profile.enable_pruning_ = false;
 
+		// BUILD THE TREE
 		auto _tree = chess::MoveTree(_board);
 		_tree.build_tree((size_t)_depth, _depth + 1, _profile);
 
@@ -189,6 +192,30 @@ namespace sch
 								};
 							};
 
+							// Second level moves
+							{
+								const auto _path = _dirPath / "moves2.txt";
+								auto _file = std::ofstream(_path);
+
+								for (auto& _fmove : _tree)
+								{
+									if (_fmove.empty())
+									{
+										_file << "-\n";
+									}
+									else
+									{
+										_file << _fmove.move << ":\n";
+										for (auto& _move : _fmove)
+										{
+											_file << '\t' << _move.move << " : " << _move.rating() << " : " << _move.quick_rating() <<  '\n';
+										};
+										_file << '\n';
+									};
+								};
+							};
+
+
 							// Lines
 							const auto _topLines = _tree.get_top_lines(3);
 							size_t _lineN = 0;
@@ -197,7 +224,7 @@ namespace sch
 								const auto _path = _dirPath / ("line" + std::to_string(_lineN++) + ".txt");
 								auto _file = std::ofstream(_path);
 								
-								_file << *_move << " = " << _move->rating() << '\n';
+								_file << "Final Rating : " << _move->rating() << '\n';
 
 								auto b = _board;
 								for (auto& v : _line)

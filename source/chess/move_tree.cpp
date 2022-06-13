@@ -7,7 +7,7 @@ namespace chess
 	/**
 	 * @brief Enables / disables ignoring repeated positions.
 	*/
-	constexpr inline bool disable_culling_repeated_positions_v = false;
+	constexpr inline bool disable_culling_repeated_positions_v = true;
 
 
 
@@ -30,9 +30,10 @@ namespace chess
 	void MoveTreeNode::resort_children()
 	{
 		// Sort children by rating
-		std::sort(this->begin(), this->end(), [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
+		std::ranges::sort(this->responses_,
+			[](const MoveTreeNode& lhs, const MoveTreeNode& rhs)
 			{
-				return lhs.rating() > rhs.rating();
+				return lhs.player_rating() > rhs.player_rating();
 			});
 	};
 
@@ -55,6 +56,35 @@ namespace chess
 
 
 
+
+	inline NodeEvalResult get_interesting_lines(
+		const MoveTreeNode& _node,
+		const Board& _previousBoard, const Board& _newBoard, Move _move,
+		const MoveTreeProfile& _profile, MoveTreeSearchData _data)
+	{
+		// Profile aliasing
+		const auto& _followChecks = _profile.follow_checks_;
+		const auto& _followCaptures = _profile.follow_captures_;
+
+		auto _result = NodeEvalResult();
+
+		// Follow captures if set.
+		if (_data.can_go_deeper())
+		{
+			// Follow captures if set.
+			if (_followCaptures && is_piece_capture(_previousBoard, _move))
+			{
+				_result.follow_capture_ = true;
+			}
+			// Follow checks if set.
+			else if (_followChecks && is_check(_newBoard, _newBoard.get_toplay()))
+			{
+				_result.follow_check_ = true;
+			};
+		};
+
+		return _result;
+	};
 
 	inline void follow_move_lines_with_profile(
 		MoveTreeNode& _node,
@@ -84,7 +114,7 @@ namespace chess
 	};
 
 
-	void MoveTreeNode::evaluate_next(const Board& _previousBoard,
+	NodeEvalResult MoveTreeNode::evaluate_next(const Board& _previousBoard,
 		const MoveTreeProfile& _profile, MoveTreeSearchData _data)
 	{
 		// Profile aliasing
@@ -99,15 +129,11 @@ namespace chess
 
 		const auto _opponentColor = !_myColor;
 
+		auto _evalResult = NodeEvalResult();
+
+
 		if (!this->was_evaluated())
 		{
-			// Bail early on max depth
-			if (!_data.can_go_deeper())
-			{
-				this->mark_as_evaluated();
-				return;
-			};
-
 			// Get the possible responses
 			std::array<Move, 128> _moveBufferData{};
 			const auto _moveBegin = _moveBufferData.data();
@@ -127,11 +153,13 @@ namespace chess
 				const auto _rating = quick_rate(_newBoard, _opponentColor);
 
 				// Assign values
-				it->move = RatedMove{ *p, _rating };
-				it->rating_ = _rating;
+				it->set_move(
+					RatedMove{ *p, _rating },
+					_opponentColor
+				);
 
 				// Follow lines based on profile.
-				follow_move_lines_with_profile(*it, _board, _newBoard, _move, _profile, _data);
+				_evalResult = get_interesting_lines(*it, _board, _newBoard, _move, _profile, _data);
 
 				// Next
 				++it;
@@ -147,87 +175,11 @@ namespace chess
 			{
 				_child.evaluate_next(_board, _profile, _data.with_next_depth());
 			};
+
+			//SCREEPFISH_BREAK();
 		};
-	};
-	void MoveTreeNode::evaluate_next(const Board& _previousBoard, BoardHashSet& _hashSet,
-		const MoveTreeProfile& _profile, MoveTreeSearchData _data)
-	{
-		// Profile aliasing
-		const auto& _followChecks = _profile.follow_checks_;
-		const auto& _followCaptures = _profile.follow_captures_;
 
-		// Apply our move.
-		const auto& _myMove = this->move;
-		auto _board = _previousBoard;
-		const auto _myColor = _board.get_toplay();
-		_board.move(_myMove);
-
-		const auto _opponentColor = !_myColor;
-
-		if (!this->was_evaluated())
-		{
-			// Bail early on max depth
-			if (!_data.can_go_deeper())
-			{
-				this->mark_as_evaluated();
-				return;
-			};
-
-			// Get the possible responses
-			std::array<Move, 128> _moveBufferData{};
-			const auto _moveBegin = _moveBufferData.data();
-			const auto _moveEnd = fill_possible_moves_buffer(_board, _moveBufferData);
-
-			// Rate and add to the child nodes
-			this->resize(_moveEnd - _moveBegin);
-			auto it = this->begin();
-			for (auto p = _moveBegin; p != _moveEnd; ++p)
-			{
-				// Apply the move to the board with our move played.
-				const auto& _move = *p;
-				auto _newBoard = _board;
-				_newBoard.move(_move);
-
-				// Ensure this is a unique position.
-				const auto h = hash(_newBoard, _newBoard.get_toplay() == Color::black);
-				if (_hashSet.contains(h))
-				{
-					// Skip, position is already being evaluated
-					continue;
-				}
-				else
-				{
-					_hashSet.insert(h);
-				};
-
-				// Lightning fast rating.
-				const auto _rating = quick_rate(_newBoard, _opponentColor);
-
-				// Assign values
-				it->move = RatedMove{ *p, _rating };
-				it->rating_ = _rating;
-
-				// Follow lines based on profile.
-				follow_move_lines_with_profile(*it, _board, _newBoard, _move, _profile, _data);
-
-				// Next
-				++it;
-			};
-
-			// Set size to "remove" extra
-			this->soft_resize(it - this->begin());
-
-			// Ensure we are marked as evaluated
-			this->mark_as_evaluated();
-		}
-		else
-		{
-			// Propogate to children
-			for (auto& _child : *this)
-			{
-				_child.evaluate_next(_board, _hashSet, _profile, _data.with_next_depth());
-			};
-		};
+		return _evalResult;
 	};
 
 	size_t MoveTreeNode::tree_size() const
@@ -316,7 +268,247 @@ namespace chess
 
 
 
-	void MoveTree::evaluate_next(MoveTreeSearchData _searchData, BoardHashSet* _hashSet, const MoveTreeProfile& _profile)
+
+
+	inline AbsoluteRating deep_eval(MoveTreeNode& _node)
+	{
+		// If the opponent has no responses, we can just set the rating as the quick rating
+		// and return early. These "ends" of the tree are the basis for the deep evaluation.
+		if (_node.empty())
+		{
+			// Use the quick rating.
+			return _node.rating();
+		};
+
+		// Loop through the opponent's responses to the node's move and preform a deep eval for each.
+		bool _hasMoveAfterOpponent = false;
+		for (auto& _opponentResponse : _node)
+		{
+			// Preform a deep evaluation of the opponent's response.
+			const auto _opponentResponseRating =
+				deep_eval(_opponentResponse);
+
+			if (!_opponentResponse.empty())
+			{
+				_hasMoveAfterOpponent = true;
+			};
+		};
+
+		// Sort the opponent's responses by full rating.
+		_node.resort_children();
+
+		// The opponent's best response will be in the front.
+		const auto _bestResponseRating = _node.front().rating();
+		
+		_node.set_rating(_bestResponseRating);
+		
+		return _bestResponseRating;
+	};
+
+	inline void prune(MoveTreeNode& _node)
+	{
+		if (_node.empty())
+		{
+			return;
+		};
+		
+		_node.resize(1);
+		return;
+	};
+
+
+
+
+	Rating alpha_beta_max(const Board& _previousBoard,
+		MoveTreeNode& _node, MoveTreeProfile _profile,
+		MoveTreeSearchData _searchData, MoveTreeAlphaBeta _alphaBeta);
+
+	Rating alpha_beta_min(const Board& _previousBoard,
+		MoveTreeNode& _node, MoveTreeProfile _profile,
+		MoveTreeSearchData _searchData, MoveTreeAlphaBeta _alphaBeta);
+
+
+
+	inline void alpha_beta_eval(MoveTreeNode& _node, const Board& _previousBoard,
+		MoveTreeProfile& _profile, MoveTreeSearchData& _searchData)
+	{
+		const auto _evalResult = _node.evaluate_next(_previousBoard, _profile, _searchData);
+		if (_evalResult.follow_capture_)
+		{
+			++_searchData.max_depth_;
+			_profile.follow_captures_ = false;
+		}
+		else if (_evalResult.follow_check_)
+		{
+			++_searchData.max_depth_;
+			_profile.follow_checks_ = false;
+		};
+	};
+
+
+	Rating alpha_beta_max(const Board& _previousBoard,
+		MoveTreeNode& _node, MoveTreeProfile _profile,
+		MoveTreeSearchData _searchData, MoveTreeAlphaBeta _alphaBeta)
+	{
+		if (!_searchData.can_go_deeper())
+		{
+			return Rating(_node.quick_rating());
+		};
+
+		alpha_beta_eval(_node, _previousBoard, _profile, _searchData);
+
+		auto _newBoard = _previousBoard;
+		_newBoard.move(_node.move);
+
+		for (auto& _move : _node)
+		{
+			auto _score = alpha_beta_min(_newBoard, _move, _profile,
+				_searchData.with_next_depth(), _alphaBeta);
+
+			if (_score >= _alphaBeta.beta)
+			{
+				return _alphaBeta.beta;   // fail hard beta-cutoff
+			}
+			if (_score > _alphaBeta.alpha)
+			{
+				_alphaBeta.alpha = _score; // alpha acts like max in MiniMax
+			};
+		};
+
+		return _alphaBeta.alpha;
+	};
+
+	Rating alpha_beta_min(const Board& _previousBoard,
+		MoveTreeNode& _node, MoveTreeProfile _profile,
+		MoveTreeSearchData _searchData, MoveTreeAlphaBeta _alphaBeta)
+	{
+		if (!_searchData.can_go_deeper())
+		{
+			return -_node.quick_rating();
+		};
+
+		alpha_beta_eval(_node, _previousBoard, _profile, _searchData);
+
+		auto _newBoard = _previousBoard;
+		_newBoard.move(_node.move);
+
+		for (auto& _move : _node)
+		{
+			auto _score = alpha_beta_max(_newBoard, _move, _profile,
+				_searchData.with_next_depth(), _alphaBeta);
+
+			if (_score <= _alphaBeta.alpha)
+			{
+				return _alphaBeta.alpha; // fail hard alpha-cutoff
+			};
+			if (_score < _alphaBeta.beta)
+			{
+				_alphaBeta.beta = _score; // beta acts like min in MiniMax
+			};
+		};
+
+		return _alphaBeta.beta;
+	};
+
+	Rating alpha_beta(const Board& _previousBoard,
+		MoveTreeNode& _node, MoveTreeProfile _profile, MoveTreeSearchData _searchData,
+		MoveTreeAlphaBeta _alphaBeta, bool _isMaximizingPlayer)
+	{
+		if (!_searchData.can_go_deeper() /* or node is a terminal node */ )
+		{
+			return (_isMaximizingPlayer)?
+				_node.quick_rating() :
+				-_node.quick_rating();
+		};
+
+		_node.evaluate_next(_previousBoard, _profile, _searchData);
+
+		auto _newBoard = _previousBoard;
+		_newBoard.move(_node.move);
+
+		if (_isMaximizingPlayer)
+		{
+			auto _value = 
+				-Rating(std::numeric_limits<Rating>::infinity());
+
+			for (auto& _move : _node)
+			{
+				_value = std::max
+				(
+					_value,
+					alpha_beta(_newBoard, _move, _profile,
+						_searchData.with_next_depth(),
+						_alphaBeta, false
+					)
+				);
+
+				if (_value >= _alphaBeta.beta)
+				{
+					break; // (*β cutoff*)
+				};
+
+				_alphaBeta.alpha = std::max(
+					_alphaBeta.alpha,
+					_value
+				);
+			};
+
+			return _value;
+		}
+		else
+		{
+			auto _value =
+				Rating(std::numeric_limits<Rating>::infinity());
+
+			for (auto& _move : _node)
+			{
+				_value = std::min
+				(
+					_value,
+					alpha_beta(_newBoard, _move, _profile,
+						_searchData.with_next_depth(),
+						_alphaBeta, true
+					)
+				);
+
+				if (_value <= _alphaBeta.alpha)
+				{
+					break; // (*α cutoff*)
+				};
+
+				_alphaBeta.beta = std::min(
+					_alphaBeta.beta,
+					_value
+				);
+			};
+
+			return _value;
+		};
+
+		::abort();
+	};
+
+
+	void evaluate_next_full_move(const Board& _board, MoveTreeNode& _node,
+		const MoveTreeProfile& _profile, MoveTreeSearchData _searchData)
+	{
+		// Node should be empty.
+		SCREEPFISH_ASSERT(_node.empty());
+
+		// Evaluate 2 half-moves deeper.
+		_node.evaluate_next(_board, _profile, _searchData);
+		_node.evaluate_next(_board, _profile, _searchData);
+
+
+	};
+
+
+
+
+
+
+
+	void MoveTree::evaluate_next(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile)
 	{
 		auto& _board = this->board_;
 		auto& _moves = this->moves_;
@@ -337,18 +529,13 @@ namespace chess
 				auto _newBoard = _board;
 				_newBoard.move(*p);
 
-				// Ensure this is registered as unique position
-				if (_hashSet)
-				{
-					const auto h = hash(_newBoard, _newBoard.get_toplay() == Color::black);
-					_hashSet->insert(h);
-				};
-
 				const auto _rating = quick_rate(_newBoard, _board.get_toplay());
 
 				// Assign values
-				it->move = RatedMove{ *p, _rating };
-				it->set_rating(_rating);
+				it->set_move(
+					RatedMove{*p, _rating },
+					_board.get_toplay()
+				);
 
 				// Next
 				++it;
@@ -359,29 +546,22 @@ namespace chess
 			// Propogate to children
 			for (auto& _child : _moves)
 			{
-				if (_hashSet)
-				{
-					_child.evaluate_next(_board, *_hashSet, _profile, _searchData.with_next_depth());
-				}
-				else
-				{
-					_child.evaluate_next(_board, _profile, _searchData.with_next_depth());
-				};
+				_child.evaluate_next(_board, _profile, _searchData.with_next_depth());
 			};
 		};
 
 		++this->depth_counter_;
-	};
+		
+		// TEMPORARY PRUNING TESTING
+		if (_profile.enable_pruning_ && this->depth_counter_ == 4)
+		{
+			for (auto& _move : this->moves_)
+			{
+				deep_eval(_move);
+				prune(_move);
+			};
+		};
 
-	void MoveTree::evaluate_next_unique(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile)
-	{
-		auto& _hashSet = this->hash_set_;
-		return this->evaluate_next(_searchData, &_hashSet, _profile);
-	};
-	void MoveTree::evaluate_next(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile)
-	{
-		BoardHashSet* _hashSet = nullptr;
-		return this->evaluate_next(_searchData, _hashSet, _profile);
 	};
 
 	void MoveTree::evalulate_next(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile)
@@ -393,55 +573,11 @@ namespace chess
 
 
 
-	inline Rating deep_eval(MoveTreeNode& _node)
-	{
-		// If the opponent has no responses, we can just set the rating as the quick rating
-		// and return early. These "ends" of the tree are the basis for the deep evaluation.
-		if (_node.empty())
-		{
-			// Use the quick rating.
-			const auto _rating = _node.quick_rating();
-			_node.set_rating(_rating);
-			return _rating;
-		};
-
-		// Loop through the opponent's responses to the node's move and preform a deep eval for each.
-		bool _hasMoveAfterOpponent = false;
-		for (auto& _opponentResponse : _node)
-		{
-			// Preform a deep evaluation of the opponent's response.
-			const auto _opponentResponseRating = deep_eval(_opponentResponse);
-			if (!_opponentResponse.empty())
-			{
-				_hasMoveAfterOpponent = true;
-			};
-		};
-
-		// Sort the opponent's responses by full rating.
-		_node.resort_children();
-
-		const auto _rating = -_node.front().rating();
-		_node.set_rating(_rating);
-		return _rating;
-	};
-
-
-
-
-
-
 
 
 	std::optional<RatedMove> MoveTree::best_move(std::mt19937& _rnd)
 	{
 		auto& _moves = this->moves_;
-
-		// Preform a deep evaluation.
-		for (auto& _move : _moves)
-		{
-			deep_eval(_move);
-		};
-
 
 		if (_moves.empty())
 		{
@@ -449,33 +585,20 @@ namespace chess
 		}
 		else
 		{
-			for (auto& v : _moves)
+			for (auto& _move : _moves)
 			{
-				if (v.empty())
+				if (_move.empty())
 				{
-					return v.move;
+					return _move.move;
 				};
 			};
 
-			std::ranges::sort(this->moves_, [](auto& lhs, auto& rhs)
-				{
-					return lhs.rating() > rhs.rating();
-				});
+			// Resort to put best in the front.
+			this->resort_children(nullptr);
 
 			auto& _best = _moves.front();
-			const auto it = std::ranges::find_if(_moves, [&_best](MoveTreeNode& v)
-				{
-					return v.rating() != _best.rating();
-				});
-
-		 	const auto _rndNum = _rnd();
-			const auto _rndIndex = _rndNum % (it - _moves.begin());
-			const auto _rndIter = _moves.begin() + _rndIndex;
-			_rndIter->show_best_line();
-			std::cout << std::endl;
-
-			auto o = _rndIter->move;
-			o = RatedMove(o.from(), o.to(), _rndIter->rating());
+			auto o = _best.move;
+			o = RatedMove(o.from(), o.to(), o.rating());
 			return o;
 		};
 	};
@@ -561,10 +684,38 @@ namespace chess
 		return n;
 	};
 	
+
+
+
+	void MoveTree::resort_children(std::mt19937* _rnd)
+	{
+		auto& _moves = this->moves_;
+		std::ranges::sort(_moves, [](const MoveTreeNode& lhs, const MoveTreeNode& rhs)
+			{
+				return lhs.player_rating() > rhs.player_rating();
+			});
+
+		if (!_moves.empty() && _rnd)
+		{
+			auto& _best = _moves.front();
+			const auto it = std::ranges::find_if(_moves, [&_best](MoveTreeNode& v)
+				{
+					return v.rating() != _best.rating();
+				});
+
+			if (it != this->begin())
+			{
+				const auto _rndNum = (*_rnd)();
+				const auto _rndIndex = _rndNum % (it - _moves.begin());
+				const auto _rndIter = _moves.begin() + _rndIndex;
+				std::swap(_best, *_rndIter);
+			};
+		};
+	};
+	
 	void MoveTree::build_tree(size_t _depth, size_t _maxExtendedDepth, const MoveTreeProfile& _profile)
 	{
 		// Reset state
-		this->clear_hashes();
 		auto& _moves = this->moves_;
 		_moves.clear();
 
@@ -572,23 +723,29 @@ namespace chess
 		auto _searchData = MoveTreeSearchData();
 		_searchData.max_depth_ = static_cast<uint8_t>(_maxExtendedDepth);
 
-		// Determine whether or not to cull unique
-		if (disable_culling_repeated_positions_v || (_depth <= 3))
+		for (size_t n = 0; n != _depth; ++n)
 		{
-			// Do not worry about repeated positions - there wont be any
-			for (size_t n = 0; n != _depth; ++n)
-			{
-				this->evaluate_next(_searchData, _profile);
-			};
-		}
-		else
-		{
-			// Watch for repeated positions - this is where we actually benefit from checking
-			for (size_t n = 0; n != _depth; ++n)
-			{
-				this->evaluate_next_unique(_searchData, _profile);
-			};
+			this->evaluate_next(_searchData, _profile);
 		};
+
+		//auto _alphaBeta = MoveTreeAlphaBeta{};
+		//_alphaBeta.alpha = Rating(-std::numeric_limits<Rating>::infinity());
+		//_alphaBeta.beta = Rating(std::numeric_limits<Rating>::infinity());
+
+		for (auto& _move : this->moves_)
+		{
+			deep_eval(_move);
+
+			//const auto _rating = alpha_beta
+			//(
+			//	this->initial_board(),
+			//	_move, _profile, _searchData.with_next_depth(),
+			//	_alphaBeta, true
+			//);
+			//_move.set_rating(_rating);
+		};
+
+		this->resort_children(nullptr);
 	};
 
 };
