@@ -154,7 +154,7 @@ namespace chess
 		*/
 		Rating quick_rating() const
 		{
-			return this->move.rating();
+			return this->move_.rating();
 		};
 
 		void set_rating(AbsoluteRating r)
@@ -164,7 +164,7 @@ namespace chess
 
 		explicit operator bool() const
 		{
-			return !this->move.is_null();
+			return !this->move_.is_null();
 		};
 
 
@@ -231,6 +231,10 @@ namespace chess
 
 		void count_duplicates(Board _board, std::set<size_t>& _boards);
 		
+
+		NodeEvalResult evaluate_next_with_board(const Board& _board,
+			const MoveTreeProfile& _profile, MoveTreeSearchData _data);
+
 		NodeEvalResult evaluate_next(const Board& _previousBoard,
 			const MoveTreeProfile& _profile, MoveTreeSearchData _data);
 
@@ -245,11 +249,35 @@ namespace chess
 
 		void set_move(RatedMove _move, Color _playedBy)
 		{
-			this->move = _move;
+			this->move_ = _move;
 			this->player_ = _playedBy;
 			this->rating_ =
 				AbsoluteRating(_move.rating(), _playedBy);
+			this->responses_.clear();
 		};
+
+		/**
+		 * @brief Clears the branches from this node.
+		*/
+		void clear() noexcept
+		{
+			this->responses_.clear();
+		};
+
+
+		auto& at(size_type _index)
+		{
+			SCREEPFISH_ASSERT(_index < this->size());
+			return this->responses_.data()[_index];
+		};
+		const auto& at(size_type _index) const
+		{
+			SCREEPFISH_ASSERT(_index < this->size());
+			return this->responses_.data()[_index];
+		};
+
+
+
 
 
 
@@ -262,7 +290,7 @@ namespace chess
 		sch::NullTerminatedArena<MoveTreeNode, impl::MoveTreeNodeBlockAllocator> responses_{};
 
 	public:
-		RatedMove move{};
+		RatedMove move_{};
 	private:
 		AbsoluteRating rating_ = 0_art;
 		
@@ -316,32 +344,84 @@ namespace chess
 			return this->build_tree(_depth, _depth + 2, _profile);
 		};
 
-		auto begin() { return this->moves_.begin(); };
-		auto begin() const { return this->moves_.begin(); };
-		auto cbegin() const { return this->moves_.begin(); };
-		auto end() { return this->moves_.end(); };
-		auto end() const { return this->moves_.end(); };
-		auto cend() const { return this->moves_.end(); };
+		/**
+		 * @brief Gets the root node for this tree. 
+		 * 
+		 * The root node holds the last move played for the board this tree starts from.
+		 * 
+		 * @return Root tree node reference.
+		*/
+		MoveTreeNode& root() noexcept
+		{
+			return this->root_;
+		};
 
+		/**
+		 * @brief Gets the root node for this tree.
+		 *
+		 * The root node holds the last move played for the board this tree starts from.
+		 *
+		 * @return Root tree node reference.
+		*/
+		const MoveTreeNode& root() const noexcept
+		{
+			return this->root_;
+		};
+
+		/**
+		 * @brief Gets the initial board state.
+		 * @return Chess board state.
+		*/
 		const chess::Board& initial_board() const
 		{
 			return this->board_;
 		};
+
+		/**
+		 * @brief Sets the initial board state.
+		 * 
+		 * This will cause the tree to be cleared and the root move to be changed.
+		 * 
+		 * @param _board Chess board state.
+		*/
 		void set_initial_board(const chess::Board& _board)
 		{
+			// Set the board.
 			this->board_ = _board;
+
+			// Determine the initial board rating, this is required for changing the root node.
+			const auto _boardRating = chess::quick_rate(_board, _board.get_toplay());
+
+			// Clear out the root node and set to use the last played move.
+			this->root_.clear();
+			this->root_.set_move(RatedMove(_board.get_last_move(), _boardRating),
+				!_board.get_toplay());
+
 		};
 
 
 		MoveTree() = default;
 		MoveTree(const chess::Board& _board) :
-			board_(_board)
-		{};
+			root_()
+		{
+			this->set_initial_board(_board);
+		};
 
 	private:
 
-		chess::Board board_{}; // initial board state
-		std::vector<MoveTreeNode> moves_{}; // moves that can be played from the initial board state
+		/**
+		 * @brief Holds the initial board state.
+		*/
+		chess::Board board_{};
+
+		/**
+		 * @brief The root node for the tree, holds the last move played for the stored initial board.
+		*/
+		MoveTreeNode root_;
+		
+		/**
+		 * @brief Probably not needed.
+		*/
 		size_t depth_counter_ = 0;
 	};
 

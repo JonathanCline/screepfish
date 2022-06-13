@@ -53,6 +53,23 @@ namespace chess
 
 		constexpr RatingT rating() const noexcept { return this->rating_; };
 
+		friend inline constexpr bool operator==(const BasicRatedMove& lhs, const chess::Move& rhs)
+		{
+			return static_cast<const Move&>(lhs) == rhs;
+		};
+		friend inline constexpr bool operator==(const chess::Move& lhs, const BasicRatedMove& rhs)
+		{
+			return lhs == static_cast<const Move&>(rhs);
+		};
+		friend inline constexpr bool operator!=(const BasicRatedMove& lhs, const chess::Move& rhs)
+		{
+			return static_cast<const Move&>(lhs) != rhs;
+		};
+		friend inline constexpr bool operator!=(const chess::Move& lhs, const BasicRatedMove& rhs)
+		{
+			return lhs != static_cast<const Move&>(rhs);
+		};
+
 		constexpr auto operator<=>(const BasicRatedMove& rhs) const
 		{
 			return this->rating() <=> rhs.rating();

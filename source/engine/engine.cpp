@@ -111,7 +111,7 @@ namespace sch
 					const auto& _myColor = this->my_color_;
 					
 					const size_t _pieceCount = _board.pieces().size();
-					auto _depth = 5;
+					auto _depth = 6;
 
 					// Bump depth as many moves will be discarded
 					const bool _isCheck = is_check(_board, _myColor);
@@ -186,9 +186,9 @@ namespace sch
 
 								_file << "Total Tree Size : " << _tree.tree_size() << '\n';
 
-								for (auto& _move : _tree)
+								for (auto& _move : _tree.root())
 								{
-									_file << _move.move << " : " << _move.rating() << " : " << _move.quick_rating() << '\n';
+									_file << _move.move_ << " : " << _move.rating() << " : " << _move.quick_rating() << '\n';
 								};
 							};
 
@@ -197,7 +197,7 @@ namespace sch
 								const auto _path = _dirPath / "moves2.txt";
 								auto _file = std::ofstream(_path);
 
-								for (auto& _fmove : _tree)
+								for (auto& _fmove : _tree.root())
 								{
 									if (_fmove.empty())
 									{
@@ -205,10 +205,10 @@ namespace sch
 									}
 									else
 									{
-										_file << _fmove.move << ":\n";
+										_file << _fmove.move_ << ":\n";
 										for (auto& _move : _fmove)
 										{
-											_file << '\t' << _move.move << " : " << _move.rating() << " : " << _move.quick_rating() <<  '\n';
+											_file << '\t' << _move.move_ << " : " << _move.rating() << " : " << _move.quick_rating() <<  '\n';
 										};
 										_file << '\n';
 									};

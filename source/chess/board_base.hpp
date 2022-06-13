@@ -628,7 +628,7 @@ namespace chess
 		 * @brief Gets the last move that was played.
 		 * @return The last move played, or a null move if no moves have been played.
 		*/
-		Move last_move() const
+		Move get_last_move() const
 		{
 			return this->last_move_;
 		};

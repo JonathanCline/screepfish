@@ -520,6 +520,11 @@ namespace chess
 			return this->board().pieces();
 		};
 
+		Move get_last_move() const
+		{
+			return this->board_.get_last_move();
+		};
+
 
 		Board() = default;
 	private:

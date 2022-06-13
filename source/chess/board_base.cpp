@@ -61,8 +61,8 @@ namespace chess
 	void BoardBase::move(const Move& _move)
 	{
 		// Exit early on null move
-		if (!_move) JCLIB_UNLIKELY{
-			__debugbreak();
+		if (!_move) JCLIB_UNLIKELY
+		{
 			return;
 		};
 
