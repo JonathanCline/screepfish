@@ -104,16 +104,13 @@ namespace chess
 	consteval auto compute_pawn_move_squares(Color _color)
 	{
 		std::array<BitBoardCX, 64> bbs{};
-		auto it = bbs.begin();
 		for (auto& v : positions_v)
 		{
 			if (v.rank() == Rank::r1 || v.rank() == Rank::r8)
 			{
-				++it;
 				continue;
 			};
-			*it = compute_pawn_move_squares(v, _color);
-			++it;
+			bbs[static_cast<size_t>(v)] = compute_pawn_move_squares(v, _color);
 		};
 		return bbs;
 	};
@@ -170,11 +167,9 @@ namespace chess
 	consteval auto compute_knight_attack_squares()
 	{
 		std::array<BitBoardCX, 64> bbs{};
-		auto it = bbs.begin();
 		for (auto& v : positions_v)
 		{
-			*it = compute_knight_attack_squares(v);
-			++it;
+			bbs[static_cast<size_t>(v)] = compute_knight_attack_squares(v);
 		};
 		return bbs;
 	};
@@ -1551,6 +1546,10 @@ namespace chess
 		if (is_checkmate(_board, !Player))
 		{
 			return checkmate_rating_v;
+		};
+		if (is_checkmate(_board, Player))
+		{
+			return -checkmate_rating_v;
 		};
 
 		// Castling ability

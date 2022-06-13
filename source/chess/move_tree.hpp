@@ -16,7 +16,7 @@
 
 namespace chess
 {
-	
+
 	struct MoveTreeNode;
 
 	namespace impl
@@ -41,6 +41,17 @@ namespace chess
 	};
 
 
+
+
+	struct MoveTreeAlphaBeta
+	{
+		Rating alpha;
+		Rating beta;
+
+		MoveTreeAlphaBeta() = default;
+	};
+
+
 	/**
 	 * @brief Extra info carried around during the move search part of the move tree evaluation.
 	*/
@@ -49,9 +60,12 @@ namespace chess
 		uint8_t depth_ = 0;
 		uint8_t max_depth_ = 255;
 
+
+
+
 		MoveTreeSearchData with_next_depth() const
 		{
-			auto o = MoveTreeSearchData{*this};
+			auto o = MoveTreeSearchData{ *this };
 			++o.depth_;
 			return o;
 		};
@@ -87,6 +101,15 @@ namespace chess
 		{};
 	};
 
+
+	struct NodeEvalResult
+	{
+		bool follow_check_ = false;
+		bool follow_capture_ = false;
+
+		NodeEvalResult() = default;
+	};
+
 	struct MoveTreeNode
 	{
 	public:
@@ -96,13 +119,23 @@ namespace chess
 		using size_type = uint8_t;
 
 		/**
-		 * @brief Gets the full rating for the position - factoring in child nodes.
-		 * @return Full rating.
+		 * @brief Gets the rating for the position.
+		 * @return Absolute rating.
 		*/
 		Rating rating() const
 		{
 			return this->rating_;
 		};
+
+		/**
+		 * @brief Gets the rating for the position.
+		 * @param _player Player to get the rating's value for.
+		 * @return Rating for the given player.
+		*/
+		//Rating rating(Color _player) const
+		//{
+		//	return this->rating().player(_player);
+		//};
 
 		/**
 		 * @brief Gets the quick rating for the position.
@@ -175,9 +208,7 @@ namespace chess
 
 		void count_duplicates(Board _board, std::set<size_t>& _boards);
 		
-		void evaluate_next(const Board& _previousBoard, BoardHashSet& _hashSet,
-			const MoveTreeProfile& _profile, MoveTreeSearchData _data);
-		void evaluate_next(const Board& _previousBoard,
+		NodeEvalResult evaluate_next(const Board& _previousBoard,
 			const MoveTreeProfile& _profile, MoveTreeSearchData _data);
 
 
@@ -200,21 +231,33 @@ namespace chess
 	public:
 		RatedMove move{};
 	private:
-		Rating rating_ = 0;
-
+		Rating rating_ = 0_rt;
+	public:
 	};
+
+
+	/**
+	 * @brief Evaluates the next full move for a given move node.
+	 * 
+	 * @param _board Board prior to playing the given node's move.
+	 * @param _node Node to evaluate next full move for.
+	 * @param _profile Tree profile configuring search/eval handling.
+	 * @param _searchData Extra data about the search.
+	*/
+	void evaluate_next_full_move(const Board& _board, MoveTreeNode& _node,
+		const MoveTreeProfile& _profile, MoveTreeSearchData _searchData);
+
+
 
 
 	struct MoveTree
 	{
 	private:
-
-		// Common evaluate next function
-		void evaluate_next(MoveTreeSearchData _searchData, BoardHashSet* _hashSet, const MoveTreeProfile& _profile);
+		void resort_children(std::mt19937* _rnd);
 
 	public:
+		// Common evaluate next function
 		void evaluate_next(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile = MoveTreeProfile());
-		void evaluate_next_unique(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile = MoveTreeProfile());
 		void evalulate_next(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile = MoveTreeProfile());
 
 		std::optional<RatedMove> best_move(std::mt19937& _rnd);
@@ -226,12 +269,10 @@ namespace chess
 		size_t count_unique_positions();
 		size_t count_checks();
 
-		void clear_hashes() { this->hash_set_.clear(); };
-
 		void build_tree(size_t _depth, size_t _maxExtendedDepth, const MoveTreeProfile& _profile = MoveTreeProfile());
 		void build_tree(size_t _depth, const MoveTreeProfile& _profile = MoveTreeProfile())
 		{
-			return this->build_tree(_depth, _depth + 3, _profile);
+			return this->build_tree(_depth, _depth + 2, _profile);
 		};
 
 		auto begin() { return this->moves_.begin(); };
@@ -260,7 +301,6 @@ namespace chess
 
 		chess::Board board_{}; // initial board state
 		std::vector<MoveTreeNode> moves_{}; // moves that can be played from the initial board state
-		BoardHashSet hash_set_{};
 		size_t depth_counter_ = 0;
 	};
 
