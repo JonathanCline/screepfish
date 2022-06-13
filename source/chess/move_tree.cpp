@@ -30,9 +30,10 @@ namespace chess
 	void MoveTreeNode::resort_children()
 	{
 		// Sort children by rating
-		std::sort(this->begin(), this->end(), [](const MoveTreeNode& lhs, const MoveTreeNode& rhs) -> bool
+		std::ranges::sort(this->responses_,
+			[](const MoveTreeNode& lhs, const MoveTreeNode& rhs)
 			{
-				return lhs.rating() > rhs.rating();
+				return lhs.player_rating() > rhs.player_rating();
 			});
 	};
 
@@ -152,8 +153,10 @@ namespace chess
 				const auto _rating = quick_rate(_newBoard, _opponentColor);
 
 				// Assign values
-				it->move = RatedMove{ *p, _rating };
-				it->rating_ = _rating;
+				it->set_move(
+					RatedMove{ *p, _rating },
+					_opponentColor
+				);
 
 				// Follow lines based on profile.
 				_evalResult = get_interesting_lines(*it, _board, _newBoard, _move, _profile, _data);
@@ -267,16 +270,14 @@ namespace chess
 
 
 
-	inline Rating deep_eval(MoveTreeNode& _node)
+	inline AbsoluteRating deep_eval(MoveTreeNode& _node)
 	{
 		// If the opponent has no responses, we can just set the rating as the quick rating
 		// and return early. These "ends" of the tree are the basis for the deep evaluation.
 		if (_node.empty())
 		{
 			// Use the quick rating.
-			const auto _rating = _node.quick_rating();
-			_node.set_rating(_rating);
-			return _rating;
+			return _node.rating();
 		};
 
 		// Loop through the opponent's responses to the node's move and preform a deep eval for each.
@@ -284,7 +285,9 @@ namespace chess
 		for (auto& _opponentResponse : _node)
 		{
 			// Preform a deep evaluation of the opponent's response.
-			const auto _opponentResponseRating = deep_eval(_opponentResponse);
+			const auto _opponentResponseRating =
+				deep_eval(_opponentResponse);
+
 			if (!_opponentResponse.empty())
 			{
 				_hasMoveAfterOpponent = true;
@@ -294,9 +297,12 @@ namespace chess
 		// Sort the opponent's responses by full rating.
 		_node.resort_children();
 
-		const auto _rating = -_node.front().rating();
-		_node.set_rating(_rating);
-		return _rating;
+		// The opponent's best response will be in the front.
+		const auto _bestResponseRating = _node.front().rating();
+		
+		_node.set_rating(_bestResponseRating);
+		
+		return _bestResponseRating;
 	};
 
 	inline void prune(MoveTreeNode& _node)
@@ -308,29 +314,6 @@ namespace chess
 		
 		_node.resize(1);
 		return;
-
-		std::vector<std::pair<MoveTreeNode*, Rating>> _opponentMovesWithMyBestRating{};
-		for (auto& _opponentResponse : _node)
-		{
-			if (!_opponentResponse.empty())
-			{
-				_opponentResponse.resort_children();
-				_opponentMovesWithMyBestRating.push_back
-				(
-					{ &_opponentResponse, _opponentResponse.front().rating() }
-				);
-			};
-		};
-
-		// Sort by the rating of my responses to the opponent's response.
-		std::ranges::sort(_opponentMovesWithMyBestRating,
-			[](const auto& lhs, const auto& rhs)
-			{
-				return lhs.second > rhs.second;
-			});
-
-
-
 	};
 
 
@@ -549,8 +532,10 @@ namespace chess
 				const auto _rating = quick_rate(_newBoard, _board.get_toplay());
 
 				// Assign values
-				it->move = RatedMove{ *p, _rating };
-				it->set_rating(_rating);
+				it->set_move(
+					RatedMove{*p, _rating },
+					_board.get_toplay()
+				);
 
 				// Next
 				++it;
@@ -705,10 +690,9 @@ namespace chess
 	void MoveTree::resort_children(std::mt19937* _rnd)
 	{
 		auto& _moves = this->moves_;
-
-		std::ranges::sort(_moves, [](auto& lhs, auto& rhs)
+		std::ranges::sort(_moves, [](const MoveTreeNode& lhs, const MoveTreeNode& rhs)
 			{
-				return lhs.rating() > rhs.rating();
+				return lhs.player_rating() > rhs.player_rating();
 			});
 
 		if (!_moves.empty() && _rnd)

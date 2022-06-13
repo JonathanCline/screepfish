@@ -114,6 +114,11 @@ namespace chess
 	{
 	public:
 
+		Color played_by() const noexcept
+		{
+			return this->player_;
+		};
+
 		void resort_children();
 
 		using size_type = uint8_t;
@@ -122,7 +127,7 @@ namespace chess
 		 * @brief Gets the rating for the position.
 		 * @return Absolute rating.
 		*/
-		Rating rating() const
+		AbsoluteRating rating() const
 		{
 			return this->rating_;
 		};
@@ -132,10 +137,16 @@ namespace chess
 		 * @param _player Player to get the rating's value for.
 		 * @return Rating for the given player.
 		*/
-		//Rating rating(Color _player) const
-		//{
-		//	return this->rating().player(_player);
-		//};
+		Rating rating(Color _player) const
+		{
+			return this->rating().player(_player);
+		};
+
+		Rating player_rating() const
+		{
+			return this->rating(this->played_by());
+		};
+
 
 		/**
 		 * @brief Gets the quick rating for the position.
@@ -146,7 +157,7 @@ namespace chess
 			return this->move.rating();
 		};
 
-		void set_rating(Rating r)
+		void set_rating(AbsoluteRating r)
 		{
 			this->rating_ = r;
 		};
@@ -192,10 +203,22 @@ namespace chess
 			return this->responses_.size();
 		};
 
-		auto begin() { return this->responses_.begin(); };
-		auto begin() const { return this->responses_.begin(); };
-		auto end() { return this->responses_.end(); };
-		auto end() const { return this->responses_.end(); };
+		auto begin()
+		{
+			return this->responses_.begin();
+		};
+		auto begin() const
+		{
+			return this->responses_.begin();
+		};
+		auto end()
+		{
+			return this->responses_.end();
+		};
+		auto end() const
+		{
+			return this->responses_.end();
+		};
 
 		auto& front()
 		{
@@ -220,6 +243,16 @@ namespace chess
 		void show_best_line() const;
 		std::vector<RatedMove> get_best_line() const;
 
+		void set_move(RatedMove _move, Color _playedBy)
+		{
+			this->move = _move;
+			this->player_ = _playedBy;
+			this->rating_ =
+				AbsoluteRating(_move.rating(), _playedBy);
+		};
+
+
+
 		MoveTreeNode()
 		{
 			SCREEPFISH_ASSERT(!this->was_evaluated());
@@ -231,9 +264,15 @@ namespace chess
 	public:
 		RatedMove move{};
 	private:
-		Rating rating_ = 0_rt;
-	public:
+		AbsoluteRating rating_ = 0_art;
+		
+		/**
+		 * @brief The player that played this move.
+		*/
+		Color player_{};
+
 	};
+
 
 
 	/**
