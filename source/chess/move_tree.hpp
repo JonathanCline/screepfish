@@ -36,6 +36,7 @@ namespace chess
 		bool follow_checks_ = false;
 		bool follow_captures_ = false;
 		bool enable_pruning_ = false;
+		bool alphabeta_ = false;
 
 		MoveTreeProfile() = default;
 	};
@@ -154,7 +155,7 @@ namespace chess
 		*/
 		Rating quick_rating() const
 		{
-			return this->move.rating();
+			return this->move_.rating();
 		};
 
 		void set_rating(AbsoluteRating r)
@@ -164,7 +165,7 @@ namespace chess
 
 		explicit operator bool() const
 		{
-			return !this->move.is_null();
+			return !this->move_.is_null();
 		};
 
 
@@ -231,25 +232,56 @@ namespace chess
 
 		void count_duplicates(Board _board, std::set<size_t>& _boards);
 		
+
+		NodeEvalResult evaluate_next_with_board(const Board& _board,
+			const MoveTreeProfile& _profile, MoveTreeSearchData _data, bool _autoProp = true);
+
 		NodeEvalResult evaluate_next(const Board& _previousBoard,
-			const MoveTreeProfile& _profile, MoveTreeSearchData _data);
+			const MoveTreeProfile& _profile, MoveTreeSearchData _data, bool _autoProp = true);
 
 
 		size_t tree_size() const;
 		size_t total_outcomes() const;
 
-		size_t count_checks(Board _board);
+		size_t count_checks(Board _board) const;
+		
+
+
 
 		void show_best_line() const;
 		std::vector<RatedMove> get_best_line() const;
 
 		void set_move(RatedMove _move, Color _playedBy)
 		{
-			this->move = _move;
+			this->move_ = _move;
 			this->player_ = _playedBy;
 			this->rating_ =
 				AbsoluteRating(_move.rating(), _playedBy);
+			this->responses_.clear();
 		};
+
+		/**
+		 * @brief Clears the branches from this node.
+		*/
+		void clear() noexcept
+		{
+			this->responses_.clear();
+		};
+
+
+		auto& at(size_type _index)
+		{
+			SCREEPFISH_ASSERT(_index < this->size());
+			return this->responses_.data()[_index];
+		};
+		const auto& at(size_type _index) const
+		{
+			SCREEPFISH_ASSERT(_index < this->size());
+			return this->responses_.data()[_index];
+		};
+
+
+
 
 
 
@@ -262,7 +294,7 @@ namespace chess
 		sch::NullTerminatedArena<MoveTreeNode, impl::MoveTreeNodeBlockAllocator> responses_{};
 
 	public:
-		RatedMove move{};
+		RatedMove move_{};
 	private:
 		AbsoluteRating rating_ = 0_art;
 		
@@ -270,23 +302,205 @@ namespace chess
 		 * @brief The player that played this move.
 		*/
 		Color player_{};
+		uint8_t depth_ = 0;
+	};
+	
 
+
+
+	template <jc::cx_invocable<const Board&> T>
+	inline void foreach_final_position(const Board& _board, const MoveTreeNode& _node, const T& _op)
+	{
+		if (_node.empty())
+		{
+			// If it was evaluated then this is a checkmate.
+			if (_node.was_evaluated())
+			{
+				return;
+			}
+			else
+			{
+				_op(_board);
+			};
+		}
+		else
+		{
+			for (auto& _response : _node)
+			{
+				auto _nextBoard = _board;
+				_nextBoard.move(_response.move_);
+				foreach_final_position(_nextBoard, _response, _op);
+			};
+		};
+	};
+
+	template <jc::cx_invocable<const Board&, Move> T>
+	inline void foreach_final_move(const Board& _board, const MoveTreeNode& _node, const T& _op)
+	{
+		if (!_node.empty())
+		{
+			for (auto& _response : _node)
+			{
+				if (_response.empty())
+				{
+					_op(_board, _response.move_);
+				}
+				else
+				{
+					auto _nextBoard = _board;
+					_nextBoard.move(_response.move_);
+					foreach_final_move(_nextBoard, _response, _op);
+				};
+			};
+		};
+	};
+
+	template <jc::cx_invocable<const Board&> T>
+	inline void foreach_position(const Board& _board, const MoveTreeNode& _node, const T& _op)
+	{
+		_op(_board);
+		for (auto& _response : _node)
+		{
+			auto _nextBoard = _board;
+			_nextBoard.move(_response.move_);
+			foreach_position(_nextBoard, _response, _op);
+		};
 	};
 
 
 
-	/**
-	 * @brief Evaluates the next full move for a given move node.
-	 * 
-	 * @param _board Board prior to playing the given node's move.
-	 * @param _node Node to evaluate next full move for.
-	 * @param _profile Tree profile configuring search/eval handling.
-	 * @param _searchData Extra data about the search.
-	*/
-	void evaluate_next_full_move(const Board& _board, MoveTreeNode& _node,
-		const MoveTreeProfile& _profile, MoveTreeSearchData _searchData);
 
+	inline size_t count_checks(const Board& _board, const MoveTreeNode& _node)
+	{
+		size_t n = 0;
+		const auto _op = [&n](const Board& _board)
+		{
+			if (is_check(_board, Color::white) || is_check(_board, Color::black))
+			{
+				++n;
+			};
+		};
+		foreach_position(_board, _node, _op);
+		return n;
+	};
+	inline size_t count_positions(const Board& _board, const MoveTreeNode& _node)
+	{
+		size_t n = 0;
+		const auto _op = [&n](const Board& _board)
+		{
+			++n;
+		};
+		foreach_position(_board, _node, _op);
+		return n;
+	};
+	
+	inline size_t count_final_checks(const Board& _board, const MoveTreeNode& _node)
+	{
+		size_t n = 0;
+		const auto _op = [&n](const Board& _board)
+		{
+			if (is_check(_board, Color::white) || is_check(_board, Color::black))
+			{
+				++n;
+			};
+		};
+		foreach_final_position(_board, _node, _op);
+		return n;
+	};
+	inline size_t count_final_positions(const Board& _board, const MoveTreeNode& _node)
+	{
+		size_t n = 0;
+		const auto _op = [&n](const Board& _board)
+		{
+			++n;
+		};
+		foreach_final_position(_board, _node, _op);
+		return n;
+	};
+	inline size_t count_final_captures(const Board& _board, const MoveTreeNode& _node)
+	{
+		size_t n = 0;
+		const auto _op = [&n](const Board& _previousBoard, Move _move)
+		{
+			if (is_piece_capture(_previousBoard, _move))
+			{
+				++n;
+			};
+		};
+		foreach_final_move(_board, _node, _op);
+		return n;
+	};
+	inline size_t count_final_castles(const Board& _board, const MoveTreeNode& _node)
+	{
+		size_t n = 0;
+		const auto _op = [&n](const Board& _previousBoard, Move _move)
+		{
+			if (_previousBoard.get(_move.from()) == Piece::king &&
+				chess::distance(_move.from().file(), _move.to().file()) > 1)
+			{
+				++n;
+			};
+		};
+		foreach_final_move(_board, _node, _op);
+		return n;
+	};
+	inline size_t count_final_checkmates(const Board& _board, const MoveTreeNode& _node)
+	{
+		size_t n = 0;
+		const auto _op = [&n](const Board& _board)
+		{
+			if (is_checkmate(_board, Color::white) || is_checkmate(_board, Color::black))
+			{
+				++n;
+			};
+		};
+		foreach_final_position(_board, _node, _op);
+		return n;
+	};
+	inline size_t count_final_double_checks(const Board& _board, const MoveTreeNode& _node)
+	{
+		size_t n = 0;
+		const auto _op = [&n](const Board& _board)
+		{
+			if (is_double_check(_board, Color::black) || is_double_check(_board, Color::white))
+			{
+				++n;
+			};
+		};
+		foreach_final_position(_board, _node, _op);
+		return n;
+	};
+	inline size_t count_final_enpassants(const Board& _board, const MoveTreeNode& _node)
+	{
+		size_t n = 0;
+		const auto _op = [&n](const Board& _previousBoard, Move _move)
+		{
+			if (is_enpassant(_previousBoard, _move))
+			{
+				++n;
+			};
+		};
+		foreach_final_move(_board, _node, _op);
+		return n;
+	};
 
+	inline std::vector<std::pair<Board, Move>>
+		find_final_check_moves(const Board& _board, const MoveTreeNode& _node)
+	{
+		auto o = std::vector<std::pair<Board, Move>>();
+		const auto _op = [&o](const Board& _board, Move _move)
+		{
+			auto nb = _board;
+			nb.move(_move);
+
+			if (is_check(nb, Color::white) || is_check(nb, Color::black))
+			{
+				o.push_back({ nb, _move });
+			};
+		};
+		foreach_final_move(_board, _node, _op);
+		return o;
+	};
 
 
 	struct MoveTree
@@ -297,7 +511,6 @@ namespace chess
 	public:
 		// Common evaluate next function
 		void evaluate_next(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile = MoveTreeProfile());
-		void evalulate_next(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile = MoveTreeProfile());
 
 		std::optional<RatedMove> best_move();
 		std::optional<RatedMove> best_move(std::mt19937& _rnd) { return this->best_move(); };
@@ -316,47 +529,91 @@ namespace chess
 			return this->build_tree(_depth, _depth + 2, _profile);
 		};
 
-		auto begin() { return this->moves_.begin(); };
-		auto begin() const { return this->moves_.begin(); };
-		auto cbegin() const { return this->moves_.begin(); };
-		auto end() { return this->moves_.end(); };
-		auto end() const { return this->moves_.end(); };
-		auto cend() const { return this->moves_.end(); };
+		/**
+		 * @brief Gets the root node for this tree. 
+		 * 
+		 * The root node holds the last move played for the board this tree starts from.
+		 * 
+		 * @return Root tree node reference.
+		*/
+		MoveTreeNode& root() noexcept
+		{
+			return this->root_;
+		};
 
+		/**
+		 * @brief Gets the root node for this tree.
+		 *
+		 * The root node holds the last move played for the board this tree starts from.
+		 *
+		 * @return Root tree node reference.
+		*/
+		const MoveTreeNode& root() const noexcept
+		{
+			return this->root_;
+		};
+
+		/**
+		 * @brief Gets the initial board state.
+		 * @return Chess board state.
+		*/
 		const chess::Board& initial_board() const
 		{
 			return this->board_;
 		};
+
+		/**
+		 * @brief Sets the initial board state.
+		 * 
+		 * This will cause the tree to be cleared and the root move to be changed.
+		 * 
+		 * @param _board Chess board state.
+		*/
 		void set_initial_board(const chess::Board& _board)
 		{
+			// Set the board.
 			this->board_ = _board;
+
+			// Determine the initial board rating, this is required for changing the root node.
+			const auto _boardRating = chess::quick_rate(_board, _board.get_toplay());
+
+			// Clear out the root node and set to use the last played move.
+			this->root_.clear();
+			if (_board.get_last_move())
+			{
+				this->root_.set_move(RatedMove(_board.get_last_move(), _boardRating),
+					!_board.get_toplay());
+			};
+
 		};
 
 
 		MoveTree() = default;
 		MoveTree(const chess::Board& _board) :
-			board_(_board)
-		{};
+			root_()
+		{
+			this->set_initial_board(_board);
+		};
 
 	private:
 
-		chess::Board board_{}; // initial board state
-		std::vector<MoveTreeNode> moves_{}; // moves that can be played from the initial board state
+		/**
+		 * @brief Holds the initial board state.
+		*/
+		chess::Board board_{};
+
+		/**
+		 * @brief The root node for the tree, holds the last move played for the stored initial board.
+		*/
+		MoveTreeNode root_;
+		
+		/**
+		 * @brief Probably not needed.
+		*/
 		size_t depth_counter_ = 0;
 	};
 
 
-	/*
-		Before:
-			midgame (d3_unique) - 38
-			midgame (d3) - 48
-			opening (d2) - 10531
-			midgame (d2) - 1641
-	*/
 
-	/*
-		After:
-			
-	*/
 
 };

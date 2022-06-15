@@ -13,7 +13,7 @@
 
 #include "utility/perf.hpp"
 
-#include "terminal/terminal.hpp"
+#include "terminal/board_view_terminal.hpp"
 
 #include <jclib/functor.h>
 
@@ -412,10 +412,11 @@ namespace sch
 			{
 				if (!v)
 				{
-					std::cout << "TEST FAILED " <<
-						v.name() <<
+					std::cout << "TEST FAILED \n" <<
+						'\t' << v.name() << "\n\t"
 						"(" << v.result() << ") : " <<
 						v.description() << std::endl;
+					std::cout << '\n' << str::rep('=', 80) << "\n\n";
 					_failed = true;
 				};
 			};
@@ -426,9 +427,69 @@ namespace sch
 			};
 		}
 
+#if false
+		for (size_t _depth = 0; _depth != 7; ++_depth)
+		{
+			// peft
+			auto _board = chess::Board();
+			chess::reset_board(_board);
+
+			auto _profile = chess::MoveTreeProfile();
+			_profile.follow_captures_ = false;
+			_profile.follow_checks_ = false;
+			_profile.enable_pruning_ = false;
+
+			auto _tree = chess::MoveTree(_board);
+			for (size_t n = 0; n != _depth; ++n)
+			{
+				auto _searchData = chess::MoveTreeSearchData();
+				_searchData.depth_ = 0;
+				_searchData.max_depth_ = _depth + 1;
+				_tree.evaluate_next(_searchData, _profile);
+			};
+
+			auto _positions = chess::count_final_positions(_tree.initial_board(), _tree.root());
+			auto _captures = chess::count_final_captures(_tree.initial_board(), _tree.root());
+			auto _checks = chess::count_final_checks(_tree.initial_board(), _tree.root());
+			auto _castles = chess::count_final_castles(_tree.initial_board(), _tree.root());
+			auto _checkmates = chess::count_final_checkmates(_tree.initial_board(), _tree.root());
+
+			std::cout << "PerfT (d " << _depth << ") : \n";
+			std::cout << "   positions  : " << _positions << '\n';
+			std::cout << "   captures   : " << _captures << '\n';
+			std::cout << "   checks     : " << _checks << '\n';
+			std::cout << "   castles    : " << _castles << '\n';
+			std::cout << "   checkmates : " << _checkmates << '\n';
+		};
+#endif
 
 		using namespace chess;
 
+		std::cout << '\n' << str::rep('=', 80) << "\n\n";
+		{
+			auto _board = Board();
+			reset_board(_board);
+
+			auto _tree = chess::MoveTree(_board);
+			auto _profile = chess::MoveTreeProfile();
+			_profile.follow_captures_ = false;
+			_profile.follow_checks_ = false;
+			_profile.alphabeta_ = false;
+			_profile.enable_pruning_ = false;
+
+			//for (size_t n = 0; n != 6; ++n)
+			//{
+			//	auto _searchData = chess::MoveTreeSearchData();
+			//	_searchData.max_depth_ = 6;
+			//	_tree.evaluate_next(_searchData, _profile);
+			//};
+
+			_tree.build_tree(6, 6, _profile);
+			auto _finalChecks = count_final_checks(_board, _tree.root());
+			std::cout << "Final checks " << _finalChecks << '\n';
+		};
+
+		std::cout << '\n' << str::rep('=', 80) << "\n\n";
 		{
 			const auto _fen = "r3k1nr/pppn1ppp/4b3/4q3/Pb5P/8/3PP1P1/RNBQKBNR w KQkq - 0 8";
 			auto _board = *parse_fen(_fen);
@@ -510,25 +571,28 @@ namespace sch
 
 			if (!chess::is_rook_blocked(_board, (File::a, Rank::r1), Color::white))
 			{
+				std::cout << _board << std::endl;
 				abort();
 			};
 			if (!chess::is_rook_blocked(_board, (File::h, Rank::r1), Color::white))
 			{
+				std::cout << _board << std::endl;
 				abort();
 			};
 			if (!chess::is_rook_blocked(_board, (File::a, Rank::r8), Color::black))
 			{
+				std::cout << _board << std::endl;
 				abort();
 			};
 			if (!chess::is_rook_blocked(_board, (File::h, Rank::r8), Color::black))
 			{
+				std::cout << _board << std::endl;
 				abort();
 			};
-
-			std::cout << _board << std::endl;
 		};
 
 		// Queen blocked rating
+#if false
 		{
 			Rating rt0 = 0.0f;
 			Rating rt1 = 0.0f;
@@ -564,6 +628,7 @@ namespace sch
 				};
 			};
 		};
+#endif
 
 		// Mate in 1
 		{
@@ -576,16 +641,16 @@ namespace sch
 				abort();
 			};
 
-			auto _engine = sch::ScreepFish();
-			_engine.start(_board, Color::black);
-			_engine.set_board(_board);
-			const auto _move = _engine.get_move();
+			auto _tree = chess::MoveTree(_board);
+			_tree.build_tree(3, 3);
+			auto _move = _tree.best_move();
 
-			_board.move(*_move.move);
+			_board.move(*_move);
 			if (!chess::is_checkmate(_board, Color::white))
 			{
 				// Should be checkmate
-				//abort();
+				std::cout << "Expected Checkmate : \"" << chess::get_fen(_board) << "\"\n";
+				abort();
 			};
 		};
 
@@ -652,7 +717,7 @@ namespace sch
 
 			for (auto bp = b0; bp != b1; ++bp)
 			{
-				std::cout << *bp << std::endl;
+				//std::cout << *bp << std::endl;
 
 				auto nb = _board;
 				nb.move(*bp);
@@ -664,6 +729,13 @@ namespace sch
 				};
 			};
 			
+		};
+
+		// Checkmate check
+		{
+			const auto _fen = "8/3R1Q2/5pk1/3p2p1/6P1/3b3P/8/K6n b - - 11 47";
+			auto _board = *parse_fen(_fen);
+			SCREEPFISH_CHECK(chess::is_checkmate(_board, _board.get_toplay()));
 		};
 
 		return _runOnFinish;
@@ -692,102 +764,115 @@ namespace sch
 	{
 		using namespace chess;
 
-		// midgame, depth 3 - unique
-		{
-			auto b = *parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
-			const auto fn = [&b]()
-			{
-				auto t = MoveTree(b);
-				t.build_tree(3);
-			};
-			const auto r = perf_test_part(fn);
-			std::cout << "midgame (d3_unique) - " << r << std::endl;
-		};
-
-		// midgame, depth 3
-		{
-			auto b = *parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
-			const auto fn = [&b]()
-			{
-				const auto _searchData = MoveTreeSearchData();
-				auto t = MoveTree(b);
-				t.evaluate_next(_searchData);
-				t.evaluate_next(_searchData);
-				t.evaluate_next(_searchData);
-			};
-			const auto r = perf_test_part(fn);
-			std::cout << "midgame (d3) - " << r << std::endl;
-		};
-
-		// midgame, depth 4, check/capture following
-		{
-			auto b = *parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
-			const auto fn = [&b]()
-			{
-				auto _profile = MoveTreeProfile{};
-				_profile.enable_pruning_ = false;
-				_profile.follow_captures_ = true;
-				_profile.follow_checks_ = true;
-
-				// Build tree
-				auto t = MoveTree(b);
-				t.build_tree(4, 4 + 1, _profile);
-			};
-			const auto r = perf_test_part<2>(fn, std::chrono::seconds(4));
-			std::cout << "midgame (d4, check/capture) - " << r << std::endl;
-		};
-
-		// midgame, depth 4, pruning + check/capture following
-		{
-			auto b = *parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
-			const auto fn = [&b]()
-			{
-				auto _profile = MoveTreeProfile{};
-				_profile.enable_pruning_	= true;
-				_profile.follow_captures_	= true;
-				_profile.follow_checks_		= true;
-
-				// Build tree
-				auto t = MoveTree(b);
-				t.build_tree(4, 4 + 1, _profile);
-			};
-			const auto r = perf_test_part<2>(fn, std::chrono::seconds(4));
-			std::cout << "midgame (d4, pruning + check/capture) - " << r << std::endl;
-		};
-
-		// opening, depth 2
+		// opening, depth 3
 		{
 			auto b = Board();
 			reset_board(b);
 			const auto fn = [&b]()
 			{
+				auto _profile = MoveTreeProfile{};
+				_profile.enable_pruning_ = false;
+				_profile.follow_captures_ = false;
+				_profile.follow_checks_ = false;
+
 				const auto _searchData = MoveTreeSearchData();
 				auto t = MoveTree(b);
-				t.evaluate_next(_searchData);
-				t.evaluate_next(_searchData);
+				t.build_tree(3, 3, _profile);
 			};
 			const auto r = perf_test_part(fn);
-			std::cout << "opening (d2) - " << r << std::endl;
+			std::cout << "opening (d3) - " << r << std::endl;
 		};
 
-		// midgame, depth 2
+		// midgame, depth 3
 		{
-			auto b = *parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
+			auto _pFen = parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
+			SCREEPFISH_CHECK(_pFen);
+
+			auto b = *_pFen;
+			const auto fn = [&b]()
+			{
+				auto _profile = MoveTreeProfile{};
+				_profile.enable_pruning_ = false;
+				_profile.follow_captures_ = false;
+				_profile.follow_checks_ = false;
+				_profile.alphabeta_ = true;
+
+				const auto _searchData = MoveTreeSearchData();
+				auto t = MoveTree(b);
+				t.build_tree(3, 3, _profile);
+			};
+			const auto r = perf_test_part(fn);
+			std::cout << "midgame (d3) - " << r << std::endl;
+		};
+
+		// midgame, depth 3, no ab
+		{
+			auto _pFen = parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
+			SCREEPFISH_CHECK(_pFen);
+
+			auto b = *_pFen;
 			const auto fn = [&b]()
 			{
 				const auto _searchData = MoveTreeSearchData();
 				auto t = MoveTree(b);
-				t.evaluate_next(_searchData);
-				t.evaluate_next(_searchData);
+				auto p = MoveTreeProfile();
+				p.follow_captures_ = false;
+				p.follow_checks_ = false;
+				p.enable_pruning_ = false;
+				p.alphabeta_ = false;
+				t.build_tree(3, 3, p);
 			};
 			const auto r = perf_test_part(fn);
-			std::cout << "midgame (d2) - " << r << std::endl;
+			std::cout << "midgame (d3 no ab) - " << r << std::endl;
+		};
+
+		// midgame, depth 4
+		{
+			auto _pFen = parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
+			SCREEPFISH_CHECK(_pFen);
+
+			auto b = *_pFen;
+			const auto fn = [&b]()
+			{
+				auto _profile = MoveTreeProfile{};
+				_profile.enable_pruning_ = false;
+				_profile.follow_captures_ = false;
+				_profile.follow_checks_ = false;
+				_profile.alphabeta_ = true;
+
+				const auto _searchData = MoveTreeSearchData();
+				auto t = MoveTree(b);
+				t.build_tree(4, 4, _profile);
+			};
+			const auto r = perf_test_part(fn);
+			std::cout << "midgame (d4) - " << r << std::endl;
+		};
+
+		// midgame, depth 4, no ab
+		{
+			auto _pFen = parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
+			SCREEPFISH_CHECK(_pFen);
+
+			auto b = *_pFen;
+			const auto fn = [&b]()
+			{
+				const auto _searchData = MoveTreeSearchData();
+				auto t = MoveTree(b);
+				auto p = MoveTreeProfile();
+				p.follow_captures_ = false;
+				p.follow_checks_ = false;
+				p.enable_pruning_ = false;
+				p.alphabeta_ = false;
+				t.build_tree(4, 4, p);
+			};
+			const auto r = perf_test_part(fn);
+			std::cout << "midgame (d4 no ab) - " << r << std::endl;
 		};
 
 	};
 
 
-	inline void on_local_game_update(chess::Terminal& _terminal, const chess::Board& _board)
+	inline void on_local_game_update(chess::BoardViewTerminal& _terminal, const chess::Board& _board)
 	{
 		// Set the board to display
 		_terminal.set_board(_board);
@@ -802,7 +887,7 @@ namespace sch
 	bool local_game(const char* _assetsDirectoryPath, bool _step)
 	{
 		using namespace chess;
-		auto _terminal = chess::Terminal(_assetsDirectoryPath, _step);
+		auto _terminal = chess::BoardViewTerminal(_assetsDirectoryPath, _step);
 
 		auto _board = Board();
 		reset_board(_board);

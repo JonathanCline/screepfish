@@ -4,6 +4,8 @@
 
 #include "nn/net.hpp"
 
+#include "terminal/terminal.hpp"
+
 #include "chess/fen.hpp"
 #include "chess/chess.hpp"
 #include "chess/board.hpp"
@@ -23,6 +25,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <filesystem>
+#include <thread>
 
 /*
 	Initial:
@@ -61,10 +64,11 @@ inline auto make_chess_board_nn_inputs(const chess::Board& _board)
 
 int rmain(std::span<const char* const> _vargs)
 {
-	
+	std::cout << str::rep('=', 80) << '\n' << '\n';
+
 	bool _perf = false;
 	bool _local = false;
-	bool _tests = true;
+	bool _tests = false;
 
 	for (const auto& _varg : _vargs)
 	{
@@ -73,9 +77,9 @@ int rmain(std::span<const char* const> _vargs)
 		{
 			_perf = true;
 		}
-		else if (_arg == "--notest")
+		else if (_arg == "--test")
 		{
-			_tests = false;
+			_tests = true;
 		}
 		else if (_arg == "--local" || _arg == "-l")
 		{
@@ -87,11 +91,14 @@ int rmain(std::span<const char* const> _vargs)
 	{
 		sch::perf_test();
 		exit(0);
-	};
-
-	if (_tests && !sch::run_tests_main())
+	}
+	else if (_tests)
 	{
-		return 1;
+		if (!sch::run_tests_main())
+		{
+			exit(1);
+		};
+		exit(0);
 	};
 
 	if (_local)

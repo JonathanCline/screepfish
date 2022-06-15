@@ -520,6 +520,14 @@ namespace chess
 			return this->board().pieces();
 		};
 
+		Move get_last_move() const
+		{
+			return this->board_.get_last_move();
+		};
+
+		auto* operator->() { return &this->board_; };
+		auto* operator->() const { return &this->board_; };
+
 
 		Board() = default;
 	private:

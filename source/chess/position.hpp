@@ -846,4 +846,15 @@ namespace chess
 
 
 
+
+
+	constexpr int8_t distance(File lhs, File rhs)
+	{
+		return jc::to_underlying(std::max(lhs, rhs)) - jc::to_underlying(std::min(lhs, rhs));
+	};
+	constexpr int8_t distance(Rank lhs, Rank rhs)
+	{
+		return jc::to_underlying(std::max(lhs, rhs)) - jc::to_underlying(std::min(lhs, rhs));
+	};
+
 };

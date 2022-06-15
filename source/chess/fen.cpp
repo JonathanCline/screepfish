@@ -299,6 +299,12 @@ namespace chess
 			_fen = str::lstrip(_fen);
 		};
 
+		// If empty, we can finish early as no move counts were provided
+		if (_fen.empty())
+		{
+			return _board;
+		};
+
 		// Parse half move
 		{
 			auto p =  _fen.find(' ');

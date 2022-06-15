@@ -102,6 +102,17 @@ namespace chess
 		return _hash;
 	};
 
+	/**
+	 * @brief Calculates a zobrist hash for a board.
+	 * @param _board Chess board.
+	 * @return Zobrist hash.
+	*/
+	inline auto hash(const Board& _board)
+	{
+		const auto _blackToMove = (_board.get_toplay() == Color::black);
+		return hash(_board, _blackToMove);
+	};
+
 
 
 

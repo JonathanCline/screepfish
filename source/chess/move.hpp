@@ -6,6 +6,8 @@
 
 #include "chess/chess.hpp"
 
+#include "utility/utility.hpp"
+
 #include <span>
 #include <array>
 #include <cassert>
@@ -20,7 +22,7 @@ namespace chess
 
 		void write(Move _move)
 		{
-			assert(this->at_ != this->end_);
+			SCREEPFISH_ASSERT(this->at_ != this->end_);
 			*this->at_ = std::move(_move);
 			++this->at_;
 		};
@@ -32,7 +34,7 @@ namespace chess
 		MoveBuffer(chess::Move* _at, chess::Move* _end) :
 			at_(_at), end_(_end)
 		{
-			assert(_at && _end && _at <= _end);
+			SCREEPFISH_ASSERT(_at && _end && _at <= _end);
 		};
 
 		template <size_t N>
@@ -52,6 +54,23 @@ namespace chess
 	public:
 
 		constexpr RatingT rating() const noexcept { return this->rating_; };
+
+		friend inline constexpr bool operator==(const BasicRatedMove& lhs, const chess::Move& rhs)
+		{
+			return static_cast<const Move&>(lhs) == rhs;
+		};
+		friend inline constexpr bool operator==(const chess::Move& lhs, const BasicRatedMove& rhs)
+		{
+			return lhs == static_cast<const Move&>(rhs);
+		};
+		friend inline constexpr bool operator!=(const BasicRatedMove& lhs, const chess::Move& rhs)
+		{
+			return static_cast<const Move&>(lhs) != rhs;
+		};
+		friend inline constexpr bool operator!=(const chess::Move& lhs, const BasicRatedMove& rhs)
+		{
+			return lhs != static_cast<const Move&>(rhs);
+		};
 
 		constexpr auto operator<=>(const BasicRatedMove& rhs) const
 		{
@@ -199,7 +218,6 @@ namespace chess
 	 * @brief Checks if a move will result in a piece being captured.
 	 * 
 	 * Does not check the move for legality.
-	 * Does not handle en-passant.
 	 * 
 	 * @param _board Board that the move will be played on.
 	 * @param _move Move to check.
@@ -207,7 +225,74 @@ namespace chess
 	*/
 	inline bool is_piece_capture(const Board& _board, const Move& _move)
 	{
+		SCREEPFISH_ASSERT(_move);
+
+		const auto _fromPiece = _board.get(_move.from());
+		SCREEPFISH_ASSERT(_fromPiece);
+		
+		// Check for enpassant capture.
+		if (_fromPiece == Piece::pawn &&
+			_board.has_enpassant_target() &&
+			_board.enpassant_target() == _move.to())
+		{
+			return true;
+		};
+
+		// Check if target square has a piece.
 		return _board.get(_move.to()) != Piece::none;
+	};
+
+	/**
+	 * @brief Checks if a move is enpassant - always forced.
+	 *
+	 * Does not check for legality.
+	 * 
+	 * @param _board Chess board to look at.
+	 * @param _move The move to check.
+	 * @return True if move is enpassant, false otherwise.
+	*/
+	inline bool is_enpassant(const Board& _board, Move _move)
+	{
+		SCREEPFISH_CHECK(_move);
+
+		if (_board.get(_move.from()) == Piece::pawn &&
+			_board.has_enpassant_target() && _board.enpassant_target() == _move.to())
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		};
+	};
+
+	/**
+	 * @brief Checks if a position is double check for a player.
+	 * 
+	 * @param _board Chess board to look at.
+	 * @param _forPlayer Player to check if is in double check.
+	 * @return True if double check, false otherwise.
+	*/
+	inline bool is_double_check(const Board& _board, Color _forPlayer)
+	{
+		const auto _kingPiece = _board.get_king(_forPlayer);
+		SCREEPFISH_ASSERT(_kingPiece);
+
+		auto _moveData = std::array<Move, 64>{};
+		auto _buffer = MoveBuffer(_moveData);
+		const auto p0 = _buffer.head();
+		get_piece_attacked_from_moves(_board, _kingPiece, _buffer);
+		const auto p1 = _buffer.head();
+		
+		if (p1 - p0 <= 1) { return false; };
+		
+		Position _fromPos{};
+		for (auto p = p0; p != p1; ++p)
+		{
+			if (!_fromPos) { _fromPos = p->from(); continue; };
+			if (_fromPos != p->from()) { return true; };
+		};
+		return false;
 	};
 
 };

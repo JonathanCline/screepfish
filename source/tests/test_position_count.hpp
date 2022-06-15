@@ -24,20 +24,44 @@ namespace sch
 			const auto _searchData = chess::MoveTreeSearchData();
 			auto _tree = chess::MoveTree(this->board_);
 			
-			
+			auto _profile = chess::MoveTreeProfile();
+			_profile.alphabeta_ = false;
+			_profile.enable_pruning_ = false;
+			_profile.follow_captures_ = false;
+			_profile.follow_checks_ = false;
+
 			for (auto& v : this->expected_)
 			{
-				_tree.evaluate_next(_searchData);
-				if (const auto t = _tree.total_outcomes(); t != v)
+				_tree.evaluate_next(_searchData, _profile);
+				const auto u = chess::count_final_positions(_tree.initial_board(), _tree.root());
+				if (u != v)
 				{
-					const auto u = _tree.count_unique_positions();
+					const auto _captures =
+						chess::count_final_captures(_tree.initial_board(), _tree.root());
+					const auto _checks =
+						chess::count_final_checks(_tree.initial_board(), _tree.root());
+					const auto _doubleChecks =
+						chess::count_final_double_checks(_tree.initial_board(), _tree.root());
+					const auto _checkmates =
+						chess::count_final_checkmates(_tree.initial_board(), _tree.root());
+					const auto _castles =
+						chess::count_final_castles(_tree.initial_board(), _tree.root());
+					const auto _enpassants =
+						chess::count_final_enpassants(_tree.initial_board(), _tree.root());
+
 					const auto s =
 						"Expected " + std::to_string(v) +
-						" positions - got " + std::to_string(t) +
-						"\n delta = " + std::to_string((int)v - (int)t) +
-						"\n unique = " + std::to_string(u) +
-						"\n checks = " + std::to_string(_tree.count_checks()) +
-						"\n fen = " + chess::get_fen(_tree.initial_board());
+						" positions - got " + std::to_string(u) +
+						"\n fen = " + chess::get_fen(_tree.initial_board()) +
+						"\n delta = " + std::to_string((int)v - (int)u) +
+						"\n   positions     = " + std::to_string(u) +
+						"\n   captures      = " + std::to_string(_captures) +
+						"\n   checks        = " + std::to_string(_checks) +
+						"\n   double checks = " + std::to_string(_doubleChecks) +
+						"\n   checkmates    = " + std::to_string(_checkmates) +
+						"\n   castles       = " + std::to_string(_castles) +
+						"\n   enpassants    = " + std::to_string(_enpassants);
+
 					return TestResult(this->name_, -1, s);
 				};
 			};

@@ -202,6 +202,16 @@ namespace chess
 	{
 	public:
 
+		constexpr bool operator==(const Move& rhs) const noexcept
+		{
+			auto& lhs = *this;
+			return lhs.from() == rhs.from() && lhs.to() == rhs.to() && lhs.promotion() == rhs.promotion();
+		};
+		constexpr bool operator!=(const Move& rhs) const noexcept
+		{
+			auto& lhs = *this;
+			return lhs.from() != rhs.from() || lhs.to() != rhs.to() || lhs.promotion() != rhs.promotion();
+		};
 
 
 		constexpr PieceType promotion() const

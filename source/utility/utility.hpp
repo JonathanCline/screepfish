@@ -11,7 +11,26 @@
 
 #include <cassert>
 
-#define SCREEPFISH_ASSERT(cond) assert(cond)
+namespace sch
+{
+	void report_fatal_check_failure(const char* _file, unsigned long long _line, const char* _cond);
+	void report_fatal_assert_failure(const char* _file, unsigned long long _line, const char* _cond);
+};
+
+#define SCREEPFISH_DEBUG
+#ifdef NDEBUG
+#undef SCREEPFISH_DEBUG
+#endif
+
+
+#ifdef SCREEPFISH_DEBUG
+	#define SCREEPFISH_ASSERT(cond) { if(!(cond)) { ::sch::report_fatal_assert_failure(__FILE__, __LINE__, #cond); ::abort(); }; }
+#else
+	#define SCREEPFISH_ASSERT(cond) {}
+#endif
+
+#define SCREEPFISH_CHECK(cond) { if(!(cond)) { ::sch::report_fatal_check_failure(__FILE__, __LINE__, #cond); ::abort(); } }
+
 
 
 #include <array>

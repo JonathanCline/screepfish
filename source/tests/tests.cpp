@@ -30,7 +30,31 @@ namespace sch
 		));
 		_tests.push_back(jc::make_unique<Test_PositionCount>
 		(
-			std::string_view("Position Count - 5"),
+			std::string_view("Position Count - Position 2"),
+			*chess::parse_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - "),
+			std::vector<size_t>{ 48, 2'039, 97'862, 4'085'603 }
+		));
+		_tests.push_back(jc::make_unique<Test_PositionCount>
+		(
+			std::string_view("Position Count - Position 3"),
+			*chess::parse_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - "),
+			std::vector<size_t>{ 14, 191, 2'812, 43'238, 674'624 /*maybe*/ }
+		));
+		//_tests.push_back(jc::make_unique<Test_PositionCount>
+		//(
+		//	std::string_view("Position Count - 3"),
+		//	*chess::parse_fen(chess::standard_start_pos_fen_v),
+		//	std::vector<size_t>{ 20, 400, 8902, 197'281, 4'865'609 }
+		//));
+		//_tests.push_back(jc::make_unique<Test_PositionCount>
+		//(
+		//	std::string_view("Position Count - 4"),
+		//	*chess::parse_fen(chess::standard_start_pos_fen_v),
+		//	std::vector<size_t>{ 20, 400, 8902, 197'281, 4'865'609 }
+		//));
+		_tests.push_back(jc::make_unique<Test_PositionCount>
+		(
+			std::string_view("Position Count - Position 5"),
 			*chess::parse_fen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8"),
 			std::vector<size_t>{ 44, 1486, 62'379 }
 		));

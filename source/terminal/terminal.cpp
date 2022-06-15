@@ -1,363 +1,344 @@
 #include "terminal.hpp"
-#include "chess/fen.hpp"
-#include "chess/move.hpp"
 
-#include <lodepng.h>
+#include <jclib/functional.h>
 
 #include <BearLibTerminal.h>
 
 #include <iostream>
-#include <algorithm>
-#include <numeric>
-#include <charconv>
-#include <filesystem>
 
-namespace chess
+namespace term
 {
-	inline std::string itohex(int i)
+	void PlainTerminal::open()
 	{
-		std::string _buffer(12, 0);
-		auto [p, ec] = std::to_chars(_buffer.data(), _buffer.data() + _buffer.size(), i, 16);
-		_buffer.resize(p - _buffer.data());
-		return _buffer;
+		::terminal_open();
+		terminal_set("window.resizeable = true");
+		terminal_set("input.filter = [keyboard, mouse+, arrows]");
 	};
 
-	inline bool is_close_event(int ev)
+	void PlainTerminal::close()
 	{
-		return ev == TK_CLOSE or ev == TK_ESCAPE;
+		::terminal_close();
 	};
 
-	inline auto set_terminal_size_str(unsigned w, unsigned h)
+	void PlainTerminal::update(const std::function<void(int)>& _inputCallback)
 	{
-		const auto _str = "window.size=" + std::to_string(w) + "x" + std::to_string(h);
-		return _str;
-	};
-	inline void set_terminal_size(unsigned w, unsigned h)
-	{
-		const auto s = set_terminal_size_str(w, h);
-		terminal_set(s.c_str());
-	};
+		terminal_refresh();
 
-
-
-	void Terminal::step()
-	{
-		if (this->step_)
+		while (true)
 		{
-			this->wait_for_any_key();
-		};
-	};
-	void Terminal::wait_for_any_key()
-	{
-		if (const auto ev = terminal_read(); is_close_event(ev))
-		{
-			this->should_close_ = true;
-		};
-	};
-
-	bool Terminal::should_close() const
-	{
-		if (const auto ev = terminal_peek(); ev != 0)
-		{
-			terminal_read();
-			if (is_close_event(ev))
+			const auto _event = terminal_peek();
+			if (_event == 0)
 			{
-				return true;
-			};
-		};
-		return this->should_close_;
-	};
-
-	inline int white_piece_unicode(PieceType _piece)
-	{
-		switch (_piece)
-		{
-		case Piece::pawn:
-			return 0x2659;
-		case Piece::knight:
-			return 0x2658;
-		case Piece::bishop:
-			return 0x2657;
-		case Piece::rook:
-			return 0x2656;
-		case Piece::queen:
-			return 0x2655;
-		case Piece::king:
-			return 0x2654;
-		default:
-			return (int)'?'; 
-		};
-	};
-	inline int black_piece_unicode(PieceType _piece)
-	{
-		switch (_piece)
-		{
-		case Piece::pawn:
-			return 0x265F;
-		case Piece::knight:
-			return 0x265E;
-		case Piece::bishop:
-			return 0x265D;
-		case Piece::rook:
-			return 0x265C;
-		case Piece::queen:
-			return 0x265B;
-		case Piece::king:
-			return 0x265A;
-		default:
-			return (int)'?'; 
-		};
-	};
-	inline int piece_unicode(Piece _piece)
-	{
-		if (_piece.color() == Color::white)
-		{
-			return white_piece_unicode(_piece.type());
-		}
-		else
-		{
-			return black_piece_unicode(_piece.type());
-		};
-	};
-		
-
-	void Terminal::set_board(const chess::Board& _board)
-	{
-		int _offsetX = 0;
-		int _offsetY = 0;
-		bool _whiteFlag = false;
-		
-
-		for (auto& v : positions_v)
-		{
-			terminal_bkcolor((square_color(v) == Color::white)? "gray" : "dark gray");
-			
-			const auto r = (int)Rank::r8 - (int)v.rank();
-
-			const auto pc = _board.get(v);
-			if (pc)
-			{
-				const auto uni = piece_unicode(pc);
-				if (pc == Piece::king)
-				{
-					if (chess::is_check(_board, pc.color()))
-					{
-						terminal_bkcolor("light red");
-					};
-				};
-				terminal_put((int)v.file() * 2, r, uni);
+				break;
 			}
 			else
 			{
-				terminal_put((int)v.file() * 2, r, ' ');
-				terminal_put(((int)v.file() * 2) + 1, r, ' ');
+				terminal_read();
+			};
+
+			// Forward to callback
+			if (_inputCallback)
+			{
+				_inputCallback(_event);
 			};
 		};
-
-		terminal_refresh();
-
 	};
-
-
-
-	struct RGBA
+	void PlainTerminal::update()
 	{
-		uint64_t bits() const noexcept
-		{ 
-			return *reinterpret_cast<const uint64_t*>(&this->r);
-		};
+		this->update([this](int _event)
+			{
+				if (_event == TK_CLOSE)
+				{
+					this->set_should_close();
+				}
+				else
+				{
+					if (this->on_mouse_button_)
+					{
+						int _button = 0;
+						int _state = 0;
 
-		unsigned char r, g, b, a;
+						if (_event == TK_MOUSE_LEFT)
+						{
+							// m1 press
+							_button = TK_MOUSE_LEFT;
+							_state = 1;
+						}
+						else if (_event == (TK_MOUSE_LEFT | TK_KEY_RELEASED))
+						{
+							// m1 release
+							_button = TK_MOUSE_LEFT;
+							_state = 0;
+						}
+						else if (_event == TK_MOUSE_RIGHT)
+						{
+							// m2 press
+							_button = TK_MOUSE_RIGHT;
+							_state = 1;
+						}
+						else if (_event == (TK_MOUSE_RIGHT | TK_KEY_RELEASED))
+						{
+							// m2 release
+							_button = TK_MOUSE_RIGHT;
+							_state = 0;
+						};
+
+						if (_button != 0)
+						{
+							this->on_mouse_button_(_button, _state);
+						};
+					};
+				};
+			});
 	};
 	
-	inline RGBA blend(RGBA p0, RGBA p1)
+
+
+	bool PlainTerminal::should_close()
 	{
-		return RGBA
-		{
-			std::midpoint(p0.r, p1.r),
-			std::midpoint(p0.g, p1.g),
-			std::midpoint(p0.b, p1.b),
-			std::midpoint(p0.a, p1.a)
-		};
+		return this->close_flag_;
 	};
-	inline RGBA blend(RGBA p0, RGBA p1, RGBA p2, RGBA p3)
+	void PlainTerminal::set_should_close()
 	{
-		const auto b0 = blend(p0, p1);
-		const auto b1 = blend(p2, p3);
-		return blend(b0, b1);
-	};
-
-	struct Image
-	{
-		std::vector<RGBA> pixels; 
-		unsigned w, h;
-
-		const size_t idx(unsigned x, unsigned y) const
-		{
-			return (y * this->w) + x;
-		};
-
-		RGBA& at(unsigned x, unsigned y)
-		{
-			return this->pixels.at(this->idx(x, y));
-		};
-		const RGBA& at(unsigned x, unsigned y) const
-		{
-			return this->pixels.at(this->idx(x, y));
-		};
-
-	};
-	inline int load(Image& _out, const std::string& _path)
-	{
-		std::vector<unsigned char> _pixels{};
-		unsigned w, h;
-		if (const auto er = lodepng::decode(_pixels, w, h, _path); er != 0)
-		{
-			return er;
-		};
-
-		_out.w = w;
-		_out.h = h;
-		_out.pixels.resize(_pixels.size() / 4);
-
-		auto p = reinterpret_cast<RGBA*>(_pixels.data());
-		std::copy(p, p + (_pixels.size() / 4), _out.pixels.data());
-		return 0;
-	};
-	inline int save(const Image& _image, const std::string& _path)
-	{
-		return lodepng::encode(_path, reinterpret_cast<const unsigned char*>(_image.pixels.data()), _image.w, _image.h);
-	};
-
-	inline Image scaledown_half(const Image& _inImage)
-	{
-		auto _image = Image{};
-		_image.w = _inImage.w / 2;
-		_image.h = _inImage.h / 2;
-		_image.pixels.resize(_image.w * _image.h);
-
-		for (unsigned x = 0; x != _inImage.w; x += 2)
-		{
-			for (unsigned y = 0; y != _inImage.h; y += 2)
-			{
-				auto p0 = _inImage.at(x, y);
-				auto p1 = _inImage.at(x + 1, y);
-				auto p2 = _inImage.at(x, y + 1);
-				auto p3 = _inImage.at(x + 1, y + 1);
-				const auto bp = blend(p0, p1, p2, p3);
-				_image.at(x >> 1, y >> 1) = bp;
-			};
-		};
-
-		return _image;
+		this->close_flag_ = true;
 	};
 
 
-	inline void make_scaledown_set(const std::string& _fromSet, unsigned _newSize)
+	void PlainTerminal::set_background_color(Color _color)
 	{
-		namespace fs = std::filesystem;
-		auto sp = fs::path(_fromSet);
-		auto odp = sp.parent_path() / std::to_string(_newSize);
-		if (!fs::exists(odp))
-			fs::create_directory(odp);
-		std::cout << odp.generic_string() << '\n';
-		std::cout << sp << '\n';
-		for (auto& v : fs::directory_iterator(sp))
+		const char* _name = "";
+		switch (_color)
 		{
-			if (v.path().extension() == ".png")
-			{
-				auto i = Image{};
-				if (load(i, v.path().generic_string()) != 0) { std::cout << "[ERROR] Failed to load from " << v.path() << std::endl; };
-				std::cout << i.w << ", " << i.h << '\n';
-				i = scaledown_half(i);
-				auto op = odp / v.path().filename();
-				if (save(i, op.generic_string()) != 0) { std::cout << "[ERROR] Failed to load from " << v.path() << std::endl; };
-			};
+		case Color::none: return;
+		case Color::black:
+			_name = "black";
+			break;
+		case Color::gray:
+			_name = "gray";
+			break;
+		case Color::white:
+			_name = "white";
+			break;
+		case Color::cyan:
+			_name = "cyan";
+			break;
+		case Color::dark_gray:
+			_name = "dark gray";
+			break;
+		case Color::green:
+			_name = "green";
+			break;
+		case Color::red:
+			_name = "red";
+			break;
+		default:
+			abort();
+			break;
 		};
+		terminal_bkcolor(_name);
 	};
-	inline void gen_scaledowns(const std::filesystem::path& _fullSet, unsigned _fullSize)
+	void PlainTerminal::set_background_color(ColorRGBA _color)
 	{
-		unsigned s = _fullSize;
-		auto pd = _fullSet.parent_path();
-		auto p = _fullSet;
-		while (s > 32)
-		{
-			s = s / 2;
-			make_scaledown_set(p.generic_string(), s);
-			p = pd / std::to_string(s);
-		};
+		const auto _colorTK = color_from_argb(_color.r, _color.g, _color.b, _color.a);
+		terminal_bkcolor(_colorTK);
 	};
 
-	inline void set_unicode_image(Piece _piece, const char* _name, unsigned px, const std::filesystem::path& _assetsDir)
+	CursorPos PlainTerminal::get_cursor_pos() const
 	{
-		const auto p = (_assetsDir / std::to_string(px) / _name).generic_string() + ".png";
-		std::cout << p << std::endl;
-
-		const auto op = "0x" + itohex(piece_unicode(_piece)) + ": " + p + ", align=top-left, spacing=2x1";
-		std::cout << op << '\n';
-
-		if (!terminal_set(op.c_str()))
-		{
-			std::cout << "[Error] Failed to set " << op << '\n';
-		};
+		const auto x = terminal_state(TK_MOUSE_X);
+		const auto y = terminal_state(TK_MOUSE_Y);
+		return CursorPos(x, y);
 	};
 
 
 
-
-
-	Terminal::Terminal(const char* _assetsDirectoryPathStr, bool _step) :
-		cw_(32), ch_(64), step_(_step)
+	void PlainTerminal::fill(const int x, const int y, const int w, const int h, Color _color)
 	{
-		namespace fs = std::filesystem;
+		this->set_background_color(_color);
+		terminal_clear_area(x, y, w, h);
+	};
 
-		const auto _assetsDirectoryPath = fs::path(_assetsDirectoryPathStr);
+	void PlainTerminal::print(const int x, const int y, const char* _str)
+	{
+		terminal_print(x, y, _str);
+	};
 
-		terminal_open();
-
-		set_terminal_size(32, 8);
-
+	void PlainTerminal::draw_vertical_line(const int x, const int y, const int h)
+	{
+		for (int cy = y; cy <= y + h; ++cy)
 		{
-			const auto s = std::string("font: C:/Windows/fonts/CascadiaMono.ttf, size=")
-				+ std::to_string(this->cw_) + "x" + std::to_string(this->ch_);
-			terminal_set(s.c_str());
+			terminal_put(x, cy, ' ');
+		};
+	};
+	void PlainTerminal::draw_horizontal_line(const int x, const int y, const int w)
+	{
+		for (int cx = x; cx <= x + w; ++cx)
+		{
+			terminal_put(cx, y, ' ');
+		};
+	};
+
+	void PlainTerminal::draw_rectangle_frame(const int x, const int y, const int w, const int h,
+		Color _frameColor, Color _fillColor)
+	{
+		this->set_background_color(_frameColor);
+
+		this->draw_horizontal_line(x, y, w);
+		this->draw_horizontal_line(x, y + h, w);
+		this->draw_vertical_line(x, y, h);
+		this->draw_vertical_line(x + w, y, h);
+
+		if (_fillColor != Color::none && w > 1 && h > 1)
+		{
+			this->draw_rectangle(x + 1, y + 1, w - 1, h - 1, _fillColor);
 		};
 
-		auto _tempDir = _assetsDirectoryPath / "_tmp";
-		if (!fs::exists(_tempDir))
+	};
+
+	void PlainTerminal::draw_rectangle(const int x, const int y, const int w, const int h, Color _color)
+	{
+		this->fill(x, y, w, h, _color);
+	};
+
+
+};
+
+namespace term
+{
+	void TMButton::on_draw()
+	{
+		auto& _terminal = this->terminal();
+		auto& _rect = this->rect_;
+
+		_rect.draw(_terminal);
+
+		if (!this->label_.empty())
 		{
-			fs::create_directory(_tempDir);
+			_terminal.set_background_color(this->rect_.frame_color_);
+			_terminal.print(this->rect_.x_ + 1, this->rect_.y_, this->label_.c_str());
 		};
 		
-
-		if(fs::exists(_assetsDirectoryPath) && fs::is_directory(_assetsDirectoryPath))
-		{
-			set_unicode_image(Piece(PieceType::king, Color::white), "king_white", this->ch_, _assetsDirectoryPath);
-			set_unicode_image(Piece(PieceType::queen, Color::white), "queen_white", this->ch_, _assetsDirectoryPath);
-			set_unicode_image(Piece(PieceType::bishop, Color::white), "bishop_white", this->ch_, _assetsDirectoryPath);
-			set_unicode_image(Piece(PieceType::knight, Color::white), "knight_white", this->ch_, _assetsDirectoryPath);
-			set_unicode_image(Piece(PieceType::rook, Color::white), "rook_white", this->ch_, _assetsDirectoryPath);
-			set_unicode_image(Piece(PieceType::pawn, Color::white), "pawn_white", this->ch_, _assetsDirectoryPath);
-
-			set_unicode_image(Piece(PieceType::king, Color::black), "king_black", this->ch_, _assetsDirectoryPath);
-			set_unicode_image(Piece(PieceType::queen, Color::black), "queen_black", this->ch_, _assetsDirectoryPath);
-			set_unicode_image(Piece(PieceType::bishop, Color::black), "bishop_black", this->ch_, _assetsDirectoryPath);
-			set_unicode_image(Piece(PieceType::knight, Color::black), "knight_black", this->ch_, _assetsDirectoryPath);
-			set_unicode_image(Piece(PieceType::rook, Color::black), "rook_black", this->ch_, _assetsDirectoryPath);
-			set_unicode_image(Piece(PieceType::pawn, Color::black), "pawn_black", this->ch_, _assetsDirectoryPath);
-
-			std::cout << "Loaded assets\n";
-		}
-		else
-		{
-			std::cout << "No assets directory\n";
-		};
-
-		terminal_refresh();
 	};
-
-	Terminal::~Terminal()
+	void TMButton::on_attach()
 	{
-		terminal_close();
+		this->rect_.fill_color_ = (this->pressed_)? this->on_color_ : this->off_color_;
 	};
+
+	void TMButton::set_pressed(bool _state)
+	{
+		if (this->pressed_ != _state)
+		{
+			// Update variables first.
+			this->pressed_ = _state;
+			this->rect_.fill_color_ = (_state) ?
+				this->on_color_ : this->off_color_;
+
+			// If clicked, invoke on click callback if set.
+			if (_state == 0 && this->click_callback_)
+			{
+				this->click_callback_(*this);
+			};
+		};
+	};
+
+	void TMButton::cursor_exit()
+	{
+		this->pressed_ = false;
+		this->rect_.fill_color_ = this->off_color_;
+		this->draw();
+	};
+
+	void TMButton::press(int _mouseButton)
+	{
+		if (_mouseButton == TK_MOUSE_LEFT)
+		{
+			this->set_pressed(true);
+			this->draw();
+		};
+	};
+	void TMButton::release(int _mouseButton)
+	{
+		if (_mouseButton == TK_MOUSE_LEFT)
+		{
+			this->set_pressed(false);
+			this->draw();
+		};
+	};
+
+	TMButton::TMButton()
+	{
+		this->rect_.frame_color_ = Color::dark_gray;
+	};
+}
+
+namespace term
+{
+	void Terminal::open()
+	{
+		PlainTerminal::open();
+
+		this->set_mouse_button_callback([this](int _button, int _state)
+			{
+				const auto _csPos = this->get_cursor_pos();
+
+				TMButton* _bt{};
+				for (auto& _button : this->buttons_)
+				{
+					if (_button->covers_cell(_csPos))
+					{
+						_bt = _button.get();
+						break;
+					};
+				};
+
+				if (_bt)
+				{
+					if (_state)
+					{
+						_bt->press(_button);
+					}
+					else
+					{
+						_bt->release(_button);
+					};
+				};
+			});
+	};
+
+	TMButton* Terminal::add_button(Rectangle _rect)
+	{
+		auto _button = std::make_unique<TMButton>();
+		auto _buttonPtr = _button.get();
+
+		this->buttons_.push_back(std::move(_button));
+		_buttonPtr->rect_ = _rect;
+		_buttonPtr->attach(*this);
+
+		return _buttonPtr;
+	};
+	TMButton* Terminal::add_button(int x, int y, int w, int h)
+	{
+		return this->add_button(Rectangle(x, y, w, h));
+	};
+
+	void Terminal::erase(TMButton* _ptr)
+	{
+		std::erase_if(this->buttons_,
+			jc::dereference | jc::address_of | jc::equals & _ptr);
+	};
+
+	void Terminal::update()
+	{
+		PlainTerminal::update();
+
+		auto _csPos = this->get_cursor_pos();
+		for (auto& _button : this->buttons_)
+		{
+			if (_button->pressed_ && !_button->covers_cell(_csPos))
+			{
+				_button->cursor_exit();
+			};
+		};
+	};
+
 };

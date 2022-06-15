@@ -31,6 +31,8 @@
 
 namespace chess
 {
+	class Board;
+
 	/**
 	 * @brief Represents a chess board with only enough info to track game state.
 	*/
@@ -86,10 +88,10 @@ namespace chess
 
 		enum CastleBit : uint8_t
 		{
-			wking = 0b001,
-			wqueen = 0b010,
-			bking = 0b101,
-			bqueen = 0b110
+			wking  = 0b0001,
+			wqueen = 0b0010,
+			bking  = 0b0100,
+			bqueen = 0b1000
 		};
 
 	public:
@@ -342,7 +344,7 @@ namespace chess
 			this->bpieces_.reset();
 			this->wpieces_.reset();
 
-			this->last_move_ = jc::null;
+			this->last_moves_.fill(jc::null);
 		};
 
 		void new_piece(Piece _piece, Position _pos)
@@ -619,8 +621,12 @@ namespace chess
 		*/
 		void set_last_move(const Move& _move)
 		{
-			this->last_move_ = _move;
+			auto& _storage = this->last_moves_;
+			std::shift_right(_storage.begin(), _storage.end(), 1);
+			_storage.front() = _move;
 		};
+
+		void set_previous_board_hash(const Board& _board);
 
 	public:
 
@@ -628,10 +634,15 @@ namespace chess
 		 * @brief Gets the last move that was played.
 		 * @return The last move played, or a null move if no moves have been played.
 		*/
-		Move last_move() const
+		Move get_last_move() const
 		{
-			return this->last_move_;
+			return this->last_moves_.front();
 		};
+
+		bool is_repeated_move(Move _move) const;
+		bool is_last_move_repeated_move() const;
+
+
 
 
 
@@ -639,7 +650,7 @@ namespace chess
 		{
 			return std::span<const BoardPiece>(this->pbegin(), this->pend());
 		};
-
+		
 
 		friend std::ostream& operator<<(std::ostream& _ostr, const BoardBase& _value);
 
@@ -656,7 +667,9 @@ namespace chess
 		/**
 		 * @brief Holds the last move that was played on the board.
 		*/
-		Move last_move_{};
+		std::array<Move, 5> last_moves_{};
+		//std::array<uint32_t, 6> last_board_hashes_{};
+
 
 		std::optional<Position> enpassant_target_;
 
@@ -679,5 +692,7 @@ namespace chess
 		Color toplay_ = Color::white;
 
 	};
+
+	constexpr static auto p0 = sizeof(BoardBase);
 
 }

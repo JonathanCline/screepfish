@@ -35,10 +35,15 @@ namespace sch
 		void set_logging_dir(std::filesystem::path _path);
 
 
+		void set_search_depth(size_t _depth);
+
+
+
 		ScreepFish();
 		~ScreepFish();
 
 	private:
+
 		chess::Board board_;
 		chess::Color my_color_;
 
@@ -51,6 +56,8 @@ namespace sch
 		std::jthread thread_;
 
 		std::mt19937 rnd_;
+
+		size_t search_depth_ = 5;
 	};
 
 };

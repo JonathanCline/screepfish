@@ -17,6 +17,13 @@ namespace chess
 		constexpr auto PAWN_PUSH_RATING = 0.001f;
 		constexpr auto CASTLE_ABILITY_RATING = 0.001f;
 		constexpr auto DEVELOPMENT_RATING = 0.005f;
+		
+		// Disincentivize repeating moves
+		constexpr auto REPEATED_MOVE_RATING = -0.1f;
+
+		// Draw
+		constexpr auto FIFTY_MOVE_RULE_RATING = 0.0f;
+
 	};
 
 
@@ -1538,6 +1545,8 @@ namespace chess
 		constexpr auto& pawn_push_rating_v = PAWN_PUSH_RATING;
 		constexpr auto& castle_ability_rating_v = CASTLE_ABILITY_RATING;
 		constexpr auto& development_rating_v = DEVELOPMENT_RATING;
+		constexpr auto& repeated_move_rating_v = REPEATED_MOVE_RATING;
+		constexpr auto& fifty_move_rule_rating_v = FIFTY_MOVE_RULE_RATING;
 
 		auto _rating = Rating(0);
 
@@ -1551,6 +1560,16 @@ namespace chess
 		{
 			return -checkmate_rating_v;
 		};
+
+
+		// 50 move rule is a draw
+
+		if (_board.get_half_move_count() >= 50)
+		{
+			return fifty_move_rule_rating_v;
+		};
+
+
 
 		// Castling ability
 
@@ -1717,10 +1736,10 @@ namespace chess
 			};
 		};
 
-		// 50 move rule is a draw
-		if (_board.get_half_move_count() >= 50)
+		// Repeated move rating
+		if (_board->is_last_move_repeated_move())
 		{
-			return -1000;
+			_rating += repeated_move_rating_v;
 		};
 
 		return _rating;
