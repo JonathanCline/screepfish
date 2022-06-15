@@ -35,6 +35,15 @@ namespace chess
 
 		using rep = Rating;
 
+		constexpr static AbsoluteRating max() noexcept
+		{
+			return AbsoluteRating(std::numeric_limits<Rating>::infinity());
+		};
+		constexpr static AbsoluteRating min() noexcept
+		{
+			return AbsoluteRating(-std::numeric_limits<Rating>::infinity());
+		};
+
 		/**
 		 * @brief Gets the raw rating value.
 		 * @return Raw rating.

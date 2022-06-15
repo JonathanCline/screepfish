@@ -2,12 +2,18 @@
 
 /** @file */
 
+#include "terminal_object.hpp"
+
+#include <cstdint>
+
+#include <array>
 #include <string>
 #include <memory>
 #include <vector>
+#include <variant>
 #include <functional>
 
-namespace sch::tm
+namespace term
 {
 	enum class Color
 	{
@@ -20,6 +26,28 @@ namespace sch::tm
 		green,
 		red,
 	};
+	struct ColorRGBA
+	{
+		using channel = uint8_t;
+
+		channel r, g, b, a;
+
+		ColorRGBA(channel _r, channel _g, channel _b, channel _a) :
+			r(_r), g(_g), b(_b), a(_a)
+		{};
+		ColorRGBA(channel _r, channel _g, channel _b) :
+			ColorRGBA(_r, _g, _b, 255)
+		{};
+		ColorRGBA(channel _fill) :
+			ColorRGBA(_fill, _fill, _fill, _fill)
+		{};
+		ColorRGBA() :
+			ColorRGBA(255)
+		{};
+	};
+
+
+
 
 	/**
 	 * @brief Cursor position stored as an x, y cell coordinate pair
@@ -49,6 +77,7 @@ namespace sch::tm
 		void set_should_close();
 
 		void set_background_color(Color _color);
+		void set_background_color(ColorRGBA _color);
 
 		CursorPos get_cursor_pos() const;
 
@@ -89,31 +118,23 @@ namespace sch::tm
 
 
 
-	class TerminalObject
-	{
-	public:
-		TerminalObject() = default;
-		~TerminalObject() = default;
-
-		PlainTerminal* terminal_{};
-	};
-
-	struct Button : public TerminalObject
+	struct Rectangle
 	{
 	public:
 
-		std::function<void(Button&, int, int)> on_mouse_event_;
-		std::string label_;
-		int x_, y_, w_, h_;
-
-		Color frame_color_ = Color::gray;
-		Color off_color_ = Color::dark_gray;
-		Color on_color_ = Color::green;
-
-		bool pressed_ = false;
-
-		bool overlaps(const int cx, const int cy) const
+		void draw(PlainTerminal& _terminal)
 		{
+			_terminal.fill(this->x_, this->y_, this->w_, this->h_, this->fill_color_);
+			if (this->frame_color_ != Color::none)
+			{
+				_terminal.draw_rectangle_frame(this->x_, this->y_, this->w_, this->h_,
+					this->frame_color_);
+			};
+		};
+
+		bool covers_cell(const CursorPos& _csPos) const
+		{
+			const auto [cx, cy] = _csPos;
 			const auto l = this->x_;
 			const auto r = this->x_ + this->w_;
 			const auto t = this->y_;
@@ -121,26 +142,68 @@ namespace sch::tm
 			return (cx >= l && cx <= r && cy >= t && cy <= b);
 		};
 
-		void draw()
+		int x_, y_, w_, h_;
+		Color fill_color_ = Color::none;
+		Color frame_color_ = Color::none;
+
+		constexpr Rectangle() noexcept = default;
+		constexpr Rectangle(int _x, int _y, int _w, int _h) noexcept :
+			x_(_x), y_(_y), w_(_w), h_(_h)
+		{};
+
+	};
+
+
+
+	struct TMButton : public term::ITerminalObject
+	{
+	protected:
+
+		void on_draw() override;
+		void on_attach() override;
+
+	public:
+
+		void set_pressed(bool _state);
+		void cursor_exit();
+
+		void press(int _mouseButton);
+		void release(int _mouseButton);
+
+		bool is_pressed() const
 		{
-			auto& _terminal = *this->terminal_;
+			return this->pressed_;
+		};
 
-			_terminal.draw_rectangle_frame
-			(
-				this->x_, this->y_, this->w_, this->h_,
-				this->frame_color_,
-				(this->pressed_)? this->on_color_ : this->off_color_
-			);
+		void set_click_callback(std::function<void(TMButton&)> cb)
+		{
+			this->click_callback_ = std::move(cb);
+		};
 
-			if (!this->label_.empty())
-			{
-				_terminal.print(this->x_ + 1, this->y_ + 1, this->label_.c_str());
-			};
+		bool covers_cell(const CursorPos& _pos) const
+		{
+			return this->rect_.covers_cell(_pos);
+		};
+
+		void set_label(const std::string& _label)
+		{
+			this->label_ = _label;
+			this->draw();
 		};
 
 
 
-		Button() = default;
+		TMButton();
+
+
+		std::string label_;
+		Rectangle rect_;
+		Color off_color_ = Color::dark_gray;
+		Color on_color_ = Color::green;
+		bool pressed_ = false;
+
+	private:
+		std::function<void(TMButton&)> click_callback_;
 	};
 
 
@@ -151,8 +214,9 @@ namespace sch::tm
 
 		void open();
 
-		Button* add_button(int x, int y, int w, int h);
-		void erase(Button* _ptr);
+		TMButton* add_button(Rectangle _rect);
+		TMButton* add_button(int x, int y, int w, int h);
+		void erase(TMButton* _ptr);
 
 		void update();
 
@@ -167,7 +231,7 @@ namespace sch::tm
 		Terminal(Terminal&&) noexcept = delete;
 
 
-		std::vector<std::unique_ptr<Button>> buttons_{};
+		std::vector<std::unique_ptr<TMButton>> buttons_{};
 	};
 
 };

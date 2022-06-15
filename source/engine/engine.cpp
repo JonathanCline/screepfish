@@ -25,9 +25,10 @@ namespace sch
 
 		// Configure tree profile.
 		auto _profile = MoveTreeProfile();
-		_profile.follow_captures_ = true;
+		_profile.follow_captures_ = false;
 		_profile.follow_checks_ = true;
 		_profile.enable_pruning_ = false;
+		_profile.alphabeta_ = true;
 
 		// BUILD THE TREE
 		auto _tree = chess::MoveTree(_board);
@@ -111,7 +112,7 @@ namespace sch
 					const auto& _myColor = this->my_color_;
 					
 					const size_t _pieceCount = _board.pieces().size();
-					auto _depth = 6;
+					auto _depth = this->search_depth_;
 
 					// Bump depth as many moves will be discarded
 					const bool _isCheck = is_check(_board, _myColor);
@@ -280,10 +281,16 @@ namespace sch
 		this->logging_dir_ = _path;
 	};
 
+	void ScreepFish::set_search_depth(size_t _depth)
+	{
+		this->search_depth_ = _depth;
+	};
+
 	ScreepFish::ScreepFish() :
 		init_barrier_(2),
 		rnd_(std::random_device{}()),
-		logging_dir_{}
+		logging_dir_{},
+		search_depth_{ 6 }
 	{
 		
 	};

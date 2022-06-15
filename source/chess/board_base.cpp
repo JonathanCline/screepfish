@@ -1,4 +1,7 @@
 #include "board.hpp"
+#include "chess.hpp"
+
+#include <jclib/algorithm.h>
 
 #include <ostream>
 
@@ -208,7 +211,7 @@ namespace chess
 		};
 
 		auto it = this->find(_fromPos);
-		assert(it != this->end());
+		SCREEPFISH_ASSERT(it != this->end());
 
 		if (_promotion != PieceType::none && *it == PieceType::pawn)
 		{
@@ -243,5 +246,29 @@ namespace chess
 		// Set the played move as the last move
 		this->set_last_move(_move);
 	};
+
+	void BoardBase::set_previous_board_hash(const Board& _board)
+	{
+		//auto& _storage = this->last_board_hashes_;
+		//std::shift_right(_storage.begin(), _storage.end(), 1);
+		//_storage.front() = hash(_board);
+	};
+
+	bool BoardBase::is_repeated_move(Move _move) const
+	{
+		auto& _storage = this->last_moves_;
+		return jc::contains(_storage, _move);
+	};
+	bool BoardBase::is_last_move_repeated_move() const
+	{
+		auto& _storage = this->last_moves_;
+
+		// If last move is null we can return false early
+		if (!_storage.front()) { return false; };
+
+		// Just check if the player's last move is the same
+		return _storage.at(2) == _storage.front();
+	};
+
 }
 

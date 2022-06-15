@@ -33,7 +33,17 @@ namespace chess
 		std::ranges::sort(this->responses_,
 			[](const MoveTreeNode& lhs, const MoveTreeNode& rhs)
 			{
-				return lhs.player_rating() > rhs.player_rating();
+				const auto lr = lhs.player_rating();
+				const auto rr = rhs.player_rating();
+				if (lr != rr)
+				{
+					return lhs.player_rating() >
+						rhs.player_rating();
+				}
+				else
+				{
+					return lhs.quick_rating() > rhs.quick_rating();
+				};
 			});
 	};
 
@@ -117,7 +127,7 @@ namespace chess
 
 
 	NodeEvalResult MoveTreeNode::evaluate_next_with_board(const Board& _board,
-		const MoveTreeProfile& _profile, MoveTreeSearchData _data)
+		const MoveTreeProfile& _profile, MoveTreeSearchData _data, bool _autoProp)
 	{
 		// Profile aliasing
 		const auto& _followChecks = _profile.follow_checks_;
@@ -154,6 +164,7 @@ namespace chess
 					RatedMove{ *p, _rating },
 					_opponentColor
 				);
+				it->depth_ = this->depth_ + 1;
 
 				// Follow lines based on profile.
 				_evalResult = get_interesting_lines(*it, _board, _newBoard, _move, _profile, _data);
@@ -165,12 +176,13 @@ namespace chess
 			// Ensure we are marked as evaluated
 			this->mark_as_evaluated();
 		}
-		else
+		else if(_autoProp)
 		{
 			// Propogate to children
 			for (auto& _child : *this)
 			{
-				_child.evaluate_next(_board, _profile, _data.with_next_depth());
+				_child.depth_ = this->depth_ + 1;
+				_child.evaluate_next(_board, _profile, _data.with_next_depth(), _autoProp);
 			};
 
 			//SCREEPFISH_BREAK();
@@ -180,11 +192,11 @@ namespace chess
 	};
 
 	NodeEvalResult MoveTreeNode::evaluate_next(const Board& _previousBoard,
-		const MoveTreeProfile& _profile, MoveTreeSearchData _data)
+		const MoveTreeProfile& _profile, MoveTreeSearchData _data, bool _autoProp)
 	{
 		auto _board = _previousBoard;
 		_board.move(this->move_);
-		return this->evaluate_next_with_board(_board, _profile, _data);
+		return this->evaluate_next_with_board(_board, _profile, _data, _autoProp);
 	};
 
 
@@ -249,7 +261,7 @@ namespace chess
 		};
 	};
 
-	size_t MoveTreeNode::count_checks(Board _board)
+	size_t MoveTreeNode::count_checks(Board _board) const
 	{
 		size_t n = 0;
 		for (auto& m : *this)
@@ -264,7 +276,7 @@ namespace chess
 		};
 		return n;
 	};
-
+	
 
 
 	// MoveTree
@@ -274,42 +286,78 @@ namespace chess
 	//				-> white moves ...
 
 
-
-
-
-	inline AbsoluteRating deep_eval(MoveTreeNode& _node)
+	inline auto find_not(auto&& _range, auto&& _op)
 	{
-		// If the opponent has no responses, we can just set the rating as the quick rating
-		// and return early. These "ends" of the tree are the basis for the deep evaluation.
-		if (_node.empty())
-		{
-			// Use the quick rating.
-			return _node.rating();
-		};
-
-		// Loop through the opponent's responses to the node's move and preform a deep eval for each.
-		bool _hasMoveAfterOpponent = false;
-		for (auto& _opponentResponse : _node)
-		{
-			// Preform a deep evaluation of the opponent's response.
-			const auto _opponentResponseRating =
-				deep_eval(_opponentResponse);
-
-			if (!_opponentResponse.empty())
+		return std::ranges::find(_range, [&_op](auto& v)
 			{
-				_hasMoveAfterOpponent = true;
+				return !_op(v);
+			});
+	};
+
+
+
+
+	// Invokes a function on each leaf in a tree
+	inline auto foreach_leaf(auto&& _tree, auto&& _op)
+	{
+		auto it = std::ranges::begin(_tree);
+		const auto _end = std::ranges::end(_tree);
+		if (it == _end)
+		{
+			// Empty, therefore leaf
+			_op(*it);
+		}
+		else
+		{
+			for (; it != _end; std::ranges::advance(it, 1))
+			{
+				foreach_leaf(*it, _op);
 			};
 		};
+	};
 
-		// Sort the opponent's responses by full rating.
-		_node.resort_children();
+	
 
-		// The opponent's best response will be in the front.
-		const auto _bestResponseRating = _node.front().rating();
-		
-		_node.set_rating(_bestResponseRating);
-		
-		return _bestResponseRating;
+
+
+
+	inline Rating minimax(const Board& _board, MoveTreeNode& _node,
+		bool _isMaximizingPlayer)
+	{
+		if (_node.empty())
+		{
+			// Leaf, return node rating.
+			return _node.player_rating();
+		}
+		else
+		{
+			Rating _value = AbsoluteRating::min().raw();
+			for (auto& _move : _node)
+			{
+				// Play the next move.
+				auto _newBoard = _board;
+				_newBoard.move(_move.move_);
+					
+				// Find rating for response move.
+				const auto _newBoardRating =
+					minimax(_newBoard, _move, !_isMaximizingPlayer);
+				_value = std::max(_value, _newBoardRating);
+			};
+
+			_node.resort_children();
+
+			// Assign the rating to the node
+			auto _absValue = AbsoluteRating(_value, !_node.played_by());
+			_node.set_rating(_absValue);
+			return -_value;
+		};
+	};
+
+	inline AbsoluteRating minimax(const Board& _board, MoveTreeNode& _node)
+	{
+		// Calculate the deep rating
+		const auto _deepRating = AbsoluteRating(minimax(_board, _node, true), _node.played_by());
+		return _deepRating;
 	};
 
 	inline void prune(MoveTreeNode& _node)
@@ -326,20 +374,10 @@ namespace chess
 
 
 
-	Rating alpha_beta_max(const Board& _previousBoard,
-		MoveTreeNode& _node, MoveTreeProfile _profile,
-		MoveTreeSearchData _searchData, MoveTreeAlphaBeta _alphaBeta);
-
-	Rating alpha_beta_min(const Board& _previousBoard,
-		MoveTreeNode& _node, MoveTreeProfile _profile,
-		MoveTreeSearchData _searchData, MoveTreeAlphaBeta _alphaBeta);
-
-
-
 	inline void alpha_beta_eval(MoveTreeNode& _node, const Board& _board,
 		MoveTreeProfile& _profile, MoveTreeSearchData& _searchData)
 	{
-		const auto _evalResult = _node.evaluate_next_with_board(_board, _profile, _searchData);
+		const auto _evalResult = _node.evaluate_next_with_board(_board, _profile, _searchData, false);
 		if (_evalResult.follow_capture_)
 		{
 			++_searchData.max_depth_;
@@ -352,80 +390,7 @@ namespace chess
 		};
 	};
 
-
-	Rating alpha_beta_max(const Board& _board,
-		MoveTreeNode& _node, MoveTreeProfile _profile,
-		MoveTreeSearchData _searchData, MoveTreeAlphaBeta _alphaBeta)
-	{
-		if (!_searchData.can_go_deeper())
-		{
-			return _node.quick_rating();
-		};
-
-		alpha_beta_eval(_node, _board, _profile, _searchData);
-
-		size_t n = 0;
-		for (auto& _move : _node)
-		{
-			auto _newBoard = _board;
-			_newBoard.move(_move.move_);
-
-			auto _score = alpha_beta_min(_newBoard, _move, _profile,
-				_searchData.with_next_depth(), _alphaBeta);
-
-			if (_score >= _alphaBeta.beta)
-			{
-				return _alphaBeta.beta;   // fail hard beta-cutoff
-			}
-			if (_score > _alphaBeta.alpha)
-			{
-				_alphaBeta.alpha = _score; // alpha acts like max in MiniMax
-			};
-
-			++n;
-		};
-
-		return _alphaBeta.alpha;
-	};
-
-	Rating alpha_beta_min(const Board& _board,
-		MoveTreeNode& _node, MoveTreeProfile _profile,
-		MoveTreeSearchData _searchData, MoveTreeAlphaBeta _alphaBeta)
-	{
-		if (!_searchData.can_go_deeper())
-		{
-			return -_node.quick_rating();
-		};
-
-		alpha_beta_eval(_node, _board, _profile, _searchData);
-
-		size_t n = 0;
-		for (auto& _move : _node)
-		{
-			auto _newBoard = _board;
-			_newBoard.move(_move.move_);
-
-			auto _score = alpha_beta_max(_newBoard, _move, _profile,
-				_searchData.with_next_depth(), _alphaBeta);
-
-			if (_score <= _alphaBeta.alpha)
-			{
-				return _alphaBeta.alpha; // fail hard alpha-cutoff
-			};
-			if (_score < _alphaBeta.beta)
-			{
-				_alphaBeta.beta = _score; // beta acts like min in MiniMax
-			};
-
-			++n;
-		};
-
-		return _alphaBeta.beta;
-	};
-
-
-
-	Rating alpha_beta(const Board& _board,
+	inline Rating alpha_beta(const Board& _board,
 		MoveTreeNode& _node, MoveTreeProfile _profile, MoveTreeSearchData _searchData,
 		MoveTreeAlphaBeta _alphaBeta, bool _isMaximizingPlayer)
 	{
@@ -437,14 +402,13 @@ namespace chess
 		};
 
 		SCREEPFISH_ASSERT(_board.get_last_move() == _node.move_);
-		_node.evaluate_next_with_board(_board, _profile, _searchData);
+		alpha_beta_eval(_node, _board, _profile, _searchData);
 		
 		if (_isMaximizingPlayer)
 		{
 			auto _value = 
 				-Rating(std::numeric_limits<Rating>::infinity());
 
-			size_t n = 0;
 			for (auto& _move : _node)
 			{
 				auto _newBoard = _board;
@@ -468,8 +432,6 @@ namespace chess
 					_alphaBeta.alpha,
 					_value
 				);
-
-				++n;
 			};
 
 			return _value;
@@ -479,7 +441,6 @@ namespace chess
 			auto _value =
 				Rating(std::numeric_limits<Rating>::infinity());
 
-			size_t n = 0;
 			for (auto& _move : _node)
 			{
 				auto _newBoard = _board;
@@ -503,7 +464,6 @@ namespace chess
 					_alphaBeta.beta,
 					_value
 				);
-				++n;
 			};
 
 			return _value;
@@ -513,18 +473,7 @@ namespace chess
 	};
 
 
-	void evaluate_next_full_move(const Board& _board, MoveTreeNode& _node,
-		const MoveTreeProfile& _profile, MoveTreeSearchData _searchData)
-	{
-		// Node should be empty.
-		SCREEPFISH_ASSERT(_node.empty());
 
-		// Evaluate 2 half-moves deeper.
-		_node.evaluate_next(_board, _profile, _searchData);
-		_node.evaluate_next(_board, _profile, _searchData);
-
-
-	};
 
 
 
@@ -544,10 +493,6 @@ namespace chess
 		++this->depth_counter_;
 	};
 
-	void MoveTree::evalulate_next(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile)
-	{
-		return this->evaluate_next(_searchData, _profile);
-	};
 
 
 
@@ -564,14 +509,6 @@ namespace chess
 		}
 		else
 		{
-			//for (auto& _move : _root)
-			//{
-			//	if (_move.empty())
-			//	{
-			//		return _move.move;
-			//	};
-			//};
-
 			// Resort to put best in the front.
 			this->resort_children(nullptr);
 
@@ -643,7 +580,6 @@ namespace chess
 		};
 		return bs.size();
 	};
-	
 	size_t MoveTree::count_checks()
 	{
 		auto& _moves = this->root();
@@ -670,6 +606,7 @@ namespace chess
 		auto _searchData = MoveTreeSearchData();
 		_searchData.max_depth_ = static_cast<uint8_t>(_maxExtendedDepth);
 
+		if (_profile.alphabeta_)
 		{
 			auto _alphaBeta = MoveTreeAlphaBeta();
 			_alphaBeta.alpha = -std::numeric_limits<Rating>::infinity();
@@ -678,11 +615,19 @@ namespace chess
 			const auto _alphaBetaRating = alpha_beta(
 				this->initial_board(), _root,
 				_profile, _searchData, _alphaBeta, true);
-			
-			deep_eval(_root);
-			this->resort_children(nullptr);
+		}
+		else
+		{
+			for (size_t n = 0; n != _depth; ++n)
+			{
+				this->root().evaluate_next(this->initial_board(), _profile, _searchData,
+					true);
+			};
 		};
-		
+
+		minimax(this->initial_board(), _root);
+		this->resort_children(nullptr);
+
 		//_root.clear();
 		//
 		//for (size_t n = 0; n != _depth; ++n)
@@ -696,5 +641,9 @@ namespace chess
 		//std::cout << "Tree Search Eval : " << this->root().front().player_rating() << '\n';
 		//SCREEPFISH_BREAK();
 	};
+
+
+
+
 
 };

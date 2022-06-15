@@ -6,12 +6,12 @@
 
 #include <iostream>
 
-namespace sch::tm
+namespace term
 {
 	void PlainTerminal::open()
 	{
 		::terminal_open();
-
+		terminal_set("window.resizeable = true");
 		terminal_set("input.filter = [keyboard, mouse+, arrows]");
 	};
 
@@ -137,6 +137,11 @@ namespace sch::tm
 		};
 		terminal_bkcolor(_name);
 	};
+	void PlainTerminal::set_background_color(ColorRGBA _color)
+	{
+		const auto _colorTK = color_from_argb(_color.r, _color.g, _color.b, _color.a);
+		terminal_bkcolor(_colorTK);
+	};
 
 	CursorPos PlainTerminal::get_cursor_pos() const
 	{
@@ -198,7 +203,75 @@ namespace sch::tm
 
 };
 
-namespace sch::tm
+namespace term
+{
+	void TMButton::on_draw()
+	{
+		auto& _terminal = this->terminal();
+		auto& _rect = this->rect_;
+
+		_rect.draw(_terminal);
+
+		if (!this->label_.empty())
+		{
+			_terminal.set_background_color(this->rect_.frame_color_);
+			_terminal.print(this->rect_.x_ + 1, this->rect_.y_, this->label_.c_str());
+		};
+		
+	};
+	void TMButton::on_attach()
+	{
+		this->rect_.fill_color_ = (this->pressed_)? this->on_color_ : this->off_color_;
+	};
+
+	void TMButton::set_pressed(bool _state)
+	{
+		if (this->pressed_ != _state)
+		{
+			// Update variables first.
+			this->pressed_ = _state;
+			this->rect_.fill_color_ = (_state) ?
+				this->on_color_ : this->off_color_;
+
+			// If clicked, invoke on click callback if set.
+			if (_state == 0 && this->click_callback_)
+			{
+				this->click_callback_(*this);
+			};
+		};
+	};
+
+	void TMButton::cursor_exit()
+	{
+		this->pressed_ = false;
+		this->rect_.fill_color_ = this->off_color_;
+		this->draw();
+	};
+
+	void TMButton::press(int _mouseButton)
+	{
+		if (_mouseButton == TK_MOUSE_LEFT)
+		{
+			this->set_pressed(true);
+			this->draw();
+		};
+	};
+	void TMButton::release(int _mouseButton)
+	{
+		if (_mouseButton == TK_MOUSE_LEFT)
+		{
+			this->set_pressed(false);
+			this->draw();
+		};
+	};
+
+	TMButton::TMButton()
+	{
+		this->rect_.frame_color_ = Color::dark_gray;
+	};
+}
+
+namespace term
 {
 	void Terminal::open()
 	{
@@ -206,42 +279,49 @@ namespace sch::tm
 
 		this->set_mouse_button_callback([this](int _button, int _state)
 			{
-				const auto cx = terminal_state(TK_MOUSE_X);
-				const auto cy = terminal_state(TK_MOUSE_Y);
-				
-				Button* _bt{};
+				const auto _csPos = this->get_cursor_pos();
+
+				TMButton* _bt{};
 				for (auto& _button : this->buttons_)
 				{
-					if (_button->overlaps(cx, cy))
+					if (_button->covers_cell(_csPos))
 					{
 						_bt = _button.get();
 						break;
 					};
 				};
 
-				if (_bt && _bt->on_mouse_event_)
+				if (_bt)
 				{
-					_bt->on_mouse_event_(*_bt, _button, _state);
+					if (_state)
+					{
+						_bt->press(_button);
+					}
+					else
+					{
+						_bt->release(_button);
+					};
 				};
 			});
 	};
 
-
-
-	Button* Terminal::add_button(int x, int y, int w, int h)
+	TMButton* Terminal::add_button(Rectangle _rect)
 	{
-		{
-			auto _button = Button{};
-			_button.terminal_ = this;
-			_button.x_ = x; _button.y_ = y; _button.w_ = w; _button.h_ = h;
-			this->buttons_.push_back(std::make_unique<Button>(_button));
-		};
+		auto _button = std::make_unique<TMButton>();
+		auto _buttonPtr = _button.get();
 
-		auto _button = this->buttons_.back().get();
-		_button->draw();
-		return _button;
+		this->buttons_.push_back(std::move(_button));
+		_buttonPtr->rect_ = _rect;
+		_buttonPtr->attach(*this);
+
+		return _buttonPtr;
 	};
-	void Terminal::erase(Button* _ptr)
+	TMButton* Terminal::add_button(int x, int y, int w, int h)
+	{
+		return this->add_button(Rectangle(x, y, w, h));
+	};
+
+	void Terminal::erase(TMButton* _ptr)
 	{
 		std::erase_if(this->buttons_,
 			jc::dereference | jc::address_of | jc::equals & _ptr);
@@ -254,9 +334,9 @@ namespace sch::tm
 		auto _csPos = this->get_cursor_pos();
 		for (auto& _button : this->buttons_)
 		{
-			if (_button->pressed_ && !_button->overlaps(_csPos.x, _csPos.y))
+			if (_button->pressed_ && !_button->covers_cell(_csPos))
 			{
-				_button->on_mouse_event_(*_button, TK_MOUSE_LEFT, 0);
+				_button->cursor_exit();
 			};
 		};
 	};
