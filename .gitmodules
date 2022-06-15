@@ -1,3 +1,4 @@
 [submodule "tools"]
 	path = tools
 	url = https://github.com/hubris-engine/hubris-repoman
+	branch = develop
