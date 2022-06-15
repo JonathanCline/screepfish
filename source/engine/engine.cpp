@@ -4,6 +4,7 @@
 #include "chess/bitboard.hpp"
 
 #include "utility/string.hpp"
+#include "utility/logging.hpp"
 
 #include <array>
 #include <vector>
@@ -75,10 +76,10 @@ namespace sch
 		this->board_ = _initialBoard;
 		this->my_color_ = _color;
 
-		std::cout << "About to start screepfish thread" << std::endl;
+		sch::log_info("About to start screepfish thread");
 		this->thread_ = std::jthread([this](std::stop_token _stop)
 			{
-				std::cout << "Started screepfish thread" << std::endl;
+				sch::log_info("Started screepfish thread");
 				this->thread_main(_stop);
 			});
 
@@ -117,17 +118,6 @@ namespace sch
 					// Bump depth as many moves will be discarded
 					const bool _isCheck = is_check(_board, _myColor);
 
-					//if (_isCheck)
-					//{
-					//	_depth += 1;
-					//};
-					
-					// Bump depth if no queens on board
-					//if (_board.pfind(Piece::queen, Color::white) == _board.pend() && _board.pfind(Piece::queen, Color::black) == _board.pend()
-					//	&& _pieceCount <= 15)
-					//{
-					//	_depth += 1;
-					//};
 					if (_pieceCount <= 8 && !_isCheck)
 					{
 						_depth += 1;
@@ -138,7 +128,6 @@ namespace sch
 					};
 
 					const auto _clock = std::chrono::steady_clock{};
-					
 
 					const auto t0 = _clock.now();
 					auto _tree = this->build_move_tree(_board, _myColor, _depth);
@@ -157,7 +146,7 @@ namespace sch
 					{
 						return std::chrono::duration_cast<std::chrono::duration<double>>(v);
 					};
-					std::cout << "Delta time : " << fn(td) << '(' << fn(tdA) << ", " << fn(tdB) << ")\n";
+					sch::log_info(str::concat_to_string("Delta time : ", fn(td), '(', fn(tdA), ", ", fn(tdB), ')'));
 					
 					// Log if set
 					if (auto& _loggingDir = this->logging_dir_; _loggingDir)

@@ -52,7 +52,7 @@ namespace sch
 
 			if (_event.status != "created" && _event.status != "started")
 			{
-				std::cout << "Result " << _event.status << '\n';
+				sch::log_info(str::concat_to_string("Result ", _event.status));
 				return;
 			};
 
@@ -86,9 +86,8 @@ namespace sch
 
 					if (_response.move)
 					{
-						std::cout << "[ERROR] Failed to submit move : " << *_response.move << '\n';
-						std::cout << _board << '\n';
-						std::cout << chess::get_fen(_board) << '\n';
+						sch::log_error(str::concat_to_string("Failed to submit move : ", *_response.move, '\n',
+							_board, '\n', chess::get_fen(_board)));
 					};
 
 					this->client_.bot_resign(_resignParams);

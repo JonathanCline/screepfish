@@ -138,7 +138,7 @@ sch::EnvInfo sch::load_env(const std::string& _executablePathStr, bool _allowUse
 			exit(1);
 		};
 	}
-	else if (!!fs::is_regular_file(_tokenFilePath))
+	else if (!fs::is_regular_file(_tokenFilePath))
 	{
 		sch::log_warning(str::concat_to_string("Token file path points to a non-text file at path ", _tokenFilePath.generic_string()));
 		_lichessAccountToken = query_user_for_string("Enter Lichess Account Token");

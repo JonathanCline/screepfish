@@ -11,6 +11,8 @@
 #include <string>
 #include <string_view>
 
+#include <jclib/concepts.h>
+
 namespace str
 {
 
@@ -185,4 +187,39 @@ namespace str
 		(impl::concat_to_string_helper(ss, _parts), ...);
 		return ss.str();
 	};
+
+
+	template <typename T>
+	struct str_format
+	{
+		str_format() = default;
+	};;
+
+	template <jc::cx_integer T>
+	struct str_format<T>
+	{
+		str_format<T>& set_width_min(size_t n) & { this->width_min = n; return *this; };
+		str_format<T>&& set_width_min(size_t n)&& {
+			return static_cast<str_format<T>&&>(this->set_width_min(n));
+		};
+
+		size_t width_min = 0;
+
+		str_format() = default;
+	};
+	
+	template <jc::cx_integer T>
+	inline std::string tostr(T _value, str_format<T> _fmt = str_format<T>{})
+	{
+		auto s = std::to_string(_value);
+		if (_fmt.width_min != 0)
+		{
+			if (s.size() < _fmt.width_min)
+			{
+				s = rep('0', _fmt.width_min - s.size()) + s;
+			};
+		};
+		return s;
+	};
+
 };

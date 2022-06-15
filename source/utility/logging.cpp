@@ -1,11 +1,13 @@
 #include "logging.hpp"
 
 #include "string.hpp"
+#include "utility.hpp"
 
 #include <mutex>
 #include <atomic>
 #include <chrono>
 #include <iostream>
+#include <charconv>
 
 namespace sch
 {
@@ -51,7 +53,7 @@ namespace sch
 		static void raw_write_log(const Ts&... _args)
 		{
 			const auto _lck = std::unique_lock(log_mutex());
-			raw_write_log(_lck, _args, ...);
+			raw_write_log(_lck, _args...);
 		};
 
 		static auto& divider_flag()
@@ -61,6 +63,7 @@ namespace sch
 		};
 	};
 
+#define DECLROOTTYPE(t) ::std::remove_cvref_t<decltype(t)>
 
 	inline auto get_current_timestamp()
 	{
@@ -68,7 +71,18 @@ namespace sch
 		const auto _currentTime = ch::system_clock::now();
 		const auto _zonedCurrentTime = ch::zoned_time(ch::current_zone(), _currentTime);
 		const auto _localCurrentTime = _zonedCurrentTime.get_local_time();
-		return _localCurrentTime;
+
+		const auto _localTimeSinceEpoch = ch::duration_cast<ch::system_clock::duration>(_localCurrentTime.time_since_epoch());
+		const auto _localDaysSinceEpoch = ch::duration_cast<ch::days>(_localTimeSinceEpoch);
+		const auto _localTimeSinceDay = ch::duration_cast<ch::system_clock::duration>(_localTimeSinceEpoch - ch::duration_cast<ch::nanoseconds>(_localDaysSinceEpoch));
+		const auto _localTime = ch::local_time<ch::system_clock::duration>(_localTimeSinceDay);
+		const auto _timeParts = ch::hh_mm_ss<DECLROOTTYPE(_localTime)::duration>(_localTime.time_since_epoch());
+
+		const auto h = (long long)_timeParts.hours().count();
+		const auto m = (long long)_timeParts.minutes().count();
+		const auto s = (long long)_timeParts.seconds().count();
+		const auto _sFmt = str::str_format<long long>().set_width_min(2);
+		return str::tostr(h) + ":" + str::tostr(m, _sFmt) + ":" + str::tostr(s, _sFmt);
 	};
 
 
@@ -76,7 +90,7 @@ namespace sch
 	{
 		const auto lck = Logger::acquire_logging_mutex();
 		Logger::divider_flag() = false;
-		Logger::raw_write_log(lck, '(', get_current_timestamp(), ")[", _cat, "] ", _what, '\n');
+		Logger::raw_write_log(lck, get_current_timestamp(), " [", _cat, "] ", _what, '\n');
 	};
 
 	void log_info(std::string_view _what)
