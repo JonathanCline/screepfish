@@ -4,6 +4,7 @@
 
 #include <mutex>
 #include <atomic>
+#include <chrono>
 #include <iostream>
 
 namespace sch
@@ -61,12 +62,34 @@ namespace sch
 	};
 
 
+	inline auto get_current_timestamp()
+	{
+		namespace ch = std::chrono;
+		const auto _currentTime = ch::system_clock::now();
+		const auto _zonedCurrentTime = ch::zoned_time(ch::current_zone(), _currentTime);
+		const auto _localCurrentTime = _zonedCurrentTime.get_local_time();
+		return _localCurrentTime;
+	};
 
-	void log_error(std::string_view _what)
+
+	inline void log_with_category(std::string_view _cat, std::string_view _what)
 	{
 		const auto lck = Logger::acquire_logging_mutex();
 		Logger::divider_flag() = false;
-		Logger::raw_write_log(lck, "[Error] ", _what, '\n');
+		Logger::raw_write_log(lck, '(', get_current_timestamp(), ")[", _cat, "] ", _what, '\n');
+	};
+
+	void log_info(std::string_view _what)
+	{
+		log_with_category("Info", _what);
+	};
+	void log_warning(std::string_view _what)
+	{
+		log_with_category("Warning", _what);
+	};
+	void log_error(std::string_view _what)
+	{
+		log_with_category("Error", _what);
 	};
 
 	void log_output_chunk_divider()

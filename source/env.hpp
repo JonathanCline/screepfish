@@ -16,6 +16,6 @@ namespace sch
 		EnvInfo() = default;
 	};
 
-	EnvInfo load_env(const std::string& _executablePath);
+	EnvInfo load_env(const std::string& _executablePath, bool _allowUserQuery = false);
 
 };

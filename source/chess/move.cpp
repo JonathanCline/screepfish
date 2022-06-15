@@ -454,7 +454,14 @@ namespace chess
 		const auto _attackingBB = get_pawn_attacking_squares(_byPiece.position(), _byPiece.color());
 		
 		// If bit is set, piece is being attacked
-		return _attackingBB.test(_piece.position());
+		if (_attackingBB.test(_piece.position()))
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		};
 	};
 	bool is_piece_attacked_by_knight(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
 	{

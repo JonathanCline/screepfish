@@ -68,6 +68,7 @@ int rmain(std::span<const char* const> _vargs)
 	bool _perf = false;
 	bool _local = false;
 	bool _tests = false;
+	bool _lichess = false;
 
 	if (_vargs.size() <= 1)
 	{
@@ -88,12 +89,17 @@ int rmain(std::span<const char* const> _vargs)
 				"    perf : Runs the performance test\n" <<
 				"    test : Runs the tests\n" <<
 				"    local : Plays a local game\n" <<
+				"    lichess : Connects to a lichess account\n" <<
 				" If no <mode> is provided then this connects to lichess\n\n";
 			return 0;
 		}
 		else if (_arg == "perf")
 		{
 			_perf = true;
+		}
+		else if (_arg == "lichess")
+		{
+			_lichess = true;
 		}
 		else if (_arg == "test")
 		{
@@ -105,7 +111,9 @@ int rmain(std::span<const char* const> _vargs)
 		}
 		else
 		{
-			auto _modeStrings = std::array<std::string_view, 5>{ "perf", "local", "test", "-h", "--help" };
+			auto _modeStrings = std::array<std::string_view, 6>{
+				"perf", "local", "lichess", "test", "-h", "--help"
+			};
 			auto it = str::find_longest_match(_modeStrings, _arg);
 
 			auto s = "Urecognized mode \"" + std::string(_arg) + "\"";
@@ -113,7 +121,7 @@ int rmain(std::span<const char* const> _vargs)
 			{
 				s = s + " (closest match \"" + std::string(*it) + "\")";
 			};
-			s += ", Use -h or --help to print usage";
+			s += "\n\tUse -h or --help to print usage";
 			sch::log_error(s);
 
 			return 1;
@@ -125,24 +133,28 @@ int rmain(std::span<const char* const> _vargs)
 	if (_perf)
 	{
 		sch::perf_test();
-		exit(0);
+		return 0;
 	}
 	else if (_tests)
 	{
 		if (!sch::run_tests_main())
 		{
-			exit(1);
+			return 1;
 		};
-		exit(0);
-	};
-
-	if (_local)
+		return 0;
+	}
+	else if (_local)
 	{
 		return sch::local_game_main((int)_vargs.size(), _vargs.data());
 	}
-	else
+	else if (_lichess)
 	{
 		return sch::lichess_bot_main((int)_vargs.size(), _vargs.data());
+	}
+	else
+	{
+		SCREEPFISH_CHECK(false);
+		return 0;
 	};
 };
 

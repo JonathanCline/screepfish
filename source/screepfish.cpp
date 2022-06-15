@@ -1031,8 +1031,12 @@ namespace sch
 
 	int lichess_bot_main(int _nargs, const char* const* _vargs)
 	{
+		// Setting(s)
+		const bool _allowUserQueries = true;
+
+
 		// Renable when lichess lets us play the AI
-		const auto _env = sch::load_env(_vargs[0]);
+		const auto _env = sch::load_env(_vargs[0], _allowUserQueries);
 		auto _accountManager = sch::AccountManager(_env);
 		_accountManager.start();
 
