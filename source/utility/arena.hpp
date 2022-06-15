@@ -14,7 +14,7 @@ namespace sch
 	/**
 	 * @brief Holds a set of responses within a move tree.
 	*/
-	template <typename T, typename AllocatorT = sch::block_allocator<T>>
+	template <typename T, sch::cx_block_allocator AllocatorT = sch::block_allocator<T>>
 	class NullTerminatedArena
 	{
 	public:
@@ -181,6 +181,21 @@ namespace sch
 			SCREEPFISH_ASSERT(!this->empty());
 			return *(this->data() + this->size() - 1);
 		};
+
+
+		template <typename IterT>
+		void assign(IterT _begin, IterT _end)
+		{
+			this->clear();
+			if (_begin != _end)
+			{
+				this->raw_set_mem(std::distance(_begin, _end));
+				std::copy(_begin, _end, this->data());
+			};
+		};
+
+
+
 
 		NullTerminatedArena() :
 			data_(nullptr)
