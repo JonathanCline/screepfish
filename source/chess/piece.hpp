@@ -305,6 +305,80 @@ namespace chess
 		return _str;
 	};
 
+	/**
+	 * @brief Parses a move value from a string.
+	 *
+	 * Format is assumed like "a1b2" where 'a1' is from pos and 'b2' is to pos.
+	 *
+	 * @param _str String to parse..
+	 * @return Null move on failure, move otherwise.
+	*/
+	constexpr Move try_parse_move(std::string_view _str)
+	{
+		// "0123" is minimal size. Additional character may be added for promotion.
+		if (_str.size() < 4 || _str.size() > 5)
+		{
+			return jc::null;
+		};
+
+		// Parse individual positions.
+		Position _from, _to;
+
+		// Parse from position.
+		if (const auto p = try_parse_position(_str.substr(0, 2)); p)
+		{
+			_from = *p;
+		}
+		else
+		{
+			return jc::null;
+		};
+
+		// Parse to position.
+		if (const auto p = try_parse_position(_str.substr(2, 4)); p)
+		{
+			_to = *p;
+		}
+		else
+		{
+			return jc::null;
+		};
+
+		// Drop parsed <from><to> positions
+		_str.remove_prefix(4);
+
+		auto _promotion = PieceType::none;
+		if (!_str.empty())
+		{
+			const auto c = _str.front();
+			switch (c)
+			{
+			case 'q':
+				_promotion = PieceType::queen;
+				break;
+			case 'n':
+				_promotion = PieceType::knight;
+				break;
+			case 'r':
+				_promotion = PieceType::rook;
+				break;
+			case 'b':
+				_promotion = PieceType::bishop;
+				break;
+			default:
+				break;
+			};
+			
+			if (_promotion != PieceType::none)
+			{
+				_str.remove_prefix(1);
+			};
+		};
+
+		// Write parsed move.
+		return Move(_from, _to, _promotion);
+	};
+
 	std::ostream& operator<<(std::ostream& _ostr, const Move& _value);
 
 

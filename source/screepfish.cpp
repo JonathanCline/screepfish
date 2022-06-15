@@ -227,6 +227,8 @@ namespace sch
 			game_id_(_gameID),
 			client_(_token)
 		{
+			this->engine_.set_search_depth(5);
+
 			this->proc_.set_callback(jc::functor(&GameStream::on_game_full, this));
 			this->proc_.set_callback(jc::functor(&GameStream::on_game_state, this));
 
@@ -964,6 +966,73 @@ namespace sch
 
 
 
+	inline void write_final_moves(std::ostream& _ostr, const chess::MoveTree& _tree)
+	{
+		size_t n = 0;
+		chess::foreach_final_move(_tree.initial_board(), _tree.root(),
+			[&_ostr, &n](const chess::Board& _previousBoard, chess::Move _move)
+			{
+				_ostr << _move << '\n';
+				++n;
+			});
+		sch::log_info(str::concat_to_string("Final Move Count : ", n));
+	};
+
+	inline size_t count_final_positions_from_initial(const chess::Board& _board,
+		size_t _depth)
+	{
+		using namespace chess;
+		
+		auto _profile = chess::MoveTreeProfile();
+		_profile.follow_captures_ = false;
+		_profile.follow_captures_ = false;
+		_profile.alphabeta_ = false;
+
+		auto _tree = chess::MoveTree(_board);
+		_tree.build_tree(_depth, _depth, _profile);
+
+		return count_final_positions(_board, _tree.root());
+	};
+
+	inline std::vector<std::pair<chess::Move, size_t>>
+		count_final_positions_for_each_branch_from_initial(const chess::Board& _board, size_t _depth)
+	{
+		using namespace chess;
+
+		auto _profile = chess::MoveTreeProfile();
+		_profile.follow_captures_ = false;
+		_profile.follow_captures_ = false;
+		_profile.alphabeta_ = false;
+
+		auto _tree = chess::MoveTree(_board);
+		_tree.build_tree(_depth, _depth, _profile);
+
+		auto o = std::vector<std::pair<chess::Move, size_t>>{};
+		for (auto& _move : _tree.root())
+		{
+			auto _nextBoard = _board;
+			_nextBoard.move(_move.move_);
+			o.push_back({ _move.move_,
+				chess::count_final_positions(_nextBoard, _move)}
+			);
+		};
+
+		return o;
+	};
+
+	inline auto make_tree_for(const chess::Board& _board, size_t _depth)
+	{
+		auto _profile = chess::MoveTreeProfile();
+		_profile.follow_captures_ = false;
+		_profile.follow_captures_ = false;
+		_profile.alphabeta_ = false;
+
+		auto _tree = chess::MoveTree(_board);
+		_tree.build_tree(_depth + 2, _depth + 2, _profile);
+		return _tree;
+	};
+
+
 	int local_game_main(int _nargs, const char* const* _vargs)
 	{
 		namespace fs = std::filesystem;
@@ -1032,7 +1101,6 @@ namespace sch
 		// Setting(s)
 		const bool _allowUserQueries = true;
 
-
 		// Renable when lichess lets us play the AI
 		const auto _env = sch::load_env(_vargs[0], _allowUserQueries);
 		auto _accountManager = sch::AccountManager(_env);
@@ -1046,4 +1114,142 @@ namespace sch
 
 		return 0;
 	};
+
+
+
+
+
+	int perft_main(int _nargs, const char* const* _vargs)
+	{
+		if (_nargs > 2 && _vargs[2] == std::string_view{ "findfen" })
+		{
+			using namespace chess;
+
+			if (_nargs < 6) { sch::log_error("Usage : screepfish perft findfen <depth> <fen0> <fen1>"); return 1; };
+
+			auto _depthArg = std::string(_vargs[3]); // get_fen(*parse_fen("8/2p5/3p4/KP5r/5pP1/7k/4P3/1R6 b - - 2 2"));
+
+			// Initial fen string
+			auto rf0 = std::string(_vargs[4]); // "8/2p5/3p4/KP5r/1R3pP1/7k/4P3/8 w - - 1 2";
+
+			// Check initial fen string
+			auto rfb0 = parse_fen(rf0);
+			SCREEPFISH_CHECK(rfb0);
+
+			// Parse out extra fen strings
+			auto rfs = std::vector<std::string>();
+			for (size_t n = 5; n != (size_t)_nargs; ++n)
+			{
+				auto _fen = std::string_view(_vargs[n]);
+				auto fb = parse_fen(_fen);
+				if (!fb)
+				{
+					sch::log_error(str::concat_to_string("Invalid fen \"", _fen, '\"'));
+					return 1;
+				};
+				rfs.push_back(get_fen(*fb));
+			};
+			
+			// Parse / check depth
+			size_t _depth = 0;
+			if (const auto [p, ec] = std::from_chars(_depthArg.data(), _depthArg.data() + _depthArg.size(), _depth);
+				ec != std::errc{})
+			{
+				sch::log_error(str::concat_to_string(
+					"Invalid <depth> : expected number, got \"", _depthArg, "\""
+				));
+				return 1;
+			};
+			if (_depth == 0 || _depth > 20)
+			{
+				sch::log_error(str::concat_to_string(
+					"Invalid <depth> : out of range [0,20), got \"", _depth, "\""
+				));
+				return 1;
+			};
+
+			// Build tree
+			auto _tree = make_tree_for(*rfb0, _depth);
+			
+
+			chess::MoveTreeNode* _searchFrom = &_tree.root();
+			chess::Board _searchFromBoard{ _tree.initial_board() };
+
+			for (size_t n = 0; n != rfs.size(); ++n)
+			{
+				bool _found = false;
+				for (auto& _node : *_searchFrom)
+				{
+					auto b = _searchFromBoard;
+					b.move(_node.move_);
+
+					if (get_fen(b) == rfs[n])
+					{
+						std::cout <<
+							str::concat_to_string(_node.move_, " : \"", rfs[n], "\" : ", count_final_positions(b, _node)) <<
+							'\n';
+						_searchFrom = &_node;
+						_searchFromBoard = b;
+						_found = true;
+						break;
+					};
+				};
+				if (!_found)
+				{
+					break;
+				};
+			};
+
+			return 0;
+		};
+
+
+		if (_nargs <= 3) { sch::log_error("Usage : screepfish perft <depth> <fen> [moves...]"); return 1; };
+
+		auto _depthArg = std::string_view(_vargs[2]);
+		auto _fenArg = std::string_view(_vargs[3]);
+
+		size_t _depth = 0;
+		if (const auto [p, ec] = std::from_chars(_depthArg.data(), _depthArg.data() + _depthArg.size(), _depth);
+			ec != std::errc{})
+		{
+			sch::log_error(str::concat_to_string(
+				"Invalid <depth> : expected number, got \"", _depthArg, "\""
+			));
+			return 1;
+		};
+		_depth += 2;
+
+		const auto _pFen = chess::parse_fen(_fenArg);
+		if (!_pFen)
+		{
+			sch::log_error(str::concat_to_string(
+				"Invalid <fen> : expected fen string, got \"", _fenArg, "\""
+			));
+			return 1;
+		};
+
+		using namespace chess;
+		auto _playMoves = std::vector<Move>();
+		for (size_t n = 4; n < (size_t)_nargs; ++n)
+		{
+			auto _moveArg = std::string_view(_vargs[n]);
+			Move _move{};
+			chess::fromstr(_moveArg, _move);
+
+		};
+
+
+		auto _board = *_pFen;
+		auto _branches = count_final_positions_for_each_branch_from_initial(_board, _depth);
+
+		for (const auto& [_move, _outcomes] : _branches)
+		{
+			auto nb = _board;
+			nb.move(_move);
+			std::cout << _outcomes << '\n' << chess::get_fen(nb) << "\n\n";
+		};
+		return 0;
+	};
+
 }

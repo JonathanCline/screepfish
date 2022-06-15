@@ -164,7 +164,7 @@ sch::EnvInfo sch::load_env(const std::string& _executablePathStr, bool _allowUse
 	// Set values
 	auto _info = sch::EnvInfo();
 	_info.executable_path = _executablePath.generic_string();
-	_info.executable_root_path = _envDirectoryPath.generic_string();
+	_info.executable_root_path = _executableDirectoryPath.generic_string();
 	_info.env_root_path = _envDirectoryPath.generic_string();
 	_info.token = _lichessAccountToken;
 

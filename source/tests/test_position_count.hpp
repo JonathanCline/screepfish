@@ -30,6 +30,8 @@ namespace sch
 			_profile.follow_captures_ = false;
 			_profile.follow_checks_ = false;
 
+			auto _result = TestResult(this->name_);
+			
 			for (auto& v : this->expected_)
 			{
 				_tree.evaluate_next(_searchData, _profile);
@@ -62,11 +64,11 @@ namespace sch
 						"\n   castles       = " + std::to_string(_castles) +
 						"\n   enpassants    = " + std::to_string(_enpassants);
 
-					return TestResult(this->name_, -1, s);
+					return TestResult(this->name_, 1, s);
 				};
 			};
 
-			return TestResult(this->name_);
+			return _result;
 		};
 
 		Test_PositionCount(std::string_view _name, chess::Board _board, std::vector<size_t> _expectedPositions) :
