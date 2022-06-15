@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <string_view>
 #include <array>
+#include <optional>
 
 namespace chess
 {
@@ -807,25 +808,13 @@ namespace chess
 	*/
 	constexpr std::string_view fromstr(std::string_view _str, Position& _value)
 	{
-		if (_str.size() < 2)
-		{
-			// fail
-			abort();
-		};
+		SCREEPFISH_ASSERT(_str.size() >= 2);
 
 		const auto _fileChar = _str.front();
-		if (!inbounds(_fileChar, 'a', 'h', inclusive))
-		{
-			// fail
-			abort();
-		};
+		SCREEPFISH_ASSERT(inbounds(_fileChar, 'a', 'h', inclusive));
 
 		const auto _rankChar = _str[1];
-		if (!inbounds(_rankChar, '1', '8', inclusive))
-		{
-			// fail
-			abort();
-		};
+		SCREEPFISH_ASSERT(inbounds(_rankChar, '1', '8', inclusive));
 
 		// Convert chars to rank and file
 		auto _file = File();
@@ -840,6 +829,34 @@ namespace chess
 		_str.remove_prefix(2);
 		return _str;
 	};
+
+
+
+
+	/**
+	 * @brief Parses a position value from a string.
+	 *
+	 * @return String with parsed characters removed.
+	*/
+	constexpr std::optional<Position> try_parse_position(std::string_view _str)
+	{
+		if (_str.size() != 2) { return std::nullopt; };
+
+		const auto _fileChar = _str.front();
+		if (!inbounds(_fileChar, 'a', 'h', inclusive)) { return std::nullopt; };
+		const auto _rankChar = _str[1];
+		if (!inbounds(_rankChar, '1', '8', inclusive)) { return std::nullopt; };
+
+		// Convert chars to rank and file
+		auto _file = File();
+		auto _rank = Rank();
+		fromchar(_fileChar, _file);
+		fromchar(_rankChar, _rank);
+
+		// Return parsed position
+		return Position(_file, _rank);
+	};
+
 
 
 	std::ostream& operator<<(std::ostream& _ostr, const Position& _value);

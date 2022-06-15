@@ -121,6 +121,7 @@ namespace chess
 		};
 
 		void resort_children();
+		void resort_children_by_quick_rating();
 
 		using size_type = uint8_t;
 
@@ -249,14 +250,18 @@ namespace chess
 
 
 		void show_best_line() const;
-		std::vector<RatedMove> get_best_line() const;
+		std::vector<const MoveTreeNode*> get_best_line() const;
+
+		size_t best_line_length() const;
+
+
 
 		void set_move(RatedMove _move, Color _playedBy)
 		{
 			this->move_ = _move;
 			this->player_ = _playedBy;
 			this->rating_ =
-				AbsoluteRating(_move.rating(), _playedBy);
+				AbsoluteRating(_move.rating() - ((Rating)this->depth_ * 0.01f), _playedBy);
 			this->responses_.clear();
 		};
 
@@ -518,7 +523,7 @@ namespace chess
 		size_t tree_size() const;
 		size_t total_outcomes() const;
 
-		std::vector<std::vector<RatedMove>> get_top_lines(size_t _maxCount) const;
+		std::vector<std::vector<const MoveTreeNode*>> get_top_lines(size_t _maxCount) const;
 
 		size_t count_unique_positions();
 		size_t count_checks();

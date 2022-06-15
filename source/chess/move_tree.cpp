@@ -2,6 +2,9 @@
 
 #include <iostream>
 
+#include <jclib/type.h>
+#include <tuple>
+
 namespace chess
 {
 	/**
@@ -44,6 +47,15 @@ namespace chess
 				{
 					return lhs.quick_rating() > rhs.quick_rating();
 				};
+			});
+	};
+	void MoveTreeNode::resort_children_by_quick_rating()
+	{
+		// Sort children by rating
+		std::ranges::sort(this->responses_,
+			[](const MoveTreeNode& lhs, const MoveTreeNode& rhs)
+			{
+				return lhs.quick_rating() > rhs.quick_rating();
 			});
 	};
 
@@ -236,9 +248,9 @@ namespace chess
 		};
 	};
 
-	std::vector<RatedMove> MoveTreeNode::get_best_line() const
+	std::vector<const MoveTreeNode*> MoveTreeNode::get_best_line() const
 	{
-		auto v = std::vector<RatedMove>{ this->move_ };
+		auto v = std::vector<const MoveTreeNode*>{ this };
 		if (!this->empty())
 		{
 			auto rv = this->front().get_best_line();
@@ -246,6 +258,21 @@ namespace chess
 		};
 		return v;
 	};
+
+	size_t MoveTreeNode::best_line_length() const
+	{
+		if (!this->empty())
+		{
+			const auto n = this->front().best_line_length();
+			return n + 1;
+		}
+		else
+		{
+			return 1;
+		};
+	};
+
+
 
 	void MoveTreeNode::count_duplicates(Board _board, std::set<size_t>& _boards)
 	{
@@ -372,6 +399,8 @@ namespace chess
 	};
 
 
+	
+
 
 
 	inline void alpha_beta_eval(MoveTreeNode& _node, const Board& _board,
@@ -388,82 +417,105 @@ namespace chess
 			++_searchData.max_depth_;
 			_profile.follow_checks_ = false;
 		};
+
+		// Sort children by quick evaluation rating
+		_node.resort_children_by_quick_rating();
 	};
 
+	/**
+	 * @brief Fills a move tree using alpha-beta pruning.
+	 * 
+	 * Depth first.
+	 * 
+	 * @param _board Board with the given node's move played.
+	 * @param _node Node to fill from.
+	 * @param _profile Move tree profile settings.
+	 * @param _searchData Search data.
+	 * @param _alphaBeta Alpha and beta parameters.
+	 * @param _isMaximizingPlayer True if maximizing player, false otherwise.
+	 * 
+	 * @return Rating for the position.
+	*/
 	inline Rating alpha_beta(const Board& _board,
 		MoveTreeNode& _node, MoveTreeProfile _profile, MoveTreeSearchData _searchData,
-		MoveTreeAlphaBeta _alphaBeta, bool _isMaximizingPlayer)
+		MoveTreeAlphaBeta _alphaBeta, Color _maximizingPlayer)
 	{
-		if (!_searchData.can_go_deeper() /* or node is a terminal node */ )
+		if (!_searchData.can_go_deeper())
 		{
-			return (_isMaximizingPlayer)?
-				-_node.quick_rating() :
-				_node.quick_rating();
+			return _node.rating().player(_maximizingPlayer);
 		};
 
 		SCREEPFISH_ASSERT(_board.get_last_move() == _node.move_);
 		alpha_beta_eval(_node, _board, _profile, _searchData);
-		
-		if (_isMaximizingPlayer)
+
+		if (_board.get_toplay() == _maximizingPlayer)
 		{
+			// We must find our best response
+
 			auto _value = 
-				-Rating(std::numeric_limits<Rating>::infinity());
+				_alphaBeta.beta;
 
 			for (auto& _move : _node)
 			{
 				auto _newBoard = _board;
 				_newBoard.move(_move.move_);
 
-				_value = std::max
-				(
-					_value,
+				const auto _moveABValue =
 					alpha_beta(_newBoard, _move, _profile,
 						_searchData.with_next_depth(),
-						_alphaBeta, false
-					)
-				);
+						_alphaBeta, _maximizingPlayer
+					);
+				_value = std::max(_value, _moveABValue);
 
-				if (_value >= _alphaBeta.beta)
+				if (!std::isinf(_moveABValue))
 				{
-					break; // (*β cutoff*)
-				};
+					if (_value >= _alphaBeta.beta)
+					{
+						break; // (*β cutoff*)
+					};
 
-				_alphaBeta.alpha = std::max(
-					_alphaBeta.alpha,
-					_value
-				);
+					// Do NOT allow early-pruning checkmates
+					_alphaBeta.alpha = std::max(
+						_alphaBeta.alpha,
+						_value
+					);
+				};
 			};
 
 			return _value;
 		}
 		else
 		{
+			// We must find the opponent's best response
+			
 			auto _value =
-				Rating(std::numeric_limits<Rating>::infinity());
+				_alphaBeta.alpha;
 
 			for (auto& _move : _node)
 			{
 				auto _newBoard = _board;
 				_newBoard.move(_move.move_);
 
-				_value = std::min
-				(
-					_value,
+				const auto _moveABValue =
 					alpha_beta(_newBoard, _move, _profile,
 						_searchData.with_next_depth(),
-						_alphaBeta, true
-					)
-				);
+						_alphaBeta, _maximizingPlayer
+					);
+				_value = std::min(_value, _moveABValue);
 
-				if (_value <= _alphaBeta.alpha)
+				// Do NOT allow early-pruning checkmates
+				if (!std::isinf(_moveABValue))
 				{
-					break; // (*α cutoff*)
-				};
+					if (_value <= _alphaBeta.alpha)
+					{
+						break; // (*α cutoff*)
+					};
 
-				_alphaBeta.beta = std::min(
-					_alphaBeta.beta,
-					_value
-				);
+					_alphaBeta.beta = std::min(
+						_alphaBeta.beta,
+						_value
+					);
+				};
 			};
 
 			return _value;
@@ -472,6 +524,16 @@ namespace chess
 		::abort();
 	};
 
+	inline Rating alpha_beta(MoveTree& _tree,
+		MoveTreeProfile _profile, MoveTreeSearchData _searchData)
+	{
+		auto _alphaBeta = MoveTreeAlphaBeta();
+		_alphaBeta.alpha = -std::numeric_limits<Rating>::infinity();
+		_alphaBeta.beta = std::numeric_limits<Rating>::infinity();
+		return alpha_beta(_tree.initial_board(), _tree.root(),
+			_profile, _searchData, _alphaBeta,
+			_tree.initial_board().get_toplay());
+	};
 
 
 
@@ -548,18 +610,20 @@ namespace chess
 		return n;
 	};
 
-	std::vector<std::vector<RatedMove>> MoveTree::get_top_lines(size_t _maxCount) const
+	std::vector<std::vector<const MoveTreeNode*>> MoveTree::get_top_lines(size_t _maxCount) const
 	{
 		auto& _moves = this->root();
 
-		auto o = std::vector<std::vector<RatedMove>>{};
+		auto o = std::vector<std::vector<const MoveTreeNode*>>{};
 		for (size_t n = 0; n != _maxCount; ++n)
 		{
 			if (n >= _moves.size())
 			{
 				break;
 			};
-			o.push_back(_moves.at(n).get_best_line());
+			o.push_back(
+				_moves.at(n).get_best_line()
+			);
 		};
 		return o;
 	};
@@ -608,13 +672,7 @@ namespace chess
 
 		if (_profile.alphabeta_)
 		{
-			auto _alphaBeta = MoveTreeAlphaBeta();
-			_alphaBeta.alpha = -std::numeric_limits<Rating>::infinity();
-			_alphaBeta.beta = std::numeric_limits<Rating>::infinity();
-
-			const auto _alphaBetaRating = alpha_beta(
-				this->initial_board(), _root,
-				_profile, _searchData, _alphaBeta, true);
+			const auto _abRating = alpha_beta(*this, _profile, _searchData);
 		}
 		else
 		{

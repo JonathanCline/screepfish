@@ -13,6 +13,7 @@
 
 #include "utility/perf.hpp"
 #include "utility/logging.hpp"
+#include "utility/system.hpp"
 
 #include "terminal/board_view_terminal.hpp"
 
@@ -56,17 +57,14 @@ namespace sch
 				return;
 			};
 
-			auto _board = chess::Board();
-			chess::reset_board(_board);
-
+			auto _board = this->initial_board_;
 			for (auto& _move : _moves)
 			{
 				_board.move(_move);
 			};
 
 			this->engine_.set_board(_board);
-
-			if (*this->my_turn_)
+			if (this->my_color_ == _board.get_toplay())
 			{
 				const auto _response = this->engine_.get_move();
 				bool _passed = false;
@@ -99,18 +97,16 @@ namespace sch
 		{
 			std::cout << "[Debug] on_game_full" << std::endl;
 
-
+			
 
 			const auto lck = std::unique_lock(this->mtx_);
 
 			if (auto& _blackID = _event.black.id; _blackID && _blackID.value() == this->player_id_)
 			{
-				this->my_turn_ = false;
 				this->my_color_ = chess::Color::black;
 			}
 			else if (auto& _whiteID = _event.white.id; _whiteID && _whiteID.value() == this->player_id_)
 			{
-				this->my_turn_ = true;
 				this->my_color_ = chess::Color::white;
 			};
 
@@ -122,75 +118,24 @@ namespace sch
 			};
 
 			// Parse fen into board state
-			auto _board = chess::parse_fen(_fen);
-			if (!_board)
+			auto _boardOpt = chess::parse_fen(_fen);
+			if (!_boardOpt)
 			{
 				std::cout << _event.initialFen << '\n';
-				abort();
+				SCREEPFISH_CHECK(false);
 			};
+
+			auto& _board = this->initial_board_;
+			_board = *_boardOpt;
 
 			// Tell the engine which color it is playing as
-			this->engine_.start(*_board, *this->my_color_);
-
-			// Count played moves
-			auto _movesPlayedCount = std::ranges::count(_event.state.moves, ' ');
-			if (!_event.state.moves.empty())
-			{
-				_movesPlayedCount += 1;
-			};
-
-			// Set if its our turn or not
-			bool _whiteToPlay = false;
-			if ((_movesPlayedCount % 2) == 0)
-			{
-				_whiteToPlay = true;
-			};
-
-			if (this->my_color_.value() == chess::Color::white && _whiteToPlay)
-			{
-				this->my_turn_ = true;
-			}
-			else if (this->my_color_.value() == chess::Color::black && !_whiteToPlay)
-			{
-				this->my_turn_ = true;
-			}
-			else
-			{
-				this->my_turn_ = false;
-			};
+			this->engine_.start(_board, *this->my_color_);
 
 			this->on_move_played(_event.state);
 		};
 		void on_game_state(const lichess::GameStateEvent& _event)
 		{
 			const auto lck = std::unique_lock(this->mtx_);
-
-			// Count played moves
-			auto _movesPlayedCount = std::ranges::count(_event.moves, ' ');
-			if (!_event.moves.empty())
-			{
-				_movesPlayedCount += 1;
-			};
-
-			bool _whitesTurn = false;
-			if ((_movesPlayedCount % 2) == 0)
-			{
-				_whitesTurn = true;
-			};
-
-			if (this->my_color_.value() == chess::Color::white && _whitesTurn)
-			{
-				this->my_turn_ = true;
-			}
-			else if (this->my_color_.value() == chess::Color::black && !_whitesTurn)
-			{
-				this->my_turn_ = true;
-			}
-			else
-			{
-				this->my_turn_ = false;
-			};
-
 			this->on_move_played(_event);
 		};
 
@@ -216,6 +161,8 @@ namespace sch
 		void enable_logging(std::string _executableDirectory)
 		{
 			this->engine_.set_logging_dir(_executableDirectory + "/" + std::string(this->game_id()));
+			auto _httpLogPath = _executableDirectory + "/" + std::string(this->game_id()) + "/http_stream.txt";
+			this->stream_.enable_logging(_httpLogPath);
 		};
 
 		GameStream(const char* _token,
@@ -227,6 +174,9 @@ namespace sch
 			game_id_(_gameID),
 			client_(_token)
 		{
+
+			this->engine_.set_search_depth(6);
+
 			this->proc_.set_callback(jc::functor(&GameStream::on_game_full, this));
 			this->proc_.set_callback(jc::functor(&GameStream::on_game_state, this));
 
@@ -249,7 +199,7 @@ namespace sch
 		std::string player_id_;
 
 		std::optional<chess::Color> my_color_{ std::nullopt };
-		std::optional<bool> my_turn_{ std::nullopt };
+		chess::Board initial_board_{};
 
 		sch::ScreepFish engine_{};
 
@@ -274,7 +224,7 @@ namespace sch
 
 			{
 				const auto _url = "https://lichess.org/" + _event.id;
-				//sch::open_browser(_url.c_str());
+				sch::open_browser(_url.c_str());
 			};
 
 			std::cout << "Started game " << _event.id << '\n';
@@ -305,7 +255,7 @@ namespace sch
 
 	public:
 
-		void start()
+		void start(bool _ensureGamePresent = false)
 		{
 			this->account_info_ = *this->account_client_.get_account_info();
 
@@ -328,25 +278,26 @@ namespace sch
 					//this->game_streams_.emplace_back(this->env_.token.c_str(), v.gameId, this->account_info_.id);
 				};
 
-				if (_games->nowPlaying.empty())
+				if (_games->nowPlaying.empty() && _ensureGamePresent)
 				{
 					using namespace std::chrono_literals;
 
 					std::this_thread::sleep_for(std::chrono::seconds(1));
 
 					auto _params = lichess::ChallengeAIParams{};
-					_params.level = 4;
+					_params.level = 3;
 					_params.days.reset();
 					_params.clock.emplace();
-					//_params.clock->set_initial(1min);
-					//_params.clock->set_increment(3s);
+					_params.clock->set_initial(1min);
+					_params.clock->set_increment(5s);
+
 					auto _result = this->account_client_.challenge_ai(_params);
 					if (!_result)
 					{
 						std::cout << "[Error] Failed to challenge the AI - " <<
 							_result.alternate().error_ << " - " <<
 							_result.alternate().status_ << '\n';
-					}
+					};
 				};
 			};
 
@@ -381,7 +332,10 @@ namespace sch
 			account_client_(this->env_.token.c_str()),
 			account_event_stream_(this->env_.token.c_str(), "/api/stream/event"),
 			account_event_proc_()
-		{};
+		{
+			const auto _path = this->env_.executable_root_path + "/logs/account_http.txt";
+			this->account_event_stream_.enable_logging(_path);
+		};
 
 	private:
 		mutable std::mutex mtx_;
@@ -464,6 +418,23 @@ namespace sch
 #endif
 
 		using namespace chess;
+
+		constexpr auto subtest = [](bool _alphaBetaPrune)
+		{
+			const auto _fen = "6n1/p7/2p4r/kp4pp/1b6/1P3p2/K7/4r3 b - - 13 54";
+			auto _board = *parse_fen(_fen);
+			auto _tree = MoveTree(_board);
+			auto _profile = MoveTreeProfile();
+			_profile.follow_captures_ = false;
+			_profile.follow_checks_ = false;
+			_profile.alphabeta_ = _alphaBetaPrune;
+			_tree.build_tree(4, 4, _profile);
+			auto _move = _tree.best_move();
+			std::cout << *_move << '\n';
+		};
+
+		subtest(false);
+		subtest(true);
 
 		std::cout << '\n' << str::rep('=', 80) << "\n\n";
 		{
@@ -964,6 +935,73 @@ namespace sch
 
 
 
+	inline void write_final_moves(std::ostream& _ostr, const chess::MoveTree& _tree)
+	{
+		size_t n = 0;
+		chess::foreach_final_move(_tree.initial_board(), _tree.root(),
+			[&_ostr, &n](const chess::Board& _previousBoard, chess::Move _move)
+			{
+				_ostr << _move << '\n';
+				++n;
+			});
+		sch::log_info(str::concat_to_string("Final Move Count : ", n));
+	};
+
+	inline size_t count_final_positions_from_initial(const chess::Board& _board,
+		size_t _depth)
+	{
+		using namespace chess;
+		
+		auto _profile = chess::MoveTreeProfile();
+		_profile.follow_captures_ = false;
+		_profile.follow_captures_ = false;
+		_profile.alphabeta_ = false;
+
+		auto _tree = chess::MoveTree(_board);
+		_tree.build_tree(_depth, _depth, _profile);
+
+		return count_final_positions(_board, _tree.root());
+	};
+
+	inline std::vector<std::pair<chess::Move, size_t>>
+		count_final_positions_for_each_branch_from_initial(const chess::Board& _board, size_t _depth)
+	{
+		using namespace chess;
+
+		auto _profile = chess::MoveTreeProfile();
+		_profile.follow_captures_ = false;
+		_profile.follow_captures_ = false;
+		_profile.alphabeta_ = false;
+
+		auto _tree = chess::MoveTree(_board);
+		_tree.build_tree(_depth, _depth, _profile);
+
+		auto o = std::vector<std::pair<chess::Move, size_t>>{};
+		for (auto& _move : _tree.root())
+		{
+			auto _nextBoard = _board;
+			_nextBoard.move(_move.move_);
+			o.push_back({ _move.move_,
+				chess::count_final_positions(_nextBoard, _move)}
+			);
+		};
+
+		return o;
+	};
+
+	inline auto make_tree_for(const chess::Board& _board, size_t _depth)
+	{
+		auto _profile = chess::MoveTreeProfile();
+		_profile.follow_captures_ = false;
+		_profile.follow_captures_ = false;
+		_profile.alphabeta_ = false;
+
+		auto _tree = chess::MoveTree(_board);
+		_tree.build_tree(_depth + 2, _depth + 2, _profile);
+		return _tree;
+	};
+
+
 	int local_game_main(int _nargs, const char* const* _vargs)
 	{
 		namespace fs = std::filesystem;
@@ -1032,11 +1070,10 @@ namespace sch
 		// Setting(s)
 		const bool _allowUserQueries = true;
 
-
 		// Renable when lichess lets us play the AI
 		const auto _env = sch::load_env(_vargs[0], _allowUserQueries);
 		auto _accountManager = sch::AccountManager(_env);
-		_accountManager.start();
+		_accountManager.start(true);
 
 		while (true)
 		{
@@ -1046,4 +1083,142 @@ namespace sch
 
 		return 0;
 	};
+
+
+
+
+
+	int perft_main(int _nargs, const char* const* _vargs)
+	{
+		if (_nargs > 2 && _vargs[2] == std::string_view{ "findfen" })
+		{
+			using namespace chess;
+
+			if (_nargs < 6) { sch::log_error("Usage : screepfish perft findfen <depth> <fen0> <fen1>"); return 1; };
+
+			auto _depthArg = std::string(_vargs[3]); // get_fen(*parse_fen("8/2p5/3p4/KP5r/5pP1/7k/4P3/1R6 b - - 2 2"));
+
+			// Initial fen string
+			auto rf0 = std::string(_vargs[4]); // "8/2p5/3p4/KP5r/1R3pP1/7k/4P3/8 w - - 1 2";
+
+			// Check initial fen string
+			auto rfb0 = parse_fen(rf0);
+			SCREEPFISH_CHECK(rfb0);
+
+			// Parse out extra fen strings
+			auto rfs = std::vector<std::string>();
+			for (size_t n = 5; n != (size_t)_nargs; ++n)
+			{
+				auto _fen = std::string_view(_vargs[n]);
+				auto fb = parse_fen(_fen);
+				if (!fb)
+				{
+					sch::log_error(str::concat_to_string("Invalid fen \"", _fen, '\"'));
+					return 1;
+				};
+				rfs.push_back(get_fen(*fb));
+			};
+			
+			// Parse / check depth
+			size_t _depth = 0;
+			if (const auto [p, ec] = std::from_chars(_depthArg.data(), _depthArg.data() + _depthArg.size(), _depth);
+				ec != std::errc{})
+			{
+				sch::log_error(str::concat_to_string(
+					"Invalid <depth> : expected number, got \"", _depthArg, "\""
+				));
+				return 1;
+			};
+			if (_depth == 0 || _depth > 20)
+			{
+				sch::log_error(str::concat_to_string(
+					"Invalid <depth> : out of range [0,20), got \"", _depth, "\""
+				));
+				return 1;
+			};
+
+			// Build tree
+			auto _tree = make_tree_for(*rfb0, _depth);
+			
+
+			chess::MoveTreeNode* _searchFrom = &_tree.root();
+			chess::Board _searchFromBoard{ _tree.initial_board() };
+
+			for (size_t n = 0; n != rfs.size(); ++n)
+			{
+				bool _found = false;
+				for (auto& _node : *_searchFrom)
+				{
+					auto b = _searchFromBoard;
+					b.move(_node.move_);
+
+					if (get_fen(b) == rfs[n])
+					{
+						std::cout <<
+							str::concat_to_string(_node.move_, " : \"", rfs[n], "\" : ", count_final_positions(b, _node)) <<
+							'\n';
+						_searchFrom = &_node;
+						_searchFromBoard = b;
+						_found = true;
+						break;
+					};
+				};
+				if (!_found)
+				{
+					break;
+				};
+			};
+
+			return 0;
+		};
+
+
+		if (_nargs <= 3) { sch::log_error("Usage : screepfish perft <depth> <fen> [moves...]"); return 1; };
+
+		auto _depthArg = std::string_view(_vargs[2]);
+		auto _fenArg = std::string_view(_vargs[3]);
+
+		size_t _depth = 0;
+		if (const auto [p, ec] = std::from_chars(_depthArg.data(), _depthArg.data() + _depthArg.size(), _depth);
+			ec != std::errc{})
+		{
+			sch::log_error(str::concat_to_string(
+				"Invalid <depth> : expected number, got \"", _depthArg, "\""
+			));
+			return 1;
+		};
+		_depth += 2;
+
+		const auto _pFen = chess::parse_fen(_fenArg);
+		if (!_pFen)
+		{
+			sch::log_error(str::concat_to_string(
+				"Invalid <fen> : expected fen string, got \"", _fenArg, "\""
+			));
+			return 1;
+		};
+
+		using namespace chess;
+		auto _playMoves = std::vector<Move>();
+		for (size_t n = 4; n < (size_t)_nargs; ++n)
+		{
+			auto _moveArg = std::string_view(_vargs[n]);
+			Move _move{};
+			chess::fromstr(_moveArg, _move);
+
+		};
+
+
+		auto _board = *_pFen;
+		auto _branches = count_final_positions_for_each_branch_from_initial(_board, _depth);
+
+		for (const auto& [_move, _outcomes] : _branches)
+		{
+			auto nb = _board;
+			nb.move(_move);
+			std::cout << _outcomes << '\n' << chess::get_fen(nb) << "\n\n";
+		};
+		return 0;
+	};
+
 }

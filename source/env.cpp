@@ -85,7 +85,7 @@ sch::EnvInfo sch::load_env(const std::string& _executablePathStr, bool _allowUse
 	SCREEPFISH_CHECK(fs::exists(_executablePath));
 
 	// Executable directory path
-	const auto _executableDirectoryPath = fs::canonical(_executablePath).parent_path();
+	const auto _executableDirectoryPath = _executablePath.parent_path();
 	SCREEPFISH_CHECK(fs::is_directory(_executableDirectoryPath));
 
 	// Env directory handling
@@ -164,7 +164,7 @@ sch::EnvInfo sch::load_env(const std::string& _executablePathStr, bool _allowUse
 	// Set values
 	auto _info = sch::EnvInfo();
 	_info.executable_path = _executablePath.generic_string();
-	_info.executable_root_path = _envDirectoryPath.generic_string();
+	_info.executable_root_path = _executableDirectoryPath.generic_string();
 	_info.env_root_path = _envDirectoryPath.generic_string();
 	_info.token = _lichessAccountToken;
 

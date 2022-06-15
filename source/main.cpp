@@ -66,6 +66,7 @@ inline auto make_chess_board_nn_inputs(const chess::Board& _board)
 int rmain(std::span<const char* const> _vargs)
 {
 	bool _perf = false;
+	bool _perft = false;
 	bool _local = false;
 	bool _tests = false;
 	bool _lichess = false;
@@ -87,6 +88,7 @@ int rmain(std::span<const char* const> _vargs)
 				"  <mode> = { perf | test | local | {--h|--help} }\n" <<
 				"    {--h|--help} : Prints this message\n" <<
 				"    perf : Runs the performance test\n" <<
+				"    perft : Runs perft\n" <<
 				"    test : Runs the tests\n" <<
 				"    local : Plays a local game\n" <<
 				"    lichess : Connects to a lichess account\n" <<
@@ -109,10 +111,14 @@ int rmain(std::span<const char* const> _vargs)
 		{
 			_local = true;
 		}
+		else if (_arg == "perft")
+		{
+			_perft = true;
+		}
 		else
 		{
-			auto _modeStrings = std::array<std::string_view, 6>{
-				"perf", "local", "lichess", "test", "-h", "--help"
+			auto _modeStrings = std::array<std::string_view, 7>{
+				"perf", "local", "lichess", "test", "perft", "-h", "--help"
 			};
 			auto it = str::find_longest_match(_modeStrings, _arg);
 
@@ -150,6 +156,10 @@ int rmain(std::span<const char* const> _vargs)
 	else if (_lichess)
 	{
 		return sch::lichess_bot_main((int)_vargs.size(), _vargs.data());
+	}
+	else if (_perft)
+	{
+		return sch::perft_main((int)_vargs.size(), _vargs.data());
 	}
 	else
 	{

@@ -27,13 +27,13 @@ namespace sch
 		// Configure tree profile.
 		auto _profile = MoveTreeProfile();
 		_profile.follow_captures_ = false;
-		_profile.follow_checks_ = true;
+		_profile.follow_checks_ = false;
 		_profile.enable_pruning_ = false;
 		_profile.alphabeta_ = true;
 
 		// BUILD THE TREE
 		auto _tree = chess::MoveTree(_board);
-		_tree.build_tree((size_t)_depth, _depth + 1, _profile);
+		_tree.build_tree((size_t)_depth, _depth, _profile);
 
 		return _tree;
 	};
@@ -178,13 +178,24 @@ namespace sch
 
 				// Perf
 				{
+					namespace ch = std::chrono;
+
+					constexpr auto cvt = [](const auto& v)
+					{
+						return ch::duration_cast<ch::duration<double>>(v);
+					};
+
 					const auto _path = _dirPath / "perf.txt";
 					auto _file = std::ofstream(_path);
-					_file << "Total		  : " << td << '\n';
+					_file << "Total		  : " << cvt(td) << '\n';
 					if (!_isBookMove)
 					{
-						_file << "Tree Build  : " << tdA << '\n';
-						_file << "Tree Search : " << tdB << '\n';
+						_file << "Tree Build      : " << cvt(tdA) << '\n';
+						_file << "Tree Search     : " << cvt(tdB) << '\n';
+						_file << "Total Tree Size : " << _tree.tree_size() << '\n';
+						_file << "Nodes / Second  : " <<
+							(double)_tree.tree_size() / cvt(td).count() << '\n';
+
 					};
 				};
 
@@ -251,23 +262,23 @@ namespace sch
 						const auto _path = _dirPath / ("line" + std::to_string(_lineN++) + ".txt");
 						auto _file = std::ofstream(_path);
 
-						_file << "Final Rating : " << _move->rating() << '\n';
+						_file << "Final Rating : " << _line.front()->rating() << '\n';
 
 						auto b = _board;
 						for (auto& v : _line)
 						{
-							b.move(v);
-							_file << v << '\n';
-							_file << v.rating() << '\n';
+							b.move(v->move_);
+							_file << v->move_ << '\n';
+							_file << v->rating() << ' ' << v->quick_rating() << '\n';
 						};
 						_file << '\n' << '\n';
 
 						b = _board;
 						for (auto& v : _line)
 						{
-							b.move(v);
-							_file << v << '\n';
-							_file << v.rating() << '\n' << '\n';
+							b.move(v->move_);
+							_file << v->move_ << '\n';
+							_file << v->rating() << ' ' << v->quick_rating() << '\n' << '\n';
 							_file << b << '\n' << '\n';
 							_file << get_fen(b) << '\n' << '\n' << str::rep('=', 80) << '\n' << '\n';
 						};
@@ -287,8 +298,6 @@ namespace sch
 		this->init_barrier_.arrive_and_wait();
 
 		// Storage for tracking calcultion times
-		auto _times = std::vector<double>();
-
 		while (!_stop.stop_requested())
 		{
 			{
@@ -300,14 +309,6 @@ namespace sch
 			};
 
 			std::this_thread::sleep_for(std::chrono::milliseconds(1));
-		};
-
-		if (!_times.empty())
-		{
-			const auto _durAcc = jc::accumulate(_times);
-			using dur = std::chrono::duration<double>;
-			const auto _avgDur = _durAcc / static_cast<dur::rep>(_times.size());
-			sch::log_info(str::concat_to_string("Average calculation time = ", dur(_avgDur)));
 		};
 	};
 
