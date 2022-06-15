@@ -73,7 +73,7 @@ namespace lichess
 			std::string name;
 			std::optional<std::string> title;
 			int32_t rating;
-			bool online;
+			std::optional<bool> online;
 
 			Challenger() = default;
 		};

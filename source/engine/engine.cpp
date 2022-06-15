@@ -279,7 +279,7 @@ namespace sch
 		init_barrier_(2),
 		rnd_(std::random_device{}()),
 		logging_dir_{},
-		search_depth_{ 6 }
+		search_depth_{ 5 }
 	{
 		
 	};
