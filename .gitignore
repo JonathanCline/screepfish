@@ -7,3 +7,6 @@ env/
 deps/BearLibTerminal/BearLibTerminal
 
 _exec_args.hpp
+
+# Pycache
+*.pyc
