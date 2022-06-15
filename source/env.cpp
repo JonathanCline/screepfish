@@ -85,7 +85,7 @@ sch::EnvInfo sch::load_env(const std::string& _executablePathStr, bool _allowUse
 	SCREEPFISH_CHECK(fs::exists(_executablePath));
 
 	// Executable directory path
-	const auto _executableDirectoryPath = fs::canonical(_executablePath).parent_path();
+	const auto _executableDirectoryPath = _executablePath.parent_path();
 	SCREEPFISH_CHECK(fs::is_directory(_executableDirectoryPath));
 
 	// Env directory handling

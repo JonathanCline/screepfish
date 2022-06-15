@@ -17,7 +17,8 @@ namespace chess
 		constexpr auto PAWN_PUSH_RATING = 0.001f;
 		constexpr auto CASTLE_ABILITY_RATING = 0.001f;
 		constexpr auto DEVELOPMENT_RATING = 0.005f;
-		
+		constexpr auto KING_MOVE_RATING = -0.01f;
+
 		// Disincentivize repeating moves
 		constexpr auto REPEATED_MOVE_RATING = -0.1f;
 
@@ -1554,8 +1555,20 @@ namespace chess
 		constexpr auto& development_rating_v = DEVELOPMENT_RATING;
 		constexpr auto& repeated_move_rating_v = REPEATED_MOVE_RATING;
 		constexpr auto& fifty_move_rule_rating_v = FIFTY_MOVE_RULE_RATING;
+		constexpr auto& king_move_rating_v = KING_MOVE_RATING;
 
 		auto _rating = Rating(0);
+
+
+		// Try to punish the (chad) random King moves
+
+		if (const auto _lastMove = _board.get_last_move(); _lastMove &&
+			_board.get(_lastMove.from()) == Piece(Piece::king, Player))
+		{
+			_rating -= king_move_rating_v;
+		};
+		
+
 
 		// Checkmate
 

@@ -1,10 +1,14 @@
 #include "lichess.hpp"
 #include "json.hpp"
 
+#include "utility/string.hpp"
+#include "utility/utility.hpp"
+#include "utility/logging.hpp"
+
 #include <array>
 #include <tuple>
 #include <string_view>
-
+#include <filesystem>
 
 #define _LICHESS_MEMBER(member) ::lichess::named_member(&type::member, #member)
 
@@ -664,6 +668,33 @@ namespace lichess
 		{
 			return false;
 		};
+	};
+
+	void StreamClient::enable_logging(const std::string& _pathStr)
+	{
+		namespace fs = std::filesystem;
+
+		auto _path = fs::path(_pathStr);
+		if (std::filesystem::exists(_path))
+		{
+			std::filesystem::remove(_path);
+		};
+		
+		if (!fs::exists(_path.parent_path()))
+		{
+			fs::create_directories(_path.parent_path());
+		};
+
+		sch::log_info(_path.generic_string());
+
+		{
+			auto _file = std::ofstream(_path);
+			_file << str::rep('=', 80) << '\n';
+			_file.flush();
+		};
+
+		SCREEPFISH_CHECK(fs::exists(_path));
+		this->data_->path = _path.generic_string();
 	};
 };
 

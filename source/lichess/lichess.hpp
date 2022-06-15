@@ -416,6 +416,7 @@ namespace lichess
 			CallbackFn callback;
 			std::latch init_latch{ 2 };
 			std::string endpoint;
+			std::string path{};
 
 			Data(const char* _authToken, std::string _endpoint) :
 				client("https://lichess.org"),
@@ -442,6 +443,7 @@ namespace lichess
 
 			_data->init_latch.arrive_and_wait();
 
+			
 			std::cout << "[Debug] Entered main stream loop" << std::endl;
 
 			auto _headers = httplib::Headers();
@@ -454,8 +456,9 @@ namespace lichess
 			const auto _isValid = _client.is_valid();
 			std::cout << _isValid << std::endl;
 
+			auto& _loggingPath = _data->path;
 			auto _result = _client.Get(_path.c_str(), _headers,
-				[&](const httplib::Response& _response) -> bool
+				[&_stop](const httplib::Response& _response) -> bool
 				{
 					if (_stop.stop_requested())
 					{
@@ -474,6 +477,12 @@ namespace lichess
 						auto _node = json::parse(std::string_view{ _data, _len }, nullptr, false);
 						if (!_node.is_discarded())
 						{
+							if (!_loggingPath.empty())
+							{
+								auto _file = std::ofstream(_loggingPath, std::ios::out | std::ios::app);
+								_file << _node.dump(1, '\t') << std::endl;
+							};
+
 							const auto lck = std::unique_lock(_mtx);
 							if (_callback)
 							{
@@ -528,6 +537,9 @@ namespace lichess
 			this->thread_ = std::jthread(&thread_main, this->data_);
 			this->data_->init_latch.arrive_and_wait();
 		};
+
+		void enable_logging(const std::string& _path);
+
 
 		StreamClient(const char* _authToken, std::string _endpoint) :
 			data_(new Data(_authToken, _endpoint))
