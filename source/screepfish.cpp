@@ -12,6 +12,7 @@
 #include "lichess/lichess.hpp"
 
 #include "utility/perf.hpp"
+#include "utility/logging.hpp"
 
 #include "terminal/board_view_terminal.hpp"
 
@@ -780,7 +781,7 @@ namespace sch
 				t.build_tree(3, 3, _profile);
 			};
 			const auto r = perf_test_part(fn);
-			std::cout << "opening (d3) - " << r << std::endl;
+			sch::log_output_chunk(str::concat_to_string("opening (d3) - ", r));
 		};
 
 		// midgame, depth 3
@@ -802,7 +803,7 @@ namespace sch
 				t.build_tree(3, 3, _profile);
 			};
 			const auto r = perf_test_part(fn);
-			std::cout << "midgame (d3) - " << r << std::endl;
+			sch::log_output_chunk(str::concat_to_string("midgame (d3) - ", r));
 		};
 
 		// midgame, depth 3, no ab
@@ -823,7 +824,7 @@ namespace sch
 				t.build_tree(3, 3, p);
 			};
 			const auto r = perf_test_part(fn);
-			std::cout << "midgame (d3 no ab) - " << r << std::endl;
+			sch::log_output_chunk(str::concat_to_string("midgame (d3 no ab) - ", r));
 		};
 
 		// midgame, depth 4
@@ -845,9 +846,10 @@ namespace sch
 				t.build_tree(4, 4, _profile);
 			};
 			const auto r = perf_test_part(fn);
-			std::cout << "midgame (d4) - " << r << std::endl;
+			sch::log_output_chunk(str::concat_to_string("midgame (d4) - ", r));
 		};
-
+		sch::log_output_chunk_divider();
+		
 		// midgame, depth 4, no ab
 		{
 			auto _pFen = parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
@@ -866,7 +868,7 @@ namespace sch
 				t.build_tree(4, 4, p);
 			};
 			const auto r = perf_test_part(fn);
-			std::cout << "midgame (d4 no ab) - " << r << std::endl;
+			sch::log_output_chunk(str::concat_to_string("midgame (d4 no ab) - ", r));
 		};
 
 	};
@@ -966,8 +968,41 @@ namespace sch
 
 	int local_game_main(int _nargs, const char* const* _vargs)
 	{
-		const auto p = (std::filesystem::path(_vargs[0]).parent_path() / "assets" / "chess").generic_string();
-		std::cout << p << '\n';
+		namespace fs = std::filesystem;
+
+		// Error code storage for filesystem handling.
+		auto _erc = std::error_code{};
+
+		// Path used to invoke the executable
+		const auto _invokePath = fs::path(_vargs[0]);
+
+		// Absolute path to the executable
+		const auto _executablePath = fs::canonical(_invokePath, _erc);
+		SCREEPFISH_CHECK(!_erc);
+
+		// Path to the executable's directory
+		const auto _executableDirectoryPath = _executablePath.parent_path();
+		SCREEPFISH_CHECK(fs::exists(_executableDirectoryPath) && fs::is_directory(_executableDirectoryPath));
+
+		// Assets directory
+		const auto _assetsDirectoryPath = _executableDirectoryPath / "assets";
+		if (!fs::is_directory(_assetsDirectoryPath))
+		{
+			auto s = "Missing assets directory, expected at \"" + _assetsDirectoryPath.string() + "\"";
+			sch::log_error(s);
+			SCREEPFISH_ASSERT(false);
+			return 1;
+		};
+
+		// Chess Assets directory
+		const auto _chessAssetsDirectoryPath = _assetsDirectoryPath / "chess";
+		if (!fs::is_directory(_chessAssetsDirectoryPath))
+		{
+			auto s = "Missing chess assets directory, expected at \"" + _chessAssetsDirectoryPath.string() + "\"";
+			sch::log_error(s);
+			SCREEPFISH_ASSERT(false);
+			return 1;
+		};
 
 		bool _step = false;
 		bool _one = false;
@@ -987,7 +1022,8 @@ namespace sch
 		bool _keepAlive = !_one;
 		while (_keepAlive)
 		{
-			_keepAlive = sch::local_game(p.c_str(), _step);
+			const auto _chessAssetsDirectoryPathStr = _chessAssetsDirectoryPath.generic_string();
+			_keepAlive = sch::local_game(_chessAssetsDirectoryPathStr.c_str(), _step);
 		};
 
 		return 0;

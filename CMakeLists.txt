@@ -65,11 +65,11 @@ add_custom_target(
 )
 
 # Make data link if data dir exists
-if (EXISTS "${_devDataPath}")
+if (EXISTS ${_devDataPath})
 	add_custom_target(
 		data_link
 		ALL
-		COMMAND ${MAKE_LINK_SCRIPT} ${CMAKE_CURRENT_SOURCE_DIR}/data ${CMAKE_CURRENT_BINARY_DIR}/data --quiet
+		COMMAND ${MAKE_LINK_SCRIPT} ${_devDataPath} ${CMAKE_CURRENT_BINARY_DIR}/data --quiet
 		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 		VERBATIM
 	)
@@ -78,10 +78,6 @@ endif()
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${_Link})
 target_include_directories(${PROJECT_NAME} PRIVATE source)
-
-if (CLANG STREQUAL "ON")
-	#target_compile_options(${PROJECT_NAME} PUBLIC -ftime-report)
-endif()
 
 install(TARGETS ${PROJECT_NAME} DESTINATION .)
 

@@ -18,6 +18,7 @@
 	#include "_exec_args.hpp"
 #endif
 
+#include "utility/logging.hpp"
 #include "utility/utility.hpp"
 
 #include <jclib/cli.hpp>
@@ -64,28 +65,62 @@ inline auto make_chess_board_nn_inputs(const chess::Board& _board)
 
 int rmain(std::span<const char* const> _vargs)
 {
-	std::cout << str::rep('=', 80) << '\n' << '\n';
-
 	bool _perf = false;
 	bool _local = false;
 	bool _tests = false;
 
-	for (const auto& _varg : _vargs)
+	if (_vargs.size() <= 1)
 	{
-		const auto _arg = std::string_view(_varg);
-		if (_arg == "--perf" || _arg == "-p")
+		sch::log_error("Missing arguments, use -h or --help to print usage");
+	}
+	
+	{
+		const auto _argCStr = _vargs[1];
+		const auto _arg = std::string_view(_argCStr);
+
+		if (_arg == "--help" || _arg == "-h")
+		{
+			std::cout << "screepfish [<mode> [args...]]\n";
+			std::cout <<
+				" Arguments:\n"
+				"  <mode> = { perf | test | local | {--h|--help} }\n" <<
+				"    {--h|--help} : Prints this message\n" <<
+				"    perf : Runs the performance test\n" <<
+				"    test : Runs the tests\n" <<
+				"    local : Plays a local game\n" <<
+				" If no <mode> is provided then this connects to lichess\n\n";
+			return 0;
+		}
+		else if (_arg == "perf")
 		{
 			_perf = true;
 		}
-		else if (_arg == "--test")
+		else if (_arg == "test")
 		{
 			_tests = true;
 		}
-		else if (_arg == "--local" || _arg == "-l")
+		else if (_arg == "local")
 		{
 			_local = true;
+		}
+		else
+		{
+			auto _modeStrings = std::array<std::string_view, 5>{ "perf", "local", "test", "-h", "--help" };
+			auto it = str::find_longest_match(_modeStrings, _arg);
+
+			auto s = "Urecognized mode \"" + std::string(_arg) + "\"";
+			if (it != _modeStrings.end())
+			{
+				s = s + " (closest match \"" + std::string(*it) + "\")";
+			};
+			s += ", Use -h or --help to print usage";
+			sch::log_error(s);
+
+			return 1;
 		};
 	};
+
+	sch::log_output_chunk_divider();
 
 	if (_perf)
 	{
