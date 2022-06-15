@@ -781,7 +781,7 @@ namespace sch
 				t.build_tree(3, 3, _profile);
 			};
 			const auto r = perf_test_part(fn);
-			sch::log_output_chunk(str::concat_to_string("opening (d3) - ", r));
+			sch::log_info(str::concat_to_string("opening (d3) - ", r));
 		};
 
 		// midgame, depth 3
@@ -803,7 +803,7 @@ namespace sch
 				t.build_tree(3, 3, _profile);
 			};
 			const auto r = perf_test_part(fn);
-			sch::log_output_chunk(str::concat_to_string("midgame (d3) - ", r));
+			sch::log_info(str::concat_to_string("midgame (d3) - ", r));
 		};
 
 		// midgame, depth 3, no ab
@@ -824,7 +824,7 @@ namespace sch
 				t.build_tree(3, 3, p);
 			};
 			const auto r = perf_test_part(fn);
-			sch::log_output_chunk(str::concat_to_string("midgame (d3 no ab) - ", r));
+			sch::log_info(str::concat_to_string("midgame (d3 no ab) - ", r));
 		};
 
 		// midgame, depth 4
@@ -846,9 +846,8 @@ namespace sch
 				t.build_tree(4, 4, _profile);
 			};
 			const auto r = perf_test_part(fn);
-			sch::log_output_chunk(str::concat_to_string("midgame (d4) - ", r));
+			sch::log_info(str::concat_to_string("midgame (d4) - ", r));
 		};
-		sch::log_output_chunk_divider();
 		
 		// midgame, depth 4, no ab
 		{
@@ -868,7 +867,7 @@ namespace sch
 				t.build_tree(4, 4, p);
 			};
 			const auto r = perf_test_part(fn);
-			sch::log_output_chunk(str::concat_to_string("midgame (d4 no ab) - ", r));
+			sch::log_info(str::concat_to_string("midgame (d4 no ab) - ", r));
 		};
 
 	};
