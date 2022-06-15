@@ -239,7 +239,7 @@ namespace chess
 		 * @param nt jclib null tag type.
 		*/
 		constexpr Move(jc::null_t nt) noexcept :
-			PieceMove(nt)
+			PieceMove(nt), promotion_{}
 		{};
 
 		/**

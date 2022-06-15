@@ -94,12 +94,200 @@ namespace sch
 		};
 	};
 	
+
+
+
+	void ScreepFish::calculate_next_move()
+	{
+		using namespace chess;
+
+		const auto& _board = this->board_;
+		const auto& _myColor = this->my_color_;
+
+		const size_t _pieceCount = _board.pieces().size();
+		auto _depth = this->search_depth_;
+
+		// Bump depth as many moves will be discarded
+		const bool _isCheck = is_check(_board, _myColor);
+
+		if (_pieceCount <= 8 && !_isCheck)
+		{
+			_depth += 1;
+		}
+		if (_pieceCount <= 4 && !_isCheck)
+		{
+			_depth += 1;
+		};
+
+
+		// TODO : Split this function into at least two parts - one for book moves, one for evaluated moves
+
+		auto _move = std::optional<RatedMove>(std::nullopt);
+		auto _tree = chess::MoveTree();
+
+		bool _isBookMove = false;
+
+		const auto _clock = std::chrono::steady_clock{};
+
+		auto t0 = _clock.now();
+		auto t1 = _clock.now();
+		auto t2 = _clock.now();
+
+		// Get next move from book if possible.
+		if (const auto _bookMove = this->pop_next_book_move(_board); _bookMove)
+		{
+			t0 = _clock.now();
+			auto _newBoard = _board;
+			_newBoard.move(_bookMove);
+
+			const auto _rating = chess::quick_rate(_newBoard, _myColor);
+			_move = RatedMove(_bookMove, _rating);
+
+			t1 = _clock.now();
+			t2 = _clock.now();
+
+			SCREEPFISH_BREAK();
+			_isBookMove = true;
+		};
+		// Evaluate next move if we didn't have a book move ready.
+		if (!_isBookMove)
+		{
+			t0 = _clock.now();
+			_tree = this->build_move_tree(_board, _myColor, _depth);
+			t1 = _clock.now();
+			_move = _tree.best_move(this->rnd_);
+			t2 = _clock.now();
+		};
+
+		const auto tdA = t1 - t0;
+		const auto tdB = t2 - t1;
+		const auto td = t2 - t0;
+
+		// Log if set
+		if (auto& _loggingDir = this->logging_dir_; _loggingDir)
+		{
+			// Log the text data
+			{
+				namespace fs = std::filesystem;
+				const auto _dirPath = *_loggingDir / ("m" + std::to_string(_board.get_full_move_count()));
+				if (fs::exists(_dirPath))
+				{
+					fs::remove_all(_dirPath);
+				};
+				fs::create_directories(_dirPath);
+
+				// Perf
+				{
+					const auto _path = _dirPath / "perf.txt";
+					auto _file = std::ofstream(_path);
+					_file << "Total		  : " << td << '\n';
+					if (!_isBookMove)
+					{
+						_file << "Tree Build  : " << tdA << '\n';
+						_file << "Tree Search : " << tdB << '\n';
+					};
+				};
+
+				// Initial position
+				{
+					const auto _path = _dirPath / "initial.txt";
+					auto _file = std::ofstream(_path);
+					if (_isBookMove)
+					{
+						_file << "Book Move\n\n";
+					}
+					else
+					{
+						_file << "Depth : " << _depth << "\n\n";
+					};
+					_file << _board << '\n' << '\n';
+					_file << get_fen(_board) << '\n';
+				};
+
+				// Top level moves
+				if(!_isBookMove)
+				{
+					const auto _path = _dirPath / "moves.txt";
+					auto _file = std::ofstream(_path);
+
+					_file << "Total Tree Size : " << _tree.tree_size() << '\n';
+					for (auto& _move : _tree.root())
+					{
+						_file << _move.move_ << " : " << _move.rating() << " : " << _move.quick_rating() << '\n';
+					};
+				};
+
+				// Second level moves
+				if (!_isBookMove)
+				{
+					const auto _path = _dirPath / "moves2.txt";
+					auto _file = std::ofstream(_path);
+
+					for (auto& _fmove : _tree.root())
+					{
+						if (_fmove.empty())
+						{
+							_file << "-\n";
+						}
+						else
+						{
+							_file << _fmove.move_ << ":\n";
+							for (auto& _move : _fmove)
+							{
+								_file << '\t' << _move.move_ << " : " << _move.rating() << " : " << _move.quick_rating() << '\n';
+							};
+							_file << '\n';
+						};
+					};
+				};
+
+				// Lines
+				if (!_isBookMove)
+				{
+					const auto _topLines = _tree.get_top_lines(3);
+					size_t _lineN = 0;
+					for (auto& _line : _topLines)
+					{
+						const auto _path = _dirPath / ("line" + std::to_string(_lineN++) + ".txt");
+						auto _file = std::ofstream(_path);
+
+						_file << "Final Rating : " << _move->rating() << '\n';
+
+						auto b = _board;
+						for (auto& v : _line)
+						{
+							b.move(v);
+							_file << v << '\n';
+							_file << v.rating() << '\n';
+						};
+						_file << '\n' << '\n';
+
+						b = _board;
+						for (auto& v : _line)
+						{
+							b.move(v);
+							_file << v << '\n';
+							_file << v.rating() << '\n' << '\n';
+							_file << b << '\n' << '\n';
+							_file << get_fen(b) << '\n' << '\n' << str::rep('=', 80) << '\n' << '\n';
+						};
+					};
+				};
+			};
+		};
+
+		Response _resp{};
+		_resp.move = _move;
+		this->best_move_ = _resp;
+	};
+
+
 	void ScreepFish::thread_main(std::stop_token _stop)
 	{
 		this->init_barrier_.arrive_and_wait();
 
 		// Storage for tracking calcultion times
-		auto _times = std::vector<std::chrono::steady_clock::duration>();
+		auto _times = std::vector<double>();
 
 		while (!_stop.stop_requested())
 		{
@@ -107,155 +295,20 @@ namespace sch
 				const auto lck = std::unique_lock(this->mtx_);
 				if (!this->best_move_)
 				{
-					using namespace chess;
-
-					const auto& _board = this->board_;
-					const auto& _myColor = this->my_color_;
-					
-					const size_t _pieceCount = _board.pieces().size();
-					auto _depth = this->search_depth_;
-
-					// Bump depth as many moves will be discarded
-					const bool _isCheck = is_check(_board, _myColor);
-
-					if (_pieceCount <= 8 && !_isCheck)
-					{
-						_depth += 1;
-					}
-					if (_pieceCount <= 4 && !_isCheck)
-					{
-						_depth += 1;
-					};
-
-					const auto _clock = std::chrono::steady_clock{};
-
-					const auto t0 = _clock.now();
-					auto _tree = this->build_move_tree(_board, _myColor, _depth);
-
-					const auto t1 = _clock.now();
-					const auto _move = _tree.best_move(this->rnd_);
-					const auto t2 = _clock.now();
-
-					const auto tdA = t1 - t0;
-					const auto tdB = t2 - t1;
-					const auto td = t2 - t0;
-
-					_times.push_back(td);
-
-					constexpr auto fn = [](auto v)
-					{
-						return std::chrono::duration_cast<std::chrono::duration<double>>(v);
-					};
-					sch::log_info(str::concat_to_string("Delta time : ", fn(td), '(', fn(tdA), ", ", fn(tdB), ')'));
-					
-					// Log if set
-					if (auto& _loggingDir = this->logging_dir_; _loggingDir)
-					{
-						// Log the text data
-						{
-							namespace fs = std::filesystem;
-							const auto _dirPath = *_loggingDir / ("m" + std::to_string(_board.get_full_move_count()));
-							if (fs::exists(_dirPath))
-							{
-								fs::remove_all(_dirPath);
-							};
-							fs::create_directories(_dirPath);
-
-							// Initial position
-							{
-								const auto _path = _dirPath / "initial.txt";
-								auto _file = std::ofstream(_path);
-								_file << _board << '\n' << '\n';
-								_file << get_fen(_board) << '\n';
-							};
-
-							// Top level moves
-							{
-								const auto _path = _dirPath / "moves.txt";
-								auto _file = std::ofstream(_path);
-
-								_file << "Total Tree Size : " << _tree.tree_size() << '\n';
-
-								for (auto& _move : _tree.root())
-								{
-									_file << _move.move_ << " : " << _move.rating() << " : " << _move.quick_rating() << '\n';
-								};
-							};
-
-							// Second level moves
-							{
-								const auto _path = _dirPath / "moves2.txt";
-								auto _file = std::ofstream(_path);
-
-								for (auto& _fmove : _tree.root())
-								{
-									if (_fmove.empty())
-									{
-										_file << "-\n";
-									}
-									else
-									{
-										_file << _fmove.move_ << ":\n";
-										for (auto& _move : _fmove)
-										{
-											_file << '\t' << _move.move_ << " : " << _move.rating() << " : " << _move.quick_rating() <<  '\n';
-										};
-										_file << '\n';
-									};
-								};
-							};
-
-
-							// Lines
-							const auto _topLines = _tree.get_top_lines(3);
-							size_t _lineN = 0;
-							for (auto& _line : _topLines)
-							{
-								const auto _path = _dirPath / ("line" + std::to_string(_lineN++) + ".txt");
-								auto _file = std::ofstream(_path);
-								
-								_file << "Final Rating : " << _move->rating() << '\n';
-
-								auto b = _board;
-								for (auto& v : _line)
-								{
-									b.move(v);
-									_file << v << '\n';
-									_file << v.rating() << '\n';
-								};
-								_file << '\n' << '\n';
-								
-								b = _board;
-								for (auto& v : _line)
-								{
-									b.move(v);
-									_file << v << '\n';
-									_file << v.rating() << '\n' << '\n';
-									_file << b << '\n' << '\n';
-									_file << get_fen(b) << '\n' << '\n' << str::rep('=', 80) << '\n' << '\n';
-								};
-							};
-						};
-					};
-
-					Response _resp{};
-					_resp.move = _move;
-					this->best_move_ = _resp;
+					this->calculate_next_move();
 				};
 			};
 
 			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		};
 
-		using dur = std::chrono::duration<double>;
-		dur _avgDur{};
-		for (auto& v : _times)
+		if (!_times.empty())
 		{
-			_avgDur += std::chrono::duration_cast<dur>(v);
+			const auto _durAcc = jc::accumulate(_times);
+			using dur = std::chrono::duration<double>;
+			const auto _avgDur = _durAcc / static_cast<dur::rep>(_times.size());
+			sch::log_info(str::concat_to_string("Average calculation time = ", dur(_avgDur)));
 		};
-		_avgDur /= static_cast<dur::rep>(_times.size());
-
-		std::cout << "Average calculation time = " << _avgDur << '\n';
 	};
 
 	void ScreepFish::set_logging_dir(std::filesystem::path _path)
@@ -279,7 +332,7 @@ namespace sch
 		init_barrier_(2),
 		rnd_(std::random_device{}()),
 		logging_dir_{},
-		search_depth_{ 5 }
+		search_depth_{ 6 }
 	{
 		
 	};
