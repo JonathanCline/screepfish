@@ -1,9 +1,9 @@
 #include "tests.hpp"
 
 #include "test_base.hpp"
-#include "test_position_count.hpp"
+#include "test_book.hpp"
 #include "test_castling.hpp"
-
+#include "test_position_count.hpp"
 
 
 #include "chess/fen.hpp"
@@ -86,6 +86,8 @@ namespace sch
 		));
 
 
+
+
 		// Run tests and collect results.
 		std::vector<TestResult> _results{};
 		for (auto& v : _tests)
@@ -96,6 +98,9 @@ namespace sch
 				break;
 			};
 		};
+
+		_results.push_back(sch::tests::test_opening_book());
+
 		return _results;
 	};
 };
