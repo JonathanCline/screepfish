@@ -451,10 +451,7 @@ namespace chess
 		if (_board.get_toplay() == _maximizingPlayer)
 		{
 			// We must find our best response
-
-			auto _value = 
-				_alphaBeta.beta;
-
+			auto _value = -std::numeric_limits<float>::infinity();
 			for (auto& _move : _node)
 			{
 				auto _newBoard = _board;
@@ -465,32 +462,26 @@ namespace chess
 						_searchData.with_next_depth(),
 						_alphaBeta, _maximizingPlayer
 					);
+
 				_value = std::max(_value, _moveABValue);
 
-				if (!std::isinf(_moveABValue))
-				{
-					if (_value >= _alphaBeta.beta)
-					{
-						break; // (*β cutoff*)
-					};
-
-					// Do NOT allow early-pruning checkmates
-					_alphaBeta.alpha = std::max(
-						_alphaBeta.alpha,
-						_value
-					);
-				};
+				//f (_value >= _alphaBeta.beta)
+				//
+				//	break; // (*β cutoff*)
+				//;
+				//
+				/// Do NOT allow early-pruning checkmates
+				//alphaBeta.alpha = std::max(
+				//	_alphaBeta.alpha,
+				//	_value
+				//);
 			};
-
 			return _value;
 		}
 		else
 		{
 			// We must find the opponent's best response
-			
-			auto _value =
-				_alphaBeta.alpha;
-
+			auto _value = -std::numeric_limits<float>::infinity();
 			for (auto& _move : _node)
 			{
 				auto _newBoard = _board;
@@ -503,21 +494,16 @@ namespace chess
 					);
 				_value = std::min(_value, _moveABValue);
 
-				// Do NOT allow early-pruning checkmates
-				if (!std::isinf(_moveABValue))
-				{
-					if (_value <= _alphaBeta.alpha)
-					{
-						break; // (*α cutoff*)
-					};
-
-					_alphaBeta.beta = std::min(
-						_alphaBeta.beta,
-						_value
-					);
-				};
+				//if (_value <= _alphaBeta.alpha)
+				//{
+				//	break; // (*α cutoff*)
+				//};
+				//
+				//_alphaBeta.beta = std::min(
+				//	_alphaBeta.beta,
+				//	_value
+				//);
 			};
-
 			return _value;
 		};
 

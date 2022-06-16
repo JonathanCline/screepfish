@@ -133,6 +133,14 @@ namespace chess
 
 	void get_moves(const chess::Board& _board, const chess::Color _forPlayer, MoveBuffer& _buffer, const bool _isCheck = false);
 
+	/**
+	 * @brief Checks if the given player has any legal moves.
+	 * @param _board Checks if the board has legal moves to escape current check.
+	 * @return True if has moves, false otherwise.
+	*/
+	bool has_legal_moves_from_check(const Board& _board);
+
+
 
 	bool can_castle_kingside(const chess::Board& _board, chess::Color _player);
 	bool can_castle_queenside(const chess::Board& _board, chess::Color _player);

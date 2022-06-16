@@ -65,3 +65,43 @@ namespace sch
 #define SCREEPFISH_BREAK() { ::raise(SIGBREAK); }
 #endif
 
+
+namespace sch
+{
+	/**
+	 * @brief Converts an enum to its underlying value representation.
+	 * @tparam T Enum type.
+	 * @param v Enum value.
+	 * @return Enum value as underlying type.
+	*/
+	template <typename T>
+	constexpr auto enumval(T v) -> std::underlying_type_t<T>
+	{
+		return static_cast<std::underlying_type_t<T>>(v);
+	};
+};
+
+#define _SCREEPFISH_DEFINE_ENUM_BITFLAG_OR(enumName) constexpr enumName operator|(enumName lhs, enumName rhs) noexcept \
+{ return static_cast<enumName>(::sch::enumval(lhs) | ::sch::enumval(rhs)); }
+
+#define _SCREEPFISH_DEFINE_ENUM_BITFLAG_AND(enumName) constexpr enumName operator&(enumName lhs, enumName rhs) noexcept \
+{ return static_cast<enumName>(::sch::enumval(lhs) & ::sch::enumval(rhs)); }
+
+#define _SCREEPFISH_DEFINE_ENUM_BITFLAG_XOR(enumName) constexpr enumName operator^(enumName lhs, enumName rhs) noexcept \
+{ return static_cast<enumName>(::sch::enumval(lhs) ^ ::sch::enumval(rhs)); }
+
+#define _SCREEPFISH_DEFINE_ENUM_BITFLAG_OR_A(enumName) constexpr enumName& operator|=(enumName& lhs, enumName rhs) noexcept { return lhs = (lhs | rhs); }
+#define _SCREEPFISH_DEFINE_ENUM_BITFLAG_AND_A(enumName) constexpr enumName& operator&=(enumName& lhs, enumName rhs) noexcept { return lhs = (lhs & rhs); }
+#define _SCREEPFISH_DEFINE_ENUM_BITFLAG_XOR_A(enumName) constexpr enumName& operator^=(enumName& lhs, enumName rhs) noexcept { return lhs = (lhs ^ rhs); }
+
+#define _SCREEPFISH_DEFINE_ENUM_BITFLAG_NOT(enumName) constexpr enumName operator~(enumName rhs) noexcept \
+{ return static_cast<enumName>(~::sch::enumval(rhs)); }
+
+#define SCREEPFISH_DEFINE_ENUM_BITFLAG(enumName) \
+_SCREEPFISH_DEFINE_ENUM_BITFLAG_OR(enumName) \
+_SCREEPFISH_DEFINE_ENUM_BITFLAG_AND(enumName) \
+_SCREEPFISH_DEFINE_ENUM_BITFLAG_XOR(enumName) \
+_SCREEPFISH_DEFINE_ENUM_BITFLAG_OR_A(enumName) \
+_SCREEPFISH_DEFINE_ENUM_BITFLAG_AND_A(enumName) \
+_SCREEPFISH_DEFINE_ENUM_BITFLAG_XOR_A(enumName) \
+_SCREEPFISH_DEFINE_ENUM_BITFLAG_NOT(enumName)

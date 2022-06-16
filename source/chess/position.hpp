@@ -573,7 +573,10 @@ namespace chess
 
 
 	/**
-	 * @brief Holds a position on a chess board as a file/rank pair
+	 * @brief Holds a position on a chess board as a file/rank pair.
+	 * 
+	 * Godbolt link with this raw bits storage of the position.
+	 * https://godbolt.org/#z:OYLghAFBqd5QCxAYwPYBMCmBRdBLAF1QCcAaPECAMzwBtMA7AQwFtMQByARg9KtQYEAysib0QXACx8BBAKoBnTAAUAHpwAMvAFYTStJg1DIApACYAQuYukl9ZATwDKjdAGFUtAK4sGe1wAyeAyYAHI%2BAEaYxCAAbAAcpAAOqAqETgwe3r56KWmOAkEh4SxRMQm2mPYFDEIETMQEWT5%2BXJXVGXUNBEVhkdFxiQr1jc05bcPdvSVlgwCUtqhexMjsHAD06wDUACoAnkmYW3tLxFtoWFsI0ZikWyRbtKhM6FuGW5iqrEn0AHQmGgAggDgWYAMzBZDeS4mMFuZDDfCCWHYEEgxg%2Bc4GBQKLYAMToRxAWy8wQI8QA%2BgQ0QB2KxAraMt5bWEAES2GlIIKZWwiLLB7La3KZyH57LMXIZTNebK2YMlgJ5R1l0mFjKoYq2AFYFTzgJrYrqmQhNTTaazYfTARiWFimDitgAlQwAay2xNJgkp1KBJjpaq2xC4ms5AeIZk1QqljOIYM1ErDkk18rDWs1qujgdimp1YZpBqNMfipvNlrRQIImBYPyYlf5bgIB0YrCOOxRILQDGGnySZyYXiIWyIADcIDstsO5rSrTziJgCMsGFtJo5kBTRMNYW5PeSqSiIJOy76aRawVby8DfUDhsQvA4tspUtOAzvvbzCAoIHNzgJN5m/TOPJMnOC7EEuABUc5ktEvbzuu9rUnCnbDCSZLeuB%2B4EAgeAKFOZ4Bn6p6AYyr5UuctYRB%2BX4/l2PqKkyAEBrO86LkOqCjlQ35%2Bm4WwQCOEDEFxcJbnKeHESyJ5Hpe9GMsOqB4K8SgEBABL0FsnEEf6mY8lhOEALQohqspUFJPKEVJAaqUcGrEmCplMs6DBumctkWZJ%2BFXoC/aDlQDAQI%2BuJJHcVnqVOx7iUkvxKdQYlhixYFbJFlEEJ%2BsXHkRILeag6kMGY/mpIlwWEqFz6ZpF0UaR5MmBvFS6RaIBDJalbkZZ5F43neBAPqk0mMZmpFdU11HIXRZladVzGgUuET2Yy5lVQGckKcu84qcVGn/uNQFMrpCgGWC2B8rKEBHWY2YaBEXBXRoN1cTSPH8ZV4nzee/VoWRM0Le5r1eQO2W%2BflCiKkF%2BLrWFwJbUy5WrU9cVTYlvxDWlEOtYCHALLQnBarwfgcFopCoJwbjWNYy6nKsLLgjwpAEJo6MLC6IBalwvw0gAnLEZhXZzsRgvE7OJJjHCSDjdME5wvAKCAnK03j6OkHAsBIGg1aEmQFAQCrSRqygBhGFSt5OXwdCVsQUsnWLlHMMQeycNTKtsIIADyDC0LbcukFgLCGMA4ge/gc4OHgw6YFLHufJgyADms1PQUL%2BO0HgETEA0eweFgYsEMQeAsHb8tUAYwAKAAangmAAO5O4cuPU/wggiGI7BSDIgiKCo6ge7obR68YJOWPoSdS5ACyoEkNRh3piJsqYljWGYGhbHpTtgpLVSRzULgMO4ngtBIEqBMEfSlAMXA6nk6QCGMrQSufNTTP0MSn%2B06%2BdCMTQ7%2BMEp2C/AhdI09/H0fjqSYowP7X1sG/ABsxT4LAUOTJuNM5wx3lkLbGpBcb40JhwVQ8RYh6ViEmKEPteJZy8E5b8EBiaz37lsXAhAHjmDBG0LYHhVb0DOIwrgcxeCyy0HMBmIBJDxF%2BPPMENJ4jxDEWCWIXB54SiFiLdBYssGS2ljTOm/D9CcDMKLD2Kj1Fy00SHM2GRBFAA%3D%3D
 	*/
 	class Position
 	{
@@ -873,5 +876,24 @@ namespace chess
 	{
 		return jc::to_underlying(std::max(lhs, rhs)) - jc::to_underlying(std::min(lhs, rhs));
 	};
+
+
+
+
+
+
+
+
+	/**
+	 * @brief Bits for tracking castling ability.
+	*/
+	enum class CastleBit : uint8_t
+	{
+		wking = 0b0001,
+		wqueen = 0b0010,
+		bking = 0b0100,
+		bqueen = 0b1000
+	};
+	SCREEPFISH_DEFINE_ENUM_BITFLAG(CastleBit);
 
 };

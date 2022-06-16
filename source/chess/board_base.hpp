@@ -33,10 +33,32 @@ namespace chess
 {
 	class Board;
 
+
+
+	class MinimalBoard
+	{
+	public:
+		std::array<Piece, 64> squares;
+		Color toplay;
+
+		
+		MinimalBoard() = default;
+	};
+	constexpr static auto s = sizeof(MinimalBoard);
+
+
+
+
+
+
+
+
+
+
 	/**
 	 * @brief Represents a chess board with only enough info to track game state.
 	*/
-	class BoardBase
+	class Board
 	{
 	private:
 
@@ -85,14 +107,6 @@ namespace chess
 		// Pieces vec iterator access
 
 		using pcontainer_type = std::array<BoardPiece, 32>;
-
-		enum CastleBit : uint8_t
-		{
-			wking  = 0b0001,
-			wqueen = 0b0010,
-			bking  = 0b0100,
-			bqueen = 0b1000
-		};
 
 	public:
 		using piterator = typename pcontainer_type::iterator;
@@ -520,22 +534,22 @@ namespace chess
 		{
 			if (_player == Color::white)
 			{
-				return this->castle_bits_ & CastleBit::wking;
+				return (this->castle_bits_ & CastleBit::wking) != CastleBit{};
 			}
 			else
 			{
-				return this->castle_bits_ & CastleBit::bking;
+				return (this->castle_bits_ & CastleBit::bking) != CastleBit{};
 			};
 		};
 		bool get_castle_queenside_flag(Color _player) const
 		{
 			if (_player == Color::white)
 			{
-				return this->castle_bits_ & CastleBit::wqueen;
+				return (this->castle_bits_ & CastleBit::wqueen) != CastleBit{};
 			}
 			else
 			{
-				return this->castle_bits_ & CastleBit::bqueen;
+				return (this->castle_bits_ & CastleBit::bqueen) != CastleBit{};
 			};
 		};
 
@@ -652,9 +666,9 @@ namespace chess
 		};
 		
 
-		friend std::ostream& operator<<(std::ostream& _ostr, const BoardBase& _value);
+		friend std::ostream& operator<<(std::ostream& _ostr, const Board& _value);
 
-		BoardBase() = default;
+		Board() = default;
 
 	private:
 		//container_type pieces_;
@@ -693,6 +707,6 @@ namespace chess
 
 	};
 
-	constexpr static auto p0 = sizeof(BoardBase);
+	constexpr static auto p0 = sizeof(Board);
 
 }

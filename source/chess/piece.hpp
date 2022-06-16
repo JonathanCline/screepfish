@@ -389,19 +389,19 @@ namespace chess
 
 	enum class PieceE : uint8_t
 	{
-		black_pawn = 0b0010,
-		black_knight = 0b0100,
-		black_bishop = 0b0110,
-		black_rook = 0b1000,
-		black_queen = 0b1010,
-		black_king = 0b1100,
+		black_pawn		= 0b0001,
+		black_knight	= 0b0010,
+		black_bishop	= 0b0011,
+		black_rook		= 0b0100,
+		black_queen		= 0b0101,
+		black_king		= 0b0110,
 
-		white_pawn = 0b0011,
-		white_knight = 0b0101,
-		white_bishop = 0b0111,
-		white_rook = 0b1001,
-		white_queen = 0b1011,
-		white_king = 0b1101,
+		white_pawn		= 0b1001,
+		white_knight	= 0b1010,
+		white_bishop	= 0b1011,
+		white_rook		= 0b1100,
+		white_queen		= 0b1101,
+		white_king		= 0b1110,
 	};
 
 
@@ -411,6 +411,10 @@ namespace chess
 	*/
 	class Piece
 	{
+	private:
+		constexpr static uint8_t color_bitmask_v = 0b1000;
+		constexpr static uint8_t piece_bitmask_v = 0b0111;
+
 	public:
 
 		/**
@@ -432,7 +436,7 @@ namespace chess
 		*/
 		constexpr Type type() const noexcept
 		{
-			return Type((this->piece_ & 0b1111'1110) >> 1);
+			return Type(this->bits_ & piece_bitmask_v);
 		};
 
 		/**
@@ -441,7 +445,7 @@ namespace chess
 		*/
 		constexpr explicit operator bool() const noexcept
 		{
-			return this->type() != Type::none;
+			return this->bits_ != 0;
 		};
 
 		/**
@@ -450,16 +454,22 @@ namespace chess
 		*/
 		constexpr Color color() const noexcept
 		{
-			return Color(this->piece_ & 0x1);
+			return Color(this->bits_ & this->color_bitmask_v);
 		};
 
 		constexpr bool is_white() const
 		{
-			return this->piece_ & 0x1;
+			return this->bits_ & this->color_bitmask_v;
 		};
 
-		constexpr explicit operator uint8_t() const noexcept { return this->piece_; };
-		constexpr operator PieceE() const noexcept { return PieceE(this->piece_); };
+		constexpr explicit operator uint8_t() const noexcept
+		{
+			return this->bits_;
+		};
+		constexpr operator PieceE() const noexcept
+		{
+			return PieceE(this->bits_);
+		};
 
 
 		// Compares color AND piece type
@@ -494,23 +504,23 @@ namespace chess
 
 
 		constexpr Piece() noexcept :
-			piece_(0)
+			bits_(0)
 		{};
 		constexpr Piece(Type _type, Color _color) noexcept :
-			piece_((jc::to_underlying(_type) << 1) | ((_color == Color::white) ? 0b1 : 0b0))
-		{
-			if (_type == Type::none) { abort(); };
-		};
+			bits_((jc::to_underlying(_type)) | ((_color == Color::white)? color_bitmask_v : 0b0))
+		{};
 
 		constexpr Piece& operator=(PieceType _type)
 		{
 			if (_type == PieceType::none)
 			{
-				this->piece_ = 0;
+				this->bits_ = 0;
 			}
 			else
 			{
-				this->piece_ = (jc::to_underlying(_type) << 1) | (this->piece_ & 0x1);
+				this->bits_ =
+					(this->bits_ & this->color_bitmask_v) |
+					(jc::to_underlying(_type));
 			};
 			return *this;
 		};
@@ -518,9 +528,9 @@ namespace chess
 	private:
 
 		/**
-		 * @brief The piece type with color value.
+		 * @brief The bits containing the piece type and color.
 		*/
-		uint8_t piece_;
+		uint8_t bits_;
 
 	};
 

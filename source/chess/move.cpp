@@ -18,6 +18,7 @@ namespace chess
 		constexpr auto CASTLE_ABILITY_RATING = 0.001f;
 		constexpr auto DEVELOPMENT_RATING = 0.005f;
 		constexpr auto KING_MOVE_RATING = -0.01f;
+		constexpr auto STALEMATE_RATING = 0.0f;
 
 		// Disincentivize repeating moves
 		constexpr auto REPEATED_MOVE_RATING = -0.1f;
@@ -218,6 +219,11 @@ namespace chess
 
 		std::array<Position, 8> postions;
 		uint8_t count;
+
+		constexpr KnightAttackPositions() :
+			postions{},
+			count(0)
+		{}
 	};
 
 	consteval KnightAttackPositions compute_knight_attack_positions(Position _pos)
@@ -263,7 +269,7 @@ namespace chess
 
 	// Precompute attack squares
 	constexpr inline auto knight_attack_positions_v = compute_knight_attack_positions();
-	constexpr inline auto get_knight_attack_positions(Position _pos)
+	constexpr inline auto& get_knight_attack_positions(Position _pos)
 	{
 		return knight_attack_positions_v[static_cast<size_t>(_pos)];
 	};
@@ -722,18 +728,10 @@ namespace chess
 	{
 		constexpr auto piece_color_v = C;
 
-		// Check if a knight is in any of the knight attacking squares
-		{
-			const auto _knightAttackPositions = get_knight_attack_positions(_piece.position());
-			for (const auto& _pos : _knightAttackPositions)
-			{
-				if (_board.get(_pos) == Piece(Piece::knight, !C))
-				{
-					return true;
-				};
-			};
-		};
-
+		// Move buffer
+		auto _bufferData = std::array<Move, 32>{};
+		auto _buffer = MoveBuffer(_bufferData);
+		const auto _bufferBegin = _buffer.head();
 
 		const auto _pend = _board.pend();
 		for (auto it = _board.pbegin(); it != _pend; ++it)
@@ -741,6 +739,9 @@ namespace chess
 			const auto& _otherPiece = *it;
 			switch (_otherPiece)
 			{
+			case Piece(Piece::knight, !piece_color_v):
+				get_piece_attacks_with_knight(_board, _piece, _otherPiece, _buffer);
+				break;
 			case Piece(Piece::bishop, !piece_color_v):
 				get_piece_attacks_with_bishop(_board, _piece, _otherPiece, _buffer);
 				break;
@@ -759,27 +760,28 @@ namespace chess
 			default:
 				break;
 			};
+
+			if (_buffer.head() != _bufferBegin)
+			{
+				return true;
+			};
 		};
 
-		std::array<Move, 64> _data{};
-		auto _buffer = MoveBuffer(_data);
-		const auto bp = _buffer.head();
-
-		get_piece_attacked_from_moves(_board, _piece, _buffer, _inCheck);
-		if (_buffer.head() != bp)
-		{
-			return true;
-		}
-		else
-		{
-			return false;
-		};
+		// No attacking moves
+		return false;
 	};
 	
 	bool is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece, bool _inCheck)
 	{
-		return is_piece_attacked(_board, _piece, _inCheck);
-	}
+		if (_piece.color() == Color::white)
+		{
+			return is_piece_attacked<Color::white>(_board, _piece, _inCheck);
+		}
+		else
+		{
+			return is_piece_attacked<Color::black>(_board, _piece, _inCheck);
+		};
+	};
 
 
 
@@ -1287,6 +1289,34 @@ namespace chess
 	};
 
 
+	bool has_legal_moves_from_check(const Board& _board)
+	{
+		auto _bufferData = std::array<Move, 32>{};
+		for (auto& v : _board.pieces())
+		{
+			if (v.color() == !_board.get_toplay())
+			{
+				auto _buffer = MoveBuffer(_bufferData.data(), _bufferData.data() + _bufferData.size());
+				const auto _bufferStart = _buffer.head();
+				get_piece_moves(_board, v, _buffer, true);
+				const auto _bufferEnd = _buffer.head();
+				for (auto p = _bufferStart; p != _bufferEnd; ++p)
+				{
+					auto _futureBoard = _board;
+					_futureBoard.move(*p);
+					if (!is_check(_futureBoard, _board.get_toplay()))
+					{
+						return true;
+					};
+				};
+			};
+		};
+		return false;
+	};
+
+
+
+
 
 	bool can_castle_kingside(const chess::Board& _board, chess::Color _player)
 	{
@@ -1512,21 +1542,6 @@ namespace chess
 			// Quick check that an enemy pieces is in one of the threat positions
 			auto _threatPositions = BitBoard(get_threat_positions(p.position()));
 
-			// Grab the friendly positions
-			//const auto _friendlyPositions = (_forPlayer == Color::white) ?
-			//	_board.get_white_piece_bitboard() :
-			//	_board.get_black_piece_bitboard();
-
-			// Grab the enemy positions
-			//const auto _enemyPositions = (_forPlayer == Color::black) ?
-			//	_board.get_white_piece_bitboard() :
-			//	_board.get_black_piece_bitboard();
-
-
-
-			// Remove the enemy king as it will never be a threat
-			//_threatPositions.reset(_board.get_king(!_forPlayer).position());
-
 			if (_forPlayer == Color::white)
 			{
 				// If a piece is directly above us, remove the whole file above the king
@@ -1574,34 +1589,14 @@ namespace chess
 	{
 		using namespace chess;
 
+		SCREEPFISH_ASSERT(_board.get_toplay() == _forPlayer);
+
 		if (!is_check(_board, _forPlayer))
 		{
 			return false;
 		};
 
-		static thread_local auto _bufferData = std::array<Move, 32>{};
-		for (auto& v : _board.pieces())
-		{
-			if (v.color() == _forPlayer)
-			{
-				auto _buffer = MoveBuffer(_bufferData.data(), _bufferData.data() + _bufferData.size());
-				const auto _bufferStart = _buffer.head();
-				get_piece_moves(_board, v, _buffer, true);
-				const auto _bufferEnd = _buffer.head();
-
-				for (auto p = _bufferStart; p != _bufferEnd; ++p)
-				{
-					auto _futureBoard = _board;
-					_futureBoard.move(*p);
-					if (!is_check(_futureBoard, _forPlayer))
-					{
-						return false;
-					};
-				};
-			};
-		};
-		
-		return true;
+		return !has_legal_moves_from_check(_board);
 	};
 
 
@@ -1684,6 +1679,7 @@ namespace chess
 		constexpr auto& repeated_move_rating_v = REPEATED_MOVE_RATING;
 		constexpr auto& fifty_move_rule_rating_v = FIFTY_MOVE_RULE_RATING;
 		constexpr auto& king_move_rating_v = KING_MOVE_RATING;
+		constexpr auto& stalemate_rating_v = STALEMATE_RATING;
 
 		auto _rating = Rating(0);
 
@@ -1885,7 +1881,7 @@ namespace chess
 		};
 
 		// Repeated move rating
-		if (_board->is_last_move_repeated_move())
+		if (_board.is_last_move_repeated_move())
 		{
 			_rating += repeated_move_rating_v;
 		};

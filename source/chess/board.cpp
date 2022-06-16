@@ -6,21 +6,13 @@
 
 namespace chess
 {
-	std::ostream& operator<<(std::ostream& _ostr, const Board& _value)
-	{
-		return _ostr << _value.board();
-	};
-};
-
-namespace chess
-{
 	void BoardPieceAttackData::clear()
 	{
 		this->wattack_.reset();
 		this->battack_.reset();
 	};
 
-	void BoardPieceAttackData::sync(const BoardBase& _board)
+	void BoardPieceAttackData::sync(const Board& _board)
 	{
 		// Clear old state
 		this->clear();
@@ -44,7 +36,7 @@ namespace chess
 		};
 	};
 
-	void BoardPieceAttackData::move(const BoardBase& _previousBoard, Move _move)
+	void BoardPieceAttackData::move(const Board& _previousBoard, Move _move)
 	{
 		// TODO : Prevent full resync.
 
