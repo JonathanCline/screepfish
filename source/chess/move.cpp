@@ -191,6 +191,86 @@ namespace chess
 
 
 
+	struct KnightAttackPositions
+	{
+		constexpr void append(Position p)
+		{
+			this->postions[this->count++] = p;
+		};
+		
+		constexpr auto begin()
+		{
+			return this->postions.begin();
+		};
+		constexpr auto begin() const
+		{
+			return this->postions.begin();
+		};
+
+		constexpr auto end()
+		{
+			return std::next(this->begin(), this->count);
+		};
+		constexpr auto end() const
+		{
+			return std::next(this->begin(), this->count);
+		};
+
+		std::array<Position, 8> postions;
+		uint8_t count;
+	};
+
+	consteval KnightAttackPositions compute_knight_attack_positions(Position _pos)
+	{
+		auto _positions = KnightAttackPositions{};
+
+		constexpr auto _deltaPairs = std::array
+		{
+			std::pair{ 1, 2 },
+			std::pair{ 1, -2 },
+
+			std::pair{ 2, 1 },
+			std::pair{ 2, -1 },
+
+			std::pair{ -1, 2 },
+			std::pair{ -1, -2 },
+
+			std::pair{ -2, -1 },
+			std::pair{ -2, 1 },
+		};
+
+		bool _possible = false;
+		Position _nextPos{};
+		for (const auto& [df, dr] : _deltaPairs)
+		{
+			_nextPos = trynext(_pos, df, dr, _possible);
+			if (_possible)
+			{
+				_positions.append(_nextPos);
+			};
+		};
+		return _positions;
+	};
+	consteval auto compute_knight_attack_positions()
+	{
+		std::array<KnightAttackPositions, 64> bbs{};
+		for (auto& v : positions_v)
+		{
+			bbs[static_cast<size_t>(v)] = compute_knight_attack_positions(v);
+		};
+		return bbs;
+	};
+
+	// Precompute attack squares
+	constexpr inline auto knight_attack_positions_v = compute_knight_attack_positions();
+	constexpr inline auto get_knight_attack_positions(Position _pos)
+	{
+		return knight_attack_positions_v[static_cast<size_t>(_pos)];
+	};
+
+
+
+
 	constexpr BitBoardCX make_rank_bits(Rank _rank)
 	{
 		auto bb = BitBoardCX();
@@ -636,8 +716,51 @@ namespace chess
 		return is_neighboring_position(_piece.position(), _byPiece.position());
 	};
 
-	bool is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece, bool _inCheck)
+
+	template <Color C>
+	inline bool is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece, bool _inCheck)
 	{
+		constexpr auto piece_color_v = C;
+
+		// Check if a knight is in any of the knight attacking squares
+		{
+			const auto _knightAttackPositions = get_knight_attack_positions(_piece.position());
+			for (const auto& _pos : _knightAttackPositions)
+			{
+				if (_board.get(_pos) == Piece(Piece::knight, !C))
+				{
+					return true;
+				};
+			};
+		};
+
+
+		const auto _pend = _board.pend();
+		for (auto it = _board.pbegin(); it != _pend; ++it)
+		{
+			const auto& _otherPiece = *it;
+			switch (_otherPiece)
+			{
+			case Piece(Piece::bishop, !piece_color_v):
+				get_piece_attacks_with_bishop(_board, _piece, _otherPiece, _buffer);
+				break;
+			case Piece(Piece::rook, !piece_color_v):
+				get_piece_attacks_with_rook(_board, _piece, _otherPiece, _buffer);
+				break;
+			case Piece(Piece::queen, !piece_color_v):
+				get_piece_attacks_with_queen(_board, _piece, _otherPiece, _buffer);
+				break;
+			case Piece(Piece::king, !piece_color_v):
+				get_piece_attacks_with_king(_board, _piece, _otherPiece, _buffer);
+				break;
+			case Piece(Piece::pawn, !piece_color_v):
+				get_piece_attacks_with_pawn(_board, _piece, _otherPiece, _buffer);
+				break;
+			default:
+				break;
+			};
+		};
+
 		std::array<Move, 64> _data{};
 		auto _buffer = MoveBuffer(_data);
 		const auto bp = _buffer.head();
@@ -653,6 +776,11 @@ namespace chess
 		};
 	};
 	
+	bool is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece, bool _inCheck)
+	{
+		return is_piece_attacked(_board, _piece, _inCheck);
+	}
+
 
 
 	void get_piece_attacks_with_pawn(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece, MoveBuffer& _buffer)
