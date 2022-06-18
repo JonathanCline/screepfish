@@ -277,66 +277,6 @@ namespace chess
 
 
 
-	constexpr BitBoardCX make_rank_bits(Rank _rank)
-	{
-		auto bb = BitBoardCX();
-		for (auto& v : files_v)
-		{
-			bb.set(v, _rank);
-		};
-		return bb;
-	};
-	constexpr BitBoardCX make_file_bits(File _file)
-	{
-		auto bb = BitBoardCX();
-		for (auto& v : ranks_v)
-		{
-			bb.set(_file, v);
-		};
-		return bb;
-	};
-	constexpr BitBoardCX make_file_bits(File _file, Rank _min, Rank _max)
-	{
-		auto bb = BitBoardCX();
-		for (Rank r = _min; r <= _max; r += 1)
-		{
-			bb.set(_file, r);
-		};
-		return bb;
-	};
-
-	constexpr BitBoardCX make_bits_in_direction(Position _startPos, int df, int dr)
-	{
-		auto bb = BitBoardCX();
-
-		bool _possible = false;
-		auto _nextPos = trynext(_startPos, df, dr, _possible);
-		while (_possible)
-		{
-			bb.set(_nextPos);
-			_nextPos = trynext(_nextPos, df, dr, _possible);
-		};
-		return bb;
-	};
-	constexpr BitBoardCX make_diagonal_bits(Position _pos)
-	{
-		auto bb = BitBoardCX();
-		const auto _directions = std::array
-		{
-			std::pair{ 1, 1 },
-			std::pair{ 1, -1 },
-			std::pair{ -1, 1 },
-			std::pair{ -1, -1 }
-		};
-		for (auto& v : _directions)
-		{
-			bb |= make_bits_in_direction(_pos, v.first, v.second);
-		};
-		return bb;
-	};
-
-
-
 
 
 
@@ -733,11 +673,6 @@ namespace chess
 	{
 		constexpr auto piece_color_v = C;
 
-		// Move buffer
-		auto _bufferData = std::array<Move, 32>{};
-		auto _buffer = MoveBuffer(_bufferData);
-		const auto _bufferBegin = _buffer.head();
-
 		const auto _pend = _board.pend();
 		for (auto it = _board.pbegin(); it != _pend; ++it)
 		{
@@ -745,30 +680,43 @@ namespace chess
 			switch (_otherPiece)
 			{
 			case Piece(Piece::knight, !piece_color_v):
-				get_piece_attacks_with_knight(_board, _piece, _otherPiece, _buffer);
+				if (is_piece_attacked_by_knight(_board, _piece, _otherPiece))
+				{
+					return true;
+				};
 				break;
 			case Piece(Piece::bishop, !piece_color_v):
-				get_piece_attacks_with_bishop(_board, _piece, _otherPiece, _buffer);
+				if (is_piece_attacked_by_bishop(_board, _piece, _otherPiece))
+				{
+					return true;
+				};
 				break;
 			case Piece(Piece::rook, !piece_color_v):
-				get_piece_attacks_with_rook(_board, _piece, _otherPiece, _buffer);
+				if (is_piece_attacked_by_rook(_board, _piece, _otherPiece))
+				{
+					return true;
+				};
 				break;
 			case Piece(Piece::queen, !piece_color_v):
-				get_piece_attacks_with_queen(_board, _piece, _otherPiece, _buffer);
+				if (is_piece_attacked_by_queen(_board, _piece, _otherPiece))
+				{
+					return true;
+				};
 				break;
 			case Piece(Piece::king, !piece_color_v):
-				get_piece_attacks_with_king(_board, _piece, _otherPiece, _buffer);
+				if (is_piece_attacked_by_king(_board, _piece, _otherPiece))
+				{
+					return true;
+				};
 				break;
 			case Piece(Piece::pawn, !piece_color_v):
-				get_piece_attacks_with_pawn(_board, _piece, _otherPiece, _buffer);
+				if (is_piece_attacked_by_pawn(_board, _piece, _otherPiece))
+				{
+					return true;
+				};
 				break;
 			default:
 				break;
-			};
-
-			if (_buffer.head() != _bufferBegin)
-			{
-				return true;
 			};
 		};
 
@@ -1467,7 +1415,7 @@ namespace chess
 
 
 
-	consteval BitBoardCX calculate_threat_positions(Position _pos)
+	consteval BitBoardCX calculate_threat_bitboard(Position _pos)
 	{
 		auto bb = BitBoardCX();
 
@@ -1512,25 +1460,24 @@ namespace chess
 		bb |= make_diagonal_bits(_pos);
 		return bb;
 	};
-	consteval auto calculate_threat_positions()
+	consteval auto calculate_threat_bitboard()
 	{
 		std::array<BitBoardCX, 64> bbs{};
 		for (auto& v : positions_v)
 		{
-			bbs[static_cast<size_t>(v)] = calculate_threat_positions(v);
+			bbs[static_cast<size_t>(v)] = calculate_threat_bitboard(v);
 		}
 		return bbs;
 	};
 
-	constexpr inline auto threat_positions_v = calculate_threat_positions();
+	constexpr inline auto threat_bitboards_v = calculate_threat_bitboard();
 
-	constexpr auto get_threat_positions(Position _pos)
+	constexpr auto get_threat_bitboard(Position _pos)
 	{
-		return threat_positions_v[static_cast<size_t>(_pos)];
+		return threat_bitboards_v[static_cast<size_t>(_pos)];
 	};
 
 	
-
 
 
 
@@ -1543,7 +1490,7 @@ namespace chess
 		if (p)
 		{
 			// Quick check that an enemy pieces is in one of the threat positions
-			auto _threatPositions = BitBoard(get_threat_positions(p.position()));
+			auto _threatPositions = BitBoard(get_threat_bitboard(p.position()));
 
 			if (_forPlayer == Color::white)
 			{

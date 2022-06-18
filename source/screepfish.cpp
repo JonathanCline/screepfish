@@ -783,7 +783,6 @@ namespace sch
 	{
 		using namespace chess;
 
-#if false
 		// opening, depth 3
 		{
 			auto b = Board();
@@ -845,7 +844,6 @@ namespace sch
 			const auto r = perf_test_part(fn);
 			sch::log_info(str::concat_to_string("midgame (d3 no ab) - ", r));
 		};
-#endif
 
 		// midgame, depth 4
 		{
@@ -865,9 +863,7 @@ namespace sch
 				auto t = MoveTree(b);
 				t.build_tree(4, 4, _profile);
 			};
-			SCREEPFISH_BREAK();
 			const auto r = perf_test_part(fn);
-			SCREEPFISH_BREAK();
 			sch::log_info(str::concat_to_string("midgame (d4) - ", r));
 		};
 		
