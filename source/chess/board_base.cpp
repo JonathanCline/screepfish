@@ -7,7 +7,7 @@
 
 namespace chess
 {
-	std::ostream& operator<<(std::ostream& _ostr, const BoardBase& _value)
+	std::ostream& operator<<(std::ostream& _ostr, const Board& _value)
 	{
 		std::array<std::array<char, 8>, 8> _grid{};
 		for (auto& vx : _grid) { std::ranges::fill(vx, ' '); };
@@ -61,7 +61,7 @@ namespace chess
 
 namespace chess
 {
-	void BoardBase::move(const Move& _move)
+	void Board::move(const Move& _move)
 	{
 		// Exit early on null move
 		if (!_move) JCLIB_UNLIKELY
@@ -247,19 +247,19 @@ namespace chess
 		this->set_last_move(_move);
 	};
 
-	void BoardBase::set_previous_board_hash(const Board& _board)
+	void Board::set_previous_board_hash(const Board& _board)
 	{
 		//auto& _storage = this->last_board_hashes_;
 		//std::shift_right(_storage.begin(), _storage.end(), 1);
 		//_storage.front() = hash(_board);
 	};
 
-	bool BoardBase::is_repeated_move(Move _move) const
+	bool Board::is_repeated_move(Move _move) const
 	{
 		auto& _storage = this->last_moves_;
 		return jc::contains(_storage, _move);
 	};
-	bool BoardBase::is_last_move_repeated_move() const
+	bool Board::is_last_move_repeated_move() const
 	{
 		auto& _storage = this->last_moves_;
 

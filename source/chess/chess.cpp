@@ -61,8 +61,6 @@ namespace chess
 
 
 		// Sync
-		_board.sync();
-
 		return _board;
 	};
 }

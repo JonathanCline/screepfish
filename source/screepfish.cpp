@@ -354,10 +354,55 @@ namespace sch
 
 namespace sch
 {
+	inline void is_piece_attacked_test(const std::string_view _fen,
+		chess::Position _piece, bool _expected)
+	{
+		using namespace chess;
+		auto _board = parse_fen(_fen);
+		SCREEPFISH_CHECK(_board);
+
+		const auto p = _board->get(_piece);
+		if (is_piece_attacked(*_board, BoardPiece(p, _piece)) != _expected)
+		{
+			sch::log_error(str::concat_to_string("Piece ",
+				((_expected) ? "should " : "should not "), "be under attack.", "\n",
+				"  piece : ", _piece, "\n",
+				"  fen : ", _fen
+			));
+			SCREEPFISH_CHECK(false);
+		};
+	};
+
 
 	bool run_tests_main()
 	{
 		bool _runOnFinish = true;
+
+		using namespace chess;
+
+		// Test if piece is attacked
+		{
+			{
+				const auto _fen = "k7/3r4/8/8/8/3K4/8/8 w - - 0 1";
+				is_piece_attacked_test(_fen, (File::d, Rank::r3), true);
+				is_piece_attacked_test(_fen, (File::d, Rank::r7), false);
+				is_piece_attacked_test(_fen, (File::a, Rank::r8), false);
+			};
+			{
+				const auto _fen = "k7/8/8/8/8/r2K4/8/8 w - - 0 1";
+				is_piece_attacked_test(_fen, (File::d, Rank::r3), true);
+				is_piece_attacked_test(_fen, (File::a, Rank::r3), false);
+				is_piece_attacked_test(_fen, (File::a, Rank::r8), false);
+			};
+			{
+				const auto _fen = "k7/7b/8/8/8/3K4/8/8 w - - 0 1";
+				is_piece_attacked_test(_fen, (File::d, Rank::r3), true);
+			};
+			{
+				const auto _fen = "k7/7b/8/5n2/8/3Kn3/8/8 w - - 0 1";
+				is_piece_attacked_test(_fen, (File::d, Rank::r3), false);
+			};
+		};
 
 		{
 			bool _failed = false;
@@ -417,8 +462,6 @@ namespace sch
 		};
 #endif
 
-		using namespace chess;
-
 		constexpr auto subtest = [](bool _alphaBetaPrune)
 		{
 			const auto _fen = "6n1/p7/2p4r/kp4pp/1b6/1P3p2/K7/4r3 b - - 13 54";
@@ -435,6 +478,15 @@ namespace sch
 
 		subtest(false);
 		subtest(true);
+
+		{
+			const auto _fen = "5k2/5Bp1/3P3p/p6P/4qBb1/8/7r/5KN1 w - - 0 28";
+			auto _board = parse_fen(_fen);
+			SCREEPFISH_CHECK(_board);
+
+			auto _moves = get_moves(*_board, _board->get_toplay());
+			SCREEPFISH_CHECK(false && "finish me please");
+		};
 
 		std::cout << '\n' << str::rep('=', 80) << "\n\n";
 		{
@@ -601,9 +653,33 @@ namespace sch
 		};
 #endif
 
+		// Checkmate + Rating shows checkmate
+		{
+			using namespace chess;
+			const auto _fen = "r6n/8/8/8/K7/2k5/1q6/8 w - - 2 2";
+			auto _board = *parse_fen(_fen);
+			
+			SCREEPFISH_CHECK(is_check(_board, _board.get_toplay()));
+			const auto _isCheckmate = is_checkmate(_board, _board.get_toplay());
+			if (!_isCheckmate)
+			{
+				sch::log_error(str::concat_to_string("Expected is_checkmate() to evaluate to true for \"",
+					_fen, "\""));
+				SCREEPFISH_CHECK(false);
+			};
+
+			const auto _rating = quick_rate(_board);
+			if (!std::isinf(_rating.raw()))
+			{
+				sch::log_error(str::concat_to_string("Expected checkmate to factor into rating \"",
+					_fen, "\""));
+				SCREEPFISH_CHECK(false);
+			}; 
+		};
+
 		// Mate in 1
 		{
-			const auto _fen = "6rn/8/8/8/K7/2k5/1q6/8 b - - 92 118";
+			const auto _fen = "6rn/8/8/8/K7/2k5/1q6/8 b - - 1 1";
 			auto _board = *parse_fen(_fen);
 
 			if (chess::is_checkmate(_board, Color::white))
@@ -613,14 +689,38 @@ namespace sch
 			};
 
 			auto _tree = chess::MoveTree(_board);
-			_tree.build_tree(3, 3);
+			
+
+			auto _profile = chess::MoveTreeProfile();
+			_profile.alphabeta_ = false;
+
+			_tree.build_tree(2, 2, _profile);
 			auto _move = _tree.best_move();
+
 
 			_board.move(*_move);
 			if (!chess::is_checkmate(_board, Color::white))
 			{
-				// Should be checkmate
-				std::cout << "Expected Checkmate : \"" << chess::get_fen(_board) << "\"\n";
+				// Best move should be checkmate
+				sch::log_error(str::concat_to_string(
+					"Move Evaluation did not pick mate in 1!\n",
+					" position : \"", _fen, "\"\n",
+					" move played : \"", *_move, "\"\n",
+					" new position : \"", chess::get_fen(_board), "\""
+				));
+				for (auto& _myMove : _tree.root())
+				{
+					sch::log_error(str::concat_to_string(_myMove.move_, " (", _myMove.quick_rating(),
+						" ", _myMove.player_rating(), ")"));
+
+					std::stringstream ss{};
+					auto _line = _myMove.get_best_line();
+					for (auto& v : _line)
+					{
+						ss << v->move_ << ' ';
+					}
+					sch::log_error(str::concat_to_string("    ", ss.str()));
+				};
 				abort();
 			};
 		};
@@ -706,7 +806,7 @@ namespace sch
 		{
 			const auto _fen = "8/3R1Q2/5pk1/3p2p1/6P1/3b3P/8/K6n b - - 11 47";
 			auto _board = *parse_fen(_fen);
-			SCREEPFISH_CHECK(chess::is_checkmate(_board, _board.get_toplay()));
+			SCREEPFISH_CHECK(!chess::is_checkmate(_board, _board.get_toplay()));
 		};
 
 		return _runOnFinish;
@@ -1221,4 +1321,26 @@ namespace sch
 		return 0;
 	};
 
+	int moves_main(int _nargs, const char* const* _vargs)
+	{
+		if (_nargs < 3)
+		{
+			sch::log_error("Missing fen");
+			return 1;
+		};
+
+		const auto _fen = _vargs[2];
+		const auto _board = chess::parse_fen(_fen);
+
+		if (!_board)
+		{
+			sch::log_error("Invalid fen string");
+			return 1;
+		};
+
+		auto _moves = chess::get_moves(*_board, _board->get_toplay());
+		sch::log_output_chunk(str::concat_to_string(_moves.size()));
+
+		return 0;
+	};
 }

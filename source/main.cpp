@@ -70,6 +70,7 @@ int rmain(std::span<const char* const> _vargs)
 	bool _local = false;
 	bool _tests = false;
 	bool _lichess = false;
+	bool _moves = false;
 
 	if (_vargs.size() <= 1)
 	{
@@ -115,10 +116,14 @@ int rmain(std::span<const char* const> _vargs)
 		{
 			_perft = true;
 		}
+		else if (_arg == "moves")
+		{
+			_moves = true;
+		}
 		else
 		{
-			auto _modeStrings = std::array<std::string_view, 7>{
-				"perf", "local", "lichess", "test", "perft", "-h", "--help"
+			auto _modeStrings = std::array<std::string_view, 8>{
+				"perf", "local", "lichess", "test", "perft", "moves", "-h", "--help"
 			};
 			auto it = str::find_longest_match(_modeStrings, _arg);
 
@@ -160,6 +165,10 @@ int rmain(std::span<const char* const> _vargs)
 	else if (_perft)
 	{
 		return sch::perft_main((int)_vargs.size(), _vargs.data());
+	}
+	else if (_moves)
+	{
+		return sch::moves_main((int)_vargs.size(), _vargs.data());
 	}
 	else
 	{
