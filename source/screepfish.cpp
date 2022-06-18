@@ -479,6 +479,15 @@ namespace sch
 		subtest(false);
 		subtest(true);
 
+		{
+			const auto _fen = "5k2/5Bp1/3P3p/p6P/4qBb1/8/7r/5KN1 w - - 0 28";
+			auto _board = parse_fen(_fen);
+			SCREEPFISH_CHECK(_board);
+
+			auto _moves = get_moves(*_board, _board->get_toplay());
+			SCREEPFISH_CHECK(false && "finish me please");
+		};
+
 		std::cout << '\n' << str::rep('=', 80) << "\n\n";
 		{
 			auto _board = Board();
@@ -1312,4 +1321,26 @@ namespace sch
 		return 0;
 	};
 
+	int moves_main(int _nargs, const char* const* _vargs)
+	{
+		if (_nargs < 3)
+		{
+			sch::log_error("Missing fen");
+			return 1;
+		};
+
+		const auto _fen = _vargs[2];
+		const auto _board = chess::parse_fen(_fen);
+
+		if (!_board)
+		{
+			sch::log_error("Invalid fen string");
+			return 1;
+		};
+
+		auto _moves = chess::get_moves(*_board, _board->get_toplay());
+		sch::log_output_chunk(str::concat_to_string(_moves.size()));
+
+		return 0;
+	};
 }

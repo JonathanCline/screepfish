@@ -440,73 +440,81 @@ namespace chess
 		MoveTreeNode& _node, MoveTreeProfile _profile, MoveTreeSearchData _searchData,
 		MoveTreeAlphaBeta _alphaBeta, Color _maximizingPlayer)
 	{
-		if (!_searchData.can_go_deeper())
+		const bool _isMaximizingPlayer = (_maximizingPlayer == _board.get_toplay());
+
+		if (!_searchData.can_go_deeper() /* or node is a terminal node */)
 		{
-			return _node.rating().player(_maximizingPlayer);
+			return (_isMaximizingPlayer) ?
+				_node.quick_rating() :
+				-_node.quick_rating();
 		};
 
 		SCREEPFISH_ASSERT(_board.get_last_move() == _node.move_);
 		alpha_beta_eval(_node, _board, _profile, _searchData);
-
-		if (_board.get_toplay() == _maximizingPlayer)
+		
+		auto _newBoard = _board;
+		if (_isMaximizingPlayer)
 		{
-			// We must find our best response
-			auto _value = -std::numeric_limits<float>::infinity();
+			auto _value =
+				-Rating(std::numeric_limits<Rating>::infinity());
+
 			for (auto& _move : _node)
 			{
-				auto _newBoard = _board;
 				_newBoard.move(_move.move_);
 
-				const auto _moveABValue =
+				_value = std::max
+				(
+					_value,
 					alpha_beta(_newBoard, _move, _profile,
 						_searchData.with_next_depth(),
-						_alphaBeta, _maximizingPlayer
-					);
+						_alphaBeta, !_maximizingPlayer
+					)
+				);
 
-				_value = std::max(_value, _moveABValue);
-
-				if(_value >= _alphaBeta.beta)
+				if (_value >= _alphaBeta.beta)
 				{
 					break; // (*β cutoff*)
 				};
-				
-				// Do NOT allow early-pruning checkmates
+
 				_alphaBeta.alpha = std::max(
 					_alphaBeta.alpha,
 					_value
 				);
 			};
+
 			return _value;
 		}
 		else
 		{
-			// We must find the opponent's best response
-			auto _value = -std::numeric_limits<float>::infinity();
+			auto _value =
+				-Rating(std::numeric_limits<Rating>::infinity());
+
 			for (auto& _move : _node)
 			{
-				auto _newBoard = _board;
 				_newBoard.move(_move.move_);
 
-				const auto _moveABValue =
+				_value = std::min
+				(
+					_value,
 					alpha_beta(_newBoard, _move, _profile,
 						_searchData.with_next_depth(),
-						_alphaBeta, _maximizingPlayer
-					);
-				_value = std::min(_value, _moveABValue);
+						_alphaBeta, !_maximizingPlayer
+					)
+				);
 
 				if (_value <= _alphaBeta.alpha)
 				{
 					break; // (*α cutoff*)
 				};
-				
+
 				_alphaBeta.beta = std::min(
 					_alphaBeta.beta,
 					_value
 				);
 			};
+
 			return _value;
 		};
-
 		::abort();
 	};
 

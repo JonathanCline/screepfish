@@ -766,15 +766,18 @@ namespace chess
 			}
 			else
 			{
+				// Blocked by friendly piece
 				return AttackLookupVerdict::blocked;
 			};
 		}
 		else
 		{
+			// Empty
 			return AttackLookupVerdict::none;
 		};
 	}
 
+#if false
 	inline AttackLookupVerdict
 		is_piece_attacked_on_rank_at(const Board& _board, const BoardPiece& _piece, File _file)
 	{
@@ -819,12 +822,13 @@ namespace chess
 			return AttackLookupVerdict::none;
 		};
 	}
+#endif
 
 	inline bool is_piece_attacked_2(const chess::Board& _board, const chess::BoardPiece& _piece, bool _inCheck)
 	{
 		const auto _pos = _piece.position();
-
 #if false
+
 		// Look along files for rook or queen
 		{
 			auto _file = _pos.file();
@@ -932,6 +936,8 @@ namespace chess
 			std::make_pair(1, -1),
 			std::make_pair(-1, -1)
 		};
+		constexpr size_t _diagonalsStartIndex = 4;
+
 
 		for (size_t dn = 0; dn != _directions.size(); ++dn)
 		{
@@ -953,13 +959,13 @@ namespace chess
 				case Piece::knight:
 					break;
 				case Piece::bishop:
-					if (dn >= 4)
+					if (dn >= _diagonalsStartIndex)
 					{
 						return true;
 					};
 					break;
 				case Piece::rook:
-					if (dn < 4)
+					if (dn < _diagonalsStartIndex)
 					{
 						return true;
 					};
@@ -1533,9 +1539,10 @@ namespace chess
 		};
 	};
 
+
 	void get_moves(const chess::Board& _board, const chess::Color _forPlayer, MoveBuffer& _buffer, const bool _isCheck)
 	{
-		static thread_local auto _bufferData = std::array<chess::Move, 256>{};
+		auto _bufferData = std::array<chess::Move, max_moves_possible_in_any_position_v>{};
 		auto _movesBuffer = MoveBuffer(_bufferData.data(), _bufferData.data() + _bufferData.size());
 
 		using namespace chess;
@@ -1566,6 +1573,17 @@ namespace chess
 			};
 		};
 	};
+	
+	std::vector<Move> get_moves(const chess::Board& _board, const chess::Color _forPlayer)
+	{
+		auto _data = std::vector<Move>(max_moves_possible_in_any_position_v, Move{});
+		auto _buffer = chess::MoveBuffer(_data.data(), _data.data() + _data.size());
+		get_moves(_board, _forPlayer, _buffer);
+		_data.resize(_buffer.head() - _data.data());
+		return _data;
+	};
+
+
 
 
 	bool has_legal_moves_from_check(const Board& _board, Color _player)

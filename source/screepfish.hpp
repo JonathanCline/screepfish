@@ -14,4 +14,6 @@ namespace sch
 	int local_game_main(int _nargs, const char* const* _vargs);
 	int lichess_bot_main(int _nargs, const char* const* _vargs);
 	int perft_main(int _nargs, const char* const* _vargs);
+
+	int moves_main(int _nargs, const char* const* _vargs);
 };
