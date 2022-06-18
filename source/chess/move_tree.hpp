@@ -513,6 +513,8 @@ namespace chess
 	private:
 		void resort_children(std::mt19937* _rnd);
 
+		void evaluate_next_propogate(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile);
+
 	public:
 		// Common evaluate next function
 		void evaluate_next(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile = MoveTreeProfile());

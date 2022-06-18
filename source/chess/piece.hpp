@@ -480,12 +480,12 @@ namespace chess
 		// Compares piece type
 		friend inline constexpr bool operator==(const Piece& lhs, const PieceType& rhs) noexcept
 		{
-			return lhs.type() == rhs;
+			return (lhs.bits_ & Piece::piece_bitmask_v) == jc::to_underlying(rhs);
 		};
 		// Compares piece type
 		friend inline constexpr bool operator==(const PieceType& lhs, const Piece& rhs) noexcept
 		{
-			return lhs == rhs.type();
+			return (rhs.bits_ & Piece::piece_bitmask_v) == jc::to_underlying(lhs);
 		};
 
 		// Compares piece type

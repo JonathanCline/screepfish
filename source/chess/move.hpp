@@ -136,9 +136,10 @@ namespace chess
 	/**
 	 * @brief Checks if the given player has any legal moves.
 	 * @param _board Checks if the board has legal moves to escape current check.
+	 * @param _player The player in check.
 	 * @return True if has moves, false otherwise.
 	*/
-	bool has_legal_moves_from_check(const Board& _board);
+	bool has_legal_moves_from_check(const Board& _board, Color _player);
 
 
 
@@ -185,6 +186,16 @@ namespace chess
 	 * @return True if player given is in check, false otherwise.
 	*/
 	bool is_check(const chess::Board& _board, const chess::Color _forPlayer);
+
+	/**
+	 * @brief Checks if a move would put a player into check.
+	 * @param _board Current board position.
+	 * @param _move Move to play.
+	 * @param _player Player to check for would be in check.
+	 * @return True if move would put the player in check, false otherwise.
+	*/
+	bool would_move_cause_check(const chess::Board& _board, const Move& _move, Color _player);
+
 
 	/**
 	 * @brief Checks if a player is in checkmate for a given board position.

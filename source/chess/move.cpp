@@ -336,6 +336,11 @@ namespace chess
 	};
 
 
+
+
+
+
+
 	consteval BitBoardCX compute_queen_attack_squares(Position _pos)
 	{
 		return	make_rank_bits(_pos.rank()) |
@@ -1279,9 +1284,7 @@ namespace chess
 
 		for (auto p = _bufferStart; p != _bufferEnd; ++p)
 		{
-			auto nb = _board;
-			nb.move(*p);
-			if (!is_check(nb, _forPlayer))
+			if (!would_move_cause_check(_board, *p, _forPlayer))
 			{
 				_buffer.write(*p);
 			};
@@ -1289,12 +1292,12 @@ namespace chess
 	};
 
 
-	bool has_legal_moves_from_check(const Board& _board)
+	bool has_legal_moves_from_check(const Board& _board, Color _player)
 	{
 		auto _bufferData = std::array<Move, 32>{};
 		for (auto& v : _board.pieces())
 		{
-			if (v.color() == !_board.get_toplay())
+			if (v.color() == _player)
 			{
 				auto _buffer = MoveBuffer(_bufferData.data(), _bufferData.data() + _bufferData.size());
 				const auto _bufferStart = _buffer.head();
@@ -1557,7 +1560,6 @@ namespace chess
 				if (_threats.none())
 				{
 					// No threats, cannot be in check
-					//std::cout << "Prevented check check\n";
 					return false;
 				};
 			}
@@ -1584,6 +1586,18 @@ namespace chess
 		return true;
 	};
 
+	bool would_move_cause_check(const chess::Board& _board, const Move& _move, Color _player)
+	{
+		// THIS IS EXPENSIVE, try to evaluate the board with time
+		auto nb = _board;
+		nb.move(_move);
+		return is_check(nb, _player);
+	};
+
+
+
+
+
 
 	bool is_checkmate(const chess::Board& _board, const chess::Color _forPlayer)
 	{
@@ -1596,7 +1610,7 @@ namespace chess
 			return false;
 		};
 
-		return !has_legal_moves_from_check(_board);
+		return !has_legal_moves_from_check(_board, _forPlayer);
 	};
 
 
@@ -1692,19 +1706,20 @@ namespace chess
 			_rating -= king_move_rating_v;
 		};
 		
-
-
 		// Checkmate
-
-		if (is_checkmate(_board, !Player))
+		const auto _isCheckmate = is_checkmate(_board, _board.get_toplay());
+		if (_isCheckmate)
 		{
-			return checkmate_rating_v;
+			return (_board.get_toplay() == Player) ?
+				-checkmate_rating_v : checkmate_rating_v;
 		};
-		if (is_checkmate(_board, Player))
+		// Checkmate
+		if (is_checkmate(_board, !_board.get_toplay()))
 		{
-			return -checkmate_rating_v;
+			return (_board.get_toplay() == Player) ?
+				checkmate_rating_v : -checkmate_rating_v;
 		};
-
+		
 
 		// 50 move rule is a draw
 

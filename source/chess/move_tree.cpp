@@ -465,16 +465,16 @@ namespace chess
 
 				_value = std::max(_value, _moveABValue);
 
-				//f (_value >= _alphaBeta.beta)
-				//
-				//	break; // (*β cutoff*)
-				//;
-				//
-				/// Do NOT allow early-pruning checkmates
-				//alphaBeta.alpha = std::max(
-				//	_alphaBeta.alpha,
-				//	_value
-				//);
+				if(_value >= _alphaBeta.beta)
+				{
+					break; // (*β cutoff*)
+				};
+				
+				// Do NOT allow early-pruning checkmates
+				_alphaBeta.alpha = std::max(
+					_alphaBeta.alpha,
+					_value
+				);
 			};
 			return _value;
 		}
@@ -494,15 +494,15 @@ namespace chess
 					);
 				_value = std::min(_value, _moveABValue);
 
-				//if (_value <= _alphaBeta.alpha)
-				//{
-				//	break; // (*α cutoff*)
-				//};
-				//
-				//_alphaBeta.beta = std::min(
-				//	_alphaBeta.beta,
-				//	_value
-				//);
+				if (_value <= _alphaBeta.alpha)
+				{
+					break; // (*α cutoff*)
+				};
+				
+				_alphaBeta.beta = std::min(
+					_alphaBeta.beta,
+					_value
+				);
 			};
 			return _value;
 		};
@@ -540,7 +540,17 @@ namespace chess
 		// Probably not needed tbh
 		++this->depth_counter_;
 	};
+	void MoveTree::evaluate_next_propogate(MoveTreeSearchData _searchData, const MoveTreeProfile& _profile)
+	{
+		auto& _board = this->board_;
+		auto& _root = this->root_;
 
+		// Forward to root node.
+		_root.evaluate_next_with_board(_board, _profile, _searchData, true);
+
+		// Probably not needed tbh
+		++this->depth_counter_;
+	};
 
 
 
@@ -645,7 +655,7 @@ namespace chess
 		auto& _root = this->root();
 		_root.resort_children();
 	};
-	
+
 	void MoveTree::build_tree(size_t _depth, size_t _maxExtendedDepth, const MoveTreeProfile& _profile)
 	{
 		// Reset state
@@ -664,8 +674,7 @@ namespace chess
 		{
 			for (size_t n = 0; n != _depth; ++n)
 			{
-				this->root().evaluate_next(this->initial_board(), _profile, _searchData,
-					true);
+				this->evaluate_next_propogate(_searchData, _profile);
 			};
 		};
 
