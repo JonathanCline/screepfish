@@ -354,10 +354,55 @@ namespace sch
 
 namespace sch
 {
+	inline void is_piece_attacked_test(const std::string_view _fen,
+		chess::Position _piece, bool _expected)
+	{
+		using namespace chess;
+		auto _board = parse_fen(_fen);
+		SCREEPFISH_CHECK(_board);
+
+		const auto p = _board->get(_piece);
+		if (is_piece_attacked(*_board, BoardPiece(p, _piece)) != _expected)
+		{
+			sch::log_error(str::concat_to_string("Piece ",
+				((_expected) ? "should " : "should not "), "be under attack.", "\n",
+				"  piece : ", _piece, "\n",
+				"  fen : ", _fen
+			));
+			SCREEPFISH_CHECK(false);
+		};
+	};
+
 
 	bool run_tests_main()
 	{
 		bool _runOnFinish = true;
+
+		using namespace chess;
+
+		// Test if piece is attacked
+		{
+			{
+				const auto _fen = "k7/3r4/8/8/8/3K4/8/8 w - - 0 1";
+				is_piece_attacked_test(_fen, (File::d, Rank::r3), true);
+				is_piece_attacked_test(_fen, (File::d, Rank::r7), false);
+				is_piece_attacked_test(_fen, (File::a, Rank::r8), false);
+			};
+			{
+				const auto _fen = "k7/8/8/8/8/r2K4/8/8 w - - 0 1";
+				is_piece_attacked_test(_fen, (File::d, Rank::r3), true);
+				is_piece_attacked_test(_fen, (File::a, Rank::r3), false);
+				is_piece_attacked_test(_fen, (File::a, Rank::r8), false);
+			};
+			{
+				const auto _fen = "k7/7b/8/8/8/3K4/8/8 w - - 0 1";
+				is_piece_attacked_test(_fen, (File::d, Rank::r3), true);
+			};
+			{
+				const auto _fen = "k7/7b/8/5n2/8/3Kn3/8/8 w - - 0 1";
+				is_piece_attacked_test(_fen, (File::d, Rank::r3), false);
+			};
+		};
 
 		{
 			bool _failed = false;
@@ -416,8 +461,6 @@ namespace sch
 			std::cout << "   checkmates : " << _checkmates << '\n';
 		};
 #endif
-
-		using namespace chess;
 
 		constexpr auto subtest = [](bool _alphaBetaPrune)
 		{
@@ -754,7 +797,7 @@ namespace sch
 		{
 			const auto _fen = "8/3R1Q2/5pk1/3p2p1/6P1/3b3P/8/K6n b - - 11 47";
 			auto _board = *parse_fen(_fen);
-			SCREEPFISH_CHECK(chess::is_checkmate(_board, _board.get_toplay()));
+			SCREEPFISH_CHECK(!chess::is_checkmate(_board, _board.get_toplay()));
 		};
 
 		return _runOnFinish;

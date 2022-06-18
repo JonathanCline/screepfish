@@ -599,6 +599,61 @@ namespace chess
 		};
 		return false;
 	};
+	
+	inline bool is_piece_attacked_by_enemy_queen(const Board& _board, const Position& _pos, const Position _enemyPos)
+	{
+		using namespace chess;
+
+		const auto _position = _pos;
+		auto _nextPosition = Position();
+		bool _possible = true;
+
+		constexpr auto _directionPairs = std::array
+		{
+			std::pair{  1,  0 },
+			std::pair{ -1,  0 },
+			std::pair{  0,  1 },
+			std::pair{  0, -1 },
+
+			std::pair{  1,  1 },
+			std::pair{ -1,  1 },
+			std::pair{  1, -1 },
+			std::pair{ -1, -1 },
+		};
+
+		for (const auto& _direction : _directionPairs)
+		{
+			int n = 1;
+			while (true)
+			{
+				auto [df, dr] = _direction;
+				df *= n;
+				dr *= n;
+
+				_nextPosition = trynext(_pos, df, dr, _possible);
+				if (_possible)
+				{
+					if (_nextPosition == _pos)
+					{
+						return true;
+					};
+
+					if (!_board.is_empty(_nextPosition))
+					{
+						break;
+					};
+				}
+				else
+				{
+					break;
+				};
+
+				++n;
+			};
+		};
+		return false;
+	};
+	
 	bool is_piece_attacked_by_queen(const chess::Board& _board, const chess::BoardPiece& _piece, const chess::BoardPiece& _byPiece)
 	{
 		using namespace chess;
@@ -668,9 +723,281 @@ namespace chess
 	};
 
 
+	enum class AttackLookupVerdict
+	{
+		none,
+		blocked,
+		enemy,
+	};
+
+	inline AttackLookupVerdict
+		is_piece_attacked_on_file_at(const Board& _board, const BoardPiece& _piece, File _file)
+	{
+		// Get piece at position.
+		const auto _otherPos = (_file, _piece.rank());
+		const auto _otherPiece = _board.get(_otherPos);
+
+		// Check if there was a piece here.
+		if (_otherPiece)
+		{
+			// Check if the piece is an enemy or friendly
+			if (_otherPiece.color() != _piece.color())
+			{
+				// Enemy is present, check type and then quit
+				switch (_otherPiece.type())
+				{
+				case Piece::rook: [[fallthrough]];
+				case Piece::queen:
+					// Under attack!
+					return AttackLookupVerdict::enemy;
+				case Piece::king:
+					// If king is right next to the given piece, its attacking it
+					if (distance(_file, _piece.file()) == 1)
+					{
+						return AttackLookupVerdict::enemy;
+					};
+					break;
+				default:
+					break;
+				};
+
+				// Stop looking as we hit the end
+				return AttackLookupVerdict::blocked;
+			}
+			else
+			{
+				return AttackLookupVerdict::blocked;
+			};
+		}
+		else
+		{
+			return AttackLookupVerdict::none;
+		};
+	}
+
+	inline AttackLookupVerdict
+		is_piece_attacked_on_rank_at(const Board& _board, const BoardPiece& _piece, File _file)
+	{
+		// Get piece at position.
+		const auto _otherPos = (_file, _piece.rank());
+		const auto _otherPiece = _board.get(_otherPos);
+
+		// Check if there was a piece here.
+		if (_otherPiece)
+		{
+			// Check if the piece is an enemy or friendly
+			if (_otherPiece.color() != _piece.color())
+			{
+				// Enemy is present, check type and then quit
+				switch (_otherPiece.type())
+				{
+				case Piece::rook: [[fallthrough]];
+				case Piece::queen:
+					// Under attack!
+					return AttackLookupVerdict::enemy;
+				case Piece::king:
+					// If king is right next to the given piece, its attacking it
+					if (distance(_file, _piece.file()) == 1)
+					{
+						return AttackLookupVerdict::enemy;
+					};
+					break;
+				default:
+					break;
+				};
+
+				// Stop looking as we hit the end
+				return AttackLookupVerdict::blocked;
+			}
+			else
+			{
+				return AttackLookupVerdict::blocked;
+			};
+		}
+		else
+		{
+			return AttackLookupVerdict::none;
+		};
+	}
+
+	inline bool is_piece_attacked_2(const chess::Board& _board, const chess::BoardPiece& _piece, bool _inCheck)
+	{
+		const auto _pos = _piece.position();
+
+#if false
+		// Look along files for rook or queen
+		{
+			auto _file = _pos.file();
+			if (_file != File::a)
+			{
+				_file -= 1;
+				do
+				{
+					switch (is_piece_attacked_on_file_at(_board, _piece, _file))
+					{
+					case AttackLookupVerdict::blocked:
+						// not attacked on this line
+						goto look_right_of;
+					case AttackLookupVerdict::enemy:
+						// attacked
+						return true;
+					case AttackLookupVerdict::none:
+						// keep looking
+						break;
+					};
+				}
+				while (_file != File::a);
+			};
+
+		look_right_of:
+			_file = _pos.file();
+			if (_file != File::h)
+			{
+				_file += 1;
+				do
+				{
+					switch (is_piece_attacked_on_file_at(_board, _piece, _file))
+					{
+					case AttackLookupVerdict::blocked:
+						// not attacked on this line
+						goto look_on_rank;
+					case AttackLookupVerdict::enemy:
+						// attacked
+						return true;
+					case AttackLookupVerdict::none:
+						// keep looking
+						break;
+					};
+				} while (_file != File::h);
+			};
+		};
+	look_on_rank:
+
+		// Look along ranks for rook or queen
+		{
+			auto _file = _pos.file();
+			if (_file != File::a)
+			{
+				_file -= 1;
+				do
+				{
+					switch (is_piece_attacked_on_file_at(_board, _piece, _file))
+					{
+					case AttackLookupVerdict::blocked:
+						// not attacked on this line
+						goto look_right_of;
+					case AttackLookupVerdict::enemy:
+						// attacked
+						return true;
+					case AttackLookupVerdict::none:
+						// keep looking
+						break;
+					};
+				} while (_file != File::a);
+			};
+
+		look_right_of:
+			_file = _pos.file();
+			if (_file != File::h)
+			{
+				_file += 1;
+				do
+				{
+					switch (is_piece_attacked_on_file_at(_board, _piece, _file))
+					{
+					case AttackLookupVerdict::blocked:
+						// not attacked on this line
+						goto look_on_rank;
+					case AttackLookupVerdict::enemy:
+						// attacked
+						return true;
+					case AttackLookupVerdict::none:
+						// keep looking
+						break;
+					};
+				} while (_file != File::h);
+			};
+		};
+	look_on_rank:
+#endif
+
+		constexpr auto _directions = std::array
+		{
+			std::make_pair(1, 0),
+			std::make_pair(0, 1),
+			std::make_pair(-1, 0),
+			std::make_pair(0, -1),
+			std::make_pair(1, 1),
+			std::make_pair(-1, 1),
+			std::make_pair(1, -1),
+			std::make_pair(-1, -1)
+		};
+
+		for (size_t dn = 0; dn != _directions.size(); ++dn)
+		{
+			const auto [df, dr] = _directions[dn];
+			const auto _found = find_next_piece_in_direction(_board, _piece.position(), df, dr);
+			if ((_found != _piece.position()) &&
+				_board.has_enemy_piece(_found, _piece.color()))
+			{
+				const auto _enemyPiece = _board.get(_found);
+
+				switch (_enemyPiece.type())
+				{
+				case Piece::pawn:
+					if (get_pawn_attacking_squares(_found, _enemyPiece.color()).test(_pos))
+					{
+						return true;
+					};
+					break;
+				case Piece::knight:
+					break;
+				case Piece::bishop:
+					if (dn >= 4)
+					{
+						return true;
+					};
+					break;
+				case Piece::rook:
+					if (dn < 4)
+					{
+						return true;
+					};
+					break;
+				case Piece::queen:
+					return true;
+				case Piece::king:
+					if (is_neighboring_position(_pos, _found))
+					{
+						return true;
+					};
+					break;
+				};
+			};
+		};
+
+		// Check for knights
+		{
+			const auto _enemyKnightThreatBits = get_knight_attack_positions(_pos);
+			for (auto& v : _enemyKnightThreatBits)
+			{
+				if (_board.get(v) == Piece(Piece::knight, !_piece.color()))
+				{
+					return true;
+				};
+			};
+		};
+
+		return false;
+	};
+
+
 	template <Color C>
 	inline bool is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece, bool _inCheck)
 	{
+		return is_piece_attacked_2(_board, _piece, _inCheck);
+
+#if false
 		constexpr auto piece_color_v = C;
 
 		const auto _pend = _board.pend();
@@ -722,6 +1049,7 @@ namespace chess
 
 		// No attacking moves
 		return false;
+#endif
 	};
 	
 	bool is_piece_attacked(const chess::Board& _board, const chess::BoardPiece& _piece, bool _inCheck)
@@ -1550,7 +1878,7 @@ namespace chess
 	{
 		using namespace chess;
 
-		SCREEPFISH_ASSERT(_board.get_toplay() == _forPlayer);
+		//SCREEPFISH_ASSERT(_board.get_toplay() == _forPlayer);
 
 		if (!is_check(_board, _forPlayer))
 		{
