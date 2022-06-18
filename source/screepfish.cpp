@@ -658,7 +658,7 @@ namespace sch
 			using namespace chess;
 			const auto _fen = "r6n/8/8/8/K7/2k5/1q6/8 w - - 2 2";
 			auto _board = *parse_fen(_fen);
-			
+
 			SCREEPFISH_CHECK(is_check(_board, _board.get_toplay()));
 			const auto _isCheckmate = is_checkmate(_board, _board.get_toplay());
 			if (!_isCheckmate)
@@ -674,7 +674,7 @@ namespace sch
 				sch::log_error(str::concat_to_string("Expected checkmate to factor into rating \"",
 					_fen, "\""));
 				SCREEPFISH_CHECK(false);
-			}; 
+			};
 		};
 
 		// Mate in 1
@@ -689,7 +689,7 @@ namespace sch
 			};
 
 			auto _tree = chess::MoveTree(_board);
-			
+
 
 			auto _profile = chess::MoveTreeProfile();
 			_profile.alphabeta_ = false;
@@ -799,7 +799,7 @@ namespace sch
 					abort();
 				};
 			};
-			
+
 		};
 
 		// Checkmate check
@@ -811,6 +811,20 @@ namespace sch
 
 		return _runOnFinish;
 	};
+
+	int run_tests_subprogram(SubprogramArgs _args)
+	{
+		if (run_tests_main())
+		{
+			return 0;
+		}
+		else
+		{
+			return 1;
+		};
+	};
+
+
 
 	template <size_t Runs = 5>
 	auto perf_test_part(auto&& _op, std::chrono::milliseconds _duration = std::chrono::seconds(1))
@@ -918,7 +932,7 @@ namespace sch
 			const auto r = perf_test_part(fn);
 			sch::log_info(str::concat_to_string("midgame (d4) - ", r));
 		};
-		
+
 		// midgame, depth 4, no ab
 		{
 			auto _pFen = parse_fen("rn2kbnr/p2b1pp1/4p3/q2P3p/p2Q4/2N2N2/1PBB1PPP/R3K2R b KQkq - 1 13");
@@ -940,6 +954,11 @@ namespace sch
 			sch::log_info(str::concat_to_string("midgame (d4 no ab) - ", r));
 		};
 
+	};
+	int perf_test_subprogram(SubprogramArgs _args)
+	{
+		perf_test();
+		return 0;
 	};
 
 
@@ -1102,104 +1121,20 @@ namespace sch
 	};
 
 
-	int local_game_main(int _nargs, const char* const* _vargs)
-	{
-		namespace fs = std::filesystem;
-
-		// Error code storage for filesystem handling.
-		auto _erc = std::error_code{};
-
-		// Path used to invoke the executable
-		const auto _invokePath = fs::path(_vargs[0]);
-
-		// Absolute path to the executable
-		const auto _executablePath = fs::canonical(_invokePath, _erc);
-		SCREEPFISH_CHECK(!_erc);
-
-		// Path to the executable's directory
-		const auto _executableDirectoryPath = _executablePath.parent_path();
-		SCREEPFISH_CHECK(fs::exists(_executableDirectoryPath) && fs::is_directory(_executableDirectoryPath));
-
-		// Assets directory
-		const auto _assetsDirectoryPath = _executableDirectoryPath / "assets";
-		if (!fs::is_directory(_assetsDirectoryPath))
-		{
-			auto s = "Missing assets directory, expected at \"" + _assetsDirectoryPath.string() + "\"";
-			sch::log_error(s);
-			SCREEPFISH_ASSERT(false);
-			return 1;
-		};
-
-		// Chess Assets directory
-		const auto _chessAssetsDirectoryPath = _assetsDirectoryPath / "chess";
-		if (!fs::is_directory(_chessAssetsDirectoryPath))
-		{
-			auto s = "Missing chess assets directory, expected at \"" + _chessAssetsDirectoryPath.string() + "\"";
-			sch::log_error(s);
-			SCREEPFISH_ASSERT(false);
-			return 1;
-		};
-
-		bool _step = false;
-		bool _one = false;
-		for (int n = 1; n < _nargs; ++n)
-		{
-			const auto _arg = std::string_view(_vargs[n]);
-			if (_arg == "--step")
-			{
-				_step = true;
-			}
-			else if (_arg == "--one")
-			{
-				_one = true;
-			};
-		};
-
-		bool _keepAlive = !_one;
-		while (_keepAlive)
-		{
-			const auto _chessAssetsDirectoryPathStr = _chessAssetsDirectoryPath.generic_string();
-			_keepAlive = sch::local_game(_chessAssetsDirectoryPathStr.c_str(), _step);
-		};
-
-		return 0;
-	};
-
-	int lichess_bot_main(int _nargs, const char* const* _vargs)
-	{
-		// Setting(s)
-		const bool _allowUserQueries = true;
-
-		// Renable when lichess lets us play the AI
-		const auto _env = sch::load_env(_vargs[0], _allowUserQueries);
-		auto _accountManager = sch::AccountManager(_env);
-		_accountManager.start(true);
-
-		while (true)
-		{
-			std::this_thread::sleep_for(std::chrono::seconds(1));
-			_accountManager.update();
-		};
-
-		return 0;
-	};
-
-
-
 
 
 	int perft_main(int _nargs, const char* const* _vargs)
 	{
-		if (_nargs > 2 && _vargs[2] == std::string_view{ "findfen" })
+		if (_nargs > 1 && _vargs[1] == std::string_view{ "findfen" })
 		{
 			using namespace chess;
 
-			if (_nargs < 6) { sch::log_error("Usage : screepfish perft findfen <depth> <fen0> <fen1>"); return 1; };
+			if (_nargs < 5) { sch::log_error("Usage : screepfish perft findfen <depth> <fen0> <fen1>"); return 1; };
 
-			auto _depthArg = std::string(_vargs[3]); // get_fen(*parse_fen("8/2p5/3p4/KP5r/5pP1/7k/4P3/1R6 b - - 2 2"));
+			auto _depthArg = std::string(_vargs[2]); // get_fen(*parse_fen("8/2p5/3p4/KP5r/5pP1/7k/4P3/1R6 b - - 2 2"));
 
 			// Initial fen string
-			auto rf0 = std::string(_vargs[4]); // "8/2p5/3p4/KP5r/1R3pP1/7k/4P3/8 w - - 1 2";
+			auto rf0 = std::string(_vargs[3]); // "8/2p5/3p4/KP5r/1R3pP1/7k/4P3/8 w - - 1 2";
 
 			// Check initial fen string
 			auto rfb0 = parse_fen(rf0);
@@ -1207,7 +1142,7 @@ namespace sch
 
 			// Parse out extra fen strings
 			auto rfs = std::vector<std::string>();
-			for (size_t n = 5; n != (size_t)_nargs; ++n)
+			for (size_t n = 4; n != (size_t)_nargs; ++n)
 			{
 				auto _fen = std::string_view(_vargs[n]);
 				auto fb = parse_fen(_fen);
@@ -1273,10 +1208,10 @@ namespace sch
 		};
 
 
-		if (_nargs <= 3) { sch::log_error("Usage : screepfish perft <depth> <fen> [moves...]"); return 1; };
+		if (_nargs <= 2) { sch::log_error("Usage : screepfish perft <depth> <fen> [moves...]"); return 1; };
 
-		auto _depthArg = std::string_view(_vargs[2]);
-		auto _fenArg = std::string_view(_vargs[3]);
+		auto _depthArg = std::string_view(_vargs[1]);
+		auto _fenArg = std::string_view(_vargs[2]);
 
 		size_t _depth = 0;
 		if (const auto [p, ec] = std::from_chars(_depthArg.data(), _depthArg.data() + _depthArg.size(), _depth);
@@ -1300,7 +1235,7 @@ namespace sch
 
 		using namespace chess;
 		auto _playMoves = std::vector<Move>();
-		for (size_t n = 4; n < (size_t)_nargs; ++n)
+		for (size_t n = 3; n < (size_t)_nargs; ++n)
 		{
 			auto _moveArg = std::string_view(_vargs[n]);
 			Move _move{};
@@ -1323,13 +1258,13 @@ namespace sch
 
 	int moves_main(int _nargs, const char* const* _vargs)
 	{
-		if (_nargs < 3)
+		if (_nargs < 2)
 		{
 			sch::log_error("Missing fen");
 			return 1;
 		};
 
-		const auto _fen = _vargs[2];
+		const auto _fen = _vargs[1];
 		const auto _board = chess::parse_fen(_fen);
 
 		if (!_board)
@@ -1343,4 +1278,100 @@ namespace sch
 
 		return 0;
 	};
+
+
+
+
+	int perft_subprogram(SubprogramArgs _args)
+	{
+		return perft_main((int)_args.size(), _args.data());
+	};
+	int moves_subprogram(SubprogramArgs _args)
+	{
+		return moves_main((int)_args.size(), _args.data());
+	};
+
+	int local_game_subprogram(SubprogramArgs _args)
+	{
+		namespace fs = std::filesystem;
+
+		// Error code storage for filesystem handling.
+		auto _erc = std::error_code{};
+
+		// Path used to invoke the executable
+		const auto _invokePath = fs::path(_args.invoke_path());
+
+		// Absolute path to the executable
+		const auto _executablePath = fs::canonical(_invokePath, _erc);
+		SCREEPFISH_CHECK(!_erc);
+
+		// Path to the executable's directory
+		const auto _executableDirectoryPath = _executablePath.parent_path();
+		SCREEPFISH_CHECK(fs::exists(_executableDirectoryPath) && fs::is_directory(_executableDirectoryPath));
+
+		// Assets directory
+		const auto _assetsDirectoryPath = _executableDirectoryPath / "assets";
+		if (!fs::is_directory(_assetsDirectoryPath))
+		{
+			auto s = "Missing assets directory, expected at \"" + _assetsDirectoryPath.string() + "\"";
+			sch::log_error(s);
+			SCREEPFISH_ASSERT(false);
+			return 1;
+		};
+
+		// Chess Assets directory
+		const auto _chessAssetsDirectoryPath = _assetsDirectoryPath / "chess";
+		if (!fs::is_directory(_chessAssetsDirectoryPath))
+		{
+			auto s = "Missing chess assets directory, expected at \"" + _chessAssetsDirectoryPath.string() + "\"";
+			sch::log_error(s);
+			SCREEPFISH_ASSERT(false);
+			return 1;
+		};
+
+		bool _step = false;
+		bool _one = false;
+		for (auto& _varg : _args)
+		{
+			const auto _arg = std::string_view(_varg);
+			if (_arg == "--step")
+			{
+				_step = true;
+			}
+			else if (_arg == "--one")
+			{
+				_one = true;
+			};
+		};
+
+		bool _keepAlive = !_one;
+		while (_keepAlive)
+		{
+			const auto _chessAssetsDirectoryPathStr = _chessAssetsDirectoryPath.generic_string();
+			_keepAlive = sch::local_game(_chessAssetsDirectoryPathStr.c_str(), _step);
+		};
+
+		return 0;
+	};
+	int lichess_bot_subprogram(SubprogramArgs _args)
+	{
+		// Setting(s)
+		const bool _allowUserQueries = true;
+
+		// Renable when lichess lets us play the AI
+		const auto _env = sch::load_env(_args.invoke_path(), _allowUserQueries);
+		auto _accountManager = sch::AccountManager(_env);
+		_accountManager.start(true);
+
+		while (true)
+		{
+			std::this_thread::sleep_for(std::chrono::seconds(1));
+			_accountManager.update();
+		};
+
+		return 0;
+	};
+
+
+
 }

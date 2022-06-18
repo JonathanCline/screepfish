@@ -153,9 +153,20 @@ namespace str
 		};
 		return _str.substr(0, _currentMatchLength);
 	};
-	constexpr auto find_longest_match(auto&& _strings, const auto& _prefix)
+
+
+
+	template <std::ranges::range RangeT>
+	requires (std::convertible_to<std::ranges::range_value_t<RangeT>, std::string_view>)
+	constexpr auto find_longest_match(RangeT&& _strings, const std::string_view& _prefix)
 	{
-		if (_strings.empty()) { return _strings.end(); };
+		const auto _begin = std::ranges::begin(_strings);
+		const auto _end = std::ranges::end(_strings);
+
+		if (_begin == _end)
+		{
+			return _end;
+		};
 		auto it = std::ranges::max_element(_strings, [_prefix](auto& lhs, auto& rhs) -> bool
 			{
 				return longest_match(lhs, _prefix) < longest_match(rhs, _prefix);

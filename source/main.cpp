@@ -63,125 +63,214 @@ inline auto make_chess_board_nn_inputs(const chess::Board& _board)
 
 
 
-int rmain(std::span<const char* const> _vargs)
+/**
+ * @brief Subprogram function type alias.
+*/
+using SubprogramFn = std::function<sch::SubprogramResult(sch::SubprogramArgs)>;
+
+/**
+ * @brief Holds a named subprogram.
+*/
+class Subprogram
 {
-	bool _perf = false;
-	bool _perft = false;
-	bool _local = false;
-	bool _tests = false;
-	bool _lichess = false;
-	bool _moves = false;
+public:
 
-	if (_vargs.size() <= 1)
+	void write_help_text(std::ostream& _ostr) const
 	{
-		sch::log_error("Missing arguments, use -h or --help to print usage");
-	}
-	
-	{
-		const auto _argCStr = _vargs[1];
-		const auto _arg = std::string_view(_argCStr);
-
-		if (_arg == "--help" || _arg == "-h")
-		{
-			std::cout << "screepfish [<mode> [args...]]\n";
-			std::cout <<
-				" Arguments:\n"
-				"  <mode> = { perf | test | local | {--h|--help} }\n" <<
-				"    {--h|--help} : Prints this message\n" <<
-				"    perf : Runs the performance test\n" <<
-				"    perft : Runs perft\n" <<
-				"    test : Runs the tests\n" <<
-				"    local : Plays a local game\n" <<
-				"    lichess : Connects to a lichess account\n" <<
-				" If no <mode> is provided then this connects to lichess\n\n";
-			return 0;
-		}
-		else if (_arg == "perf")
-		{
-			_perf = true;
-		}
-		else if (_arg == "lichess")
-		{
-			_lichess = true;
-		}
-		else if (_arg == "test")
-		{
-			_tests = true;
-		}
-		else if (_arg == "local")
-		{
-			_local = true;
-		}
-		else if (_arg == "perft")
-		{
-			_perft = true;
-		}
-		else if (_arg == "moves")
-		{
-			_moves = true;
-		}
-		else
-		{
-			auto _modeStrings = std::array<std::string_view, 8>{
-				"perf", "local", "lichess", "test", "perft", "moves", "-h", "--help"
-			};
-			auto it = str::find_longest_match(_modeStrings, _arg);
-
-			auto s = "Urecognized mode \"" + std::string(_arg) + "\"";
-			if (it != _modeStrings.end())
-			{
-				s = s + " (closest match \"" + std::string(*it) + "\")";
-			};
-			s += "\n\tUse -h or --help to print usage";
-			sch::log_error(s);
-
-			return 1;
-		};
+		_ostr << this->name_ << " : " << this->help_;
 	};
 
-	sch::log_output_chunk_divider();
 
-	if (_perf)
+
+	const std::string& name() const noexcept
 	{
-		sch::perf_test();
-		return 0;
-	}
-	else if (_tests)
-	{
-		if (!sch::run_tests_main())
-		{
-			return 1;
-		};
-		return 0;
-	}
-	else if (_local)
-	{
-		return sch::local_game_main((int)_vargs.size(), _vargs.data());
-	}
-	else if (_lichess)
-	{
-		return sch::lichess_bot_main((int)_vargs.size(), _vargs.data());
-	}
-	else if (_perft)
-	{
-		return sch::perft_main((int)_vargs.size(), _vargs.data());
-	}
-	else if (_moves)
-	{
-		return sch::moves_main((int)_vargs.size(), _vargs.data());
-	}
-	else
-	{
-		SCREEPFISH_CHECK(false);
-		return 0;
+		return this->name_;
 	};
+	const std::string& help_text() const noexcept
+	{
+		return this->help_;
+	};
+
+	template <typename... Ts>
+	requires (jc::cx_invocable<SubprogramFn, Ts...>)
+	sch::SubprogramResult invoke(Ts&&... _args) const
+	{
+		SCREEPFISH_CHECK(this->fn_ && "Subprogram has no function assigned");
+		return std::invoke(this->fn_, std::forward<Ts>(_args)...);
+	};
+
+	Subprogram(const std::string& _name, SubprogramFn _fn, const std::string& _help) :
+		name_(_name), fn_(std::move(_fn)), help_(_help)
+	{};
+
+private:
+
+	/**
+	 * @brief The name of the subprogram.
+	*/
+	std::string name_;
+
+	/**
+	 * @brief The help text for the subprogram.
+	*/
+	std::string help_;
+
+	/**
+	 * @brief The function to invoke.
+	*/
+	SubprogramFn fn_;
 };
 
 
 
+struct EngineCLI
+{
+private:
+
+	void print_subprogram_help(std::ostream& _ostr, const Subprogram& _subprogram)
+	{
+		_ostr << "   ";
+		_subprogram.write_help_text(_ostr);
+		_ostr << '\n';
+	};
+
+public:
+
+	/**
+	 * @brief Prints the help message.
+	*/
+	void print_help(std::ostream& _ostr)
+	{
+		/*
+		screepfish [<mode> [args...]]
+		  Arguments:
+		    <mode> = { perf | test | local | {--h|--help} }
+		      {--h|--help} : Prints this message
+		      perf : Runs the performance test
+		      perft : Runs perft
+		      test : Runs the tests
+		      local : Plays a local game
+		      lichess : Connects to a lichess account
+
+		 If no <mode> is provided then this connects to lichess
+		*/
+		
+		_ostr << "screepfish <mode> [args...]\n";
+		_ostr << "  The greatest chess bot ever made - never beaten by a GM\n\n";
+		_ostr << " <mode> :=\n";
+		for (const auto& _subprogram : this->programs_)
+		{
+			this->print_subprogram_help(_ostr, _subprogram);
+		};
+	};
+
+	/**
+	 * @brief Parses command line args and runs the engine.
+	 * @param _invokePath Path used to invoke the executable.
+	 * @param _vargs The arguments passed after the invoke path.
+	*/
+	void parse_args(const char* _invokePath, std::span<const char* const> _vargs)
+	{
+		// Print mini-usage if no arguments are given
+		if (_vargs.empty())
+		{
+			sch::log_error("Missing arguments, use -h or --help to print usage");
+			exit(1);
+		};
+
+		auto& _ostr = std::cout;
+
+		// Grab subprogram name
+		const auto _subprogramNameArg = std::string_view(_vargs[0]);
+		
+		// Look for help message
+		if (_subprogramNameArg == "-h" || _subprogramNameArg == "--help")
+		{
+			this->print_help(_ostr);
+			return;
+		};
+
+		// Invoke subprogram
+		if (const auto it = std::ranges::find_if(this->programs_, [&_subprogramNameArg](auto& v)
+			{
+				return v.name() == _subprogramNameArg;
+			});
+			it != this->programs_.end())
+		{
+			const auto _result = it->invoke(sch::SubprogramArgs(_invokePath, _vargs));
+			exit(_result);
+		}
+		else
+		{
+			// Invalid / Unknown subprogram given
+			
+			// Find closest match
+			const auto _names = this->programs_ | std::views::transform([](auto& v) ->
+				 const auto&
+				{
+					return v.name();
+				});
+			auto _closestIter = str::find_longest_match(_names, _subprogramNameArg);
+
+			_ostr << "Urecognized mode \"" << _subprogramNameArg << "\"";
+			if (_closestIter != _names.end())
+			{
+				_ostr << "\n\tclosest match : \"" << *_closestIter << "\"";
+			};
+			_ostr << "\n\tUse -h or --help to print usage\n";
+
+			exit(1);
+		};
+	};
+
+
+
+
+	void add_subprogram(const Subprogram& _subprogram)
+	{
+		for (auto& v : this->programs_)
+		{
+			if (v.name() == _subprogram.name())
+			{
+				SCREEPFISH_CHECK(false && "Redefined subprogram");
+			};
+		};
+
+		this->programs_.push_back(_subprogram);
+	};
+
+	EngineCLI() = default;
+
+private:
+	std::vector<Subprogram> programs_;
+};
+
+
+
+int rmain(const char* _invokePath, std::span<const char* const> _vargs)
+{
+	auto _engineCLI = EngineCLI();
+	{
+		_engineCLI.add_subprogram(Subprogram("test", &sch::run_tests_subprogram, "Runs the tests"));
+		_engineCLI.add_subprogram(Subprogram("perf", &sch::perf_test_subprogram, "Runs the performance tests"));
+		_engineCLI.add_subprogram(Subprogram("lichess", &sch::lichess_bot_subprogram, "Connects to a lichess account and plays games for it"));
+		_engineCLI.add_subprogram(Subprogram("positions", &sch::perft_subprogram, "Generator for final positions (basically perft)"));
+		_engineCLI.add_subprogram(Subprogram("moves", &sch::moves_subprogram, "Outputs the number of legal moves that can be played from a position"));
+		_engineCLI.add_subprogram(Subprogram("local", &sch::local_game_subprogram, "Runs a local game"));
+	};
+	_engineCLI.parse_args(_invokePath, _vargs);
+	return 0;
+};
+
 int main(int _nargs, const char* const* _vargs)
 {
 	std::span<const char* const> _args{};
+
+	if (_nargs == 0)
+	{
+		sch::log_error("WHAT 0 arguments??? Are you running outside of an OS??!?!??!");
+		return 1;
+	};
 
 #ifdef _SCREEPFISH_EXEC_ARGS
 	const auto _customArgs = sch::prepend_array(executable_args, _vargs[0]);
@@ -190,5 +279,10 @@ int main(int _nargs, const char* const* _vargs)
 	_args = std::span<const char* const>(_vargs, _nargs);
 #endif
 
-	return rmain(_args);
+	// Split off the invoke path.
+	const auto _invokePath = _args[0];
+	_args = _args.last(_args.size() - 1);
+
+	// Invoke the "real main" function.
+	return rmain(_invokePath, _args);
 };
