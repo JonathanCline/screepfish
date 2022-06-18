@@ -14,6 +14,14 @@
 
 namespace chess
 {
+	/**
+	 * @brief Maximum number of moves that could be reasonably expected for any board position.
+	 * 
+	 * TODO : Improve this.
+	*/
+	constexpr size_t max_moves_possible_in_any_position_v = 128;
+
+
 	struct MoveBuffer
 	{
 	public:
@@ -132,6 +140,10 @@ namespace chess
 	void get_piece_moves(const chess::Board& _board, const chess::BoardPiece& _piece, MoveBuffer& _buffer, const bool _isCheck = false);
 
 	void get_moves(const chess::Board& _board, const chess::Color _forPlayer, MoveBuffer& _buffer, const bool _isCheck = false);
+	
+	std::vector<Move> get_moves(const chess::Board& _board, const chess::Color _forPlayer);
+
+
 
 	/**
 	 * @brief Checks if the given player has any legal moves.

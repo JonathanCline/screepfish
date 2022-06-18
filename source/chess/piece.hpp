@@ -389,6 +389,7 @@ namespace chess
 
 	enum class PieceE : uint8_t
 	{
+
 		black_pawn		= 0b0001,
 		black_knight	= 0b0010,
 		black_bishop	= 0b0011,
@@ -403,7 +404,7 @@ namespace chess
 		white_queen		= 0b1101,
 		white_king		= 0b1110,
 	};
-
+	SCREEPFISH_DEFINE_ENUM_BITFLAG(PieceE);
 
 
 	/**
@@ -412,8 +413,8 @@ namespace chess
 	class Piece
 	{
 	private:
-		constexpr static uint8_t color_bitmask_v = 0b1000;
-		constexpr static uint8_t piece_bitmask_v = 0b0111;
+		constexpr static auto color_bitmask_v = PieceE(0b1000);
+		constexpr static auto piece_bitmask_v = PieceE(0b0111);
 
 	public:
 
@@ -445,7 +446,7 @@ namespace chess
 		*/
 		constexpr explicit operator bool() const noexcept
 		{
-			return this->bits_ != 0;
+			return this->bits_ != PieceE{};
 		};
 
 		/**
@@ -459,12 +460,12 @@ namespace chess
 
 		constexpr bool is_white() const
 		{
-			return this->bits_ & this->color_bitmask_v;
+			return (this->bits_ & this->color_bitmask_v) != PieceE();
 		};
 
 		constexpr explicit operator uint8_t() const noexcept
 		{
-			return this->bits_;
+			return static_cast<uint8_t>(this->bits_);
 		};
 		constexpr operator PieceE() const noexcept
 		{
@@ -480,12 +481,12 @@ namespace chess
 		// Compares piece type
 		friend inline constexpr bool operator==(const Piece& lhs, const PieceType& rhs) noexcept
 		{
-			return (lhs.bits_ & Piece::piece_bitmask_v) == jc::to_underlying(rhs);
+			return (lhs.bits_ & Piece::piece_bitmask_v) == PieceE(rhs);
 		};
 		// Compares piece type
 		friend inline constexpr bool operator==(const PieceType& lhs, const Piece& rhs) noexcept
 		{
-			return (rhs.bits_ & Piece::piece_bitmask_v) == jc::to_underlying(lhs);
+			return (rhs.bits_ & Piece::piece_bitmask_v) == PieceE(lhs);
 		};
 
 		// Compares piece type
@@ -504,23 +505,25 @@ namespace chess
 
 
 		constexpr Piece() noexcept :
-			bits_(0)
+			bits_()
 		{};
 		constexpr Piece(Type _type, Color _color) noexcept :
-			bits_((jc::to_underlying(_type)) | ((_color == Color::white)? color_bitmask_v : 0b0))
+			bits_((PieceE(jc::to_underlying(_type))) |
+					((_color == Color::white)? color_bitmask_v : PieceE())
+			)
 		{};
 
 		constexpr Piece& operator=(PieceType _type)
 		{
 			if (_type == PieceType::none)
 			{
-				this->bits_ = 0;
+				this->bits_ = PieceE{};
 			}
 			else
 			{
 				this->bits_ =
 					(this->bits_ & this->color_bitmask_v) |
-					(jc::to_underlying(_type));
+					PieceE(jc::to_underlying(_type));
 			};
 			return *this;
 		};
@@ -530,7 +533,7 @@ namespace chess
 		/**
 		 * @brief The bits containing the piece type and color.
 		*/
-		uint8_t bits_;
+		PieceE bits_;
 
 	};
 
