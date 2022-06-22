@@ -362,6 +362,8 @@ namespace sch
 		SCREEPFISH_CHECK(_board);
 
 		const auto p = _board->get(_piece);
+		SCREEPFISH_CHECK(p);
+
 		if (is_piece_attacked(*_board, BoardPiece(p, _piece)) != _expected)
 		{
 			sch::log_error(str::concat_to_string("Piece ",
@@ -372,7 +374,10 @@ namespace sch
 			SCREEPFISH_CHECK(false);
 		};
 	};
+	inline void is_mate_test(const std::string_view _fen, chess::Color _player, bool _expected)
+	{
 
+	};
 
 	bool run_tests_main()
 	{
@@ -401,6 +406,69 @@ namespace sch
 			{
 				const auto _fen = "k7/7b/8/5n2/8/3Kn3/8/8 w - - 0 1";
 				is_piece_attacked_test(_fen, (File::d, Rank::r3), false);
+			};
+			{
+				const auto _fen = "8/1b6/8/8/8/5q2/8/k4K2 w - - 14 80";
+				auto _board = parse_fen(_fen);
+				SCREEPFISH_CHECK(_board);
+				SCREEPFISH_CHECK(!is_checkmate(*_board, Color::white) && "Should NOT be checkmate");
+			};
+			{
+				const auto _fen = "8/8/b7/8/8/7q/k4K2/8 w - - 10 78";
+				auto _board = parse_fen(_fen);
+				SCREEPFISH_CHECK(_board);
+				SCREEPFISH_CHECK(!is_checkmate(*_board, Color::white) && "Should NOT be checkmate");
+			};
+		};
+
+		// TODO : The bot tried to play this, figure out what is wrong
+		{
+			const auto _fen = "rn2kbnr/p1p2ppp/b2p4/1B1p4/8/N4N2/PPPP1PPP/R1BQK2R b KQkq - 0 6";
+			auto _board = parse_fen(_fen);
+			SCREEPFISH_CHECK(_board);
+
+			_board->move((File::e, Rank::r8), (File::d, Rank::r7));
+			SCREEPFISH_CHECK(is_check(*_board, Color::black));
+		};
+
+		// TODO : The bot tried to play this, figure out what is wrong
+		{
+			const auto _fen = "2kr3r/ppp5/2b1Q2p/8/3pp3/q2B2K1/P1R2PPP/3R4 b - - 0 23";
+			const auto _move = Move((File::a, Rank::r3), (File::d, Rank::r6));
+			auto _board = parse_fen(_fen);
+			SCREEPFISH_CHECK(_board);
+			_board->move(_move);
+			SCREEPFISH_CHECK(is_check(*_board, Color::black));
+		};
+
+
+		// Test promotion move processed by board
+		{
+			const auto _fen = "8/2P5/8/k6B/8/8/1K1N4/8 w - - 1 40";
+			auto _board = parse_fen(_fen);
+			SCREEPFISH_CHECK(_fen);
+			{
+				auto nb = *_board;
+				const auto _move = Move((File::c, Rank::r7), (File::c, Rank::r8));
+				nb.move(_move);
+				const auto _newPiece = nb.get(File::c, Rank::r8);
+				SCREEPFISH_CHECK(_newPiece == Piece::white_queen);
+			};
+			{
+				auto nb = *_board;
+				const auto _move = Move((File::c, Rank::r7), (File::c, Rank::r8),
+					PieceType::queen);
+				nb.move(_move);
+				const auto _newPiece = nb.get(File::c, Rank::r8);
+				SCREEPFISH_CHECK(_newPiece == Piece::white_queen);
+			};
+			{
+				auto nb = *_board;
+				const auto _move = Move((File::c, Rank::r7), (File::c, Rank::r8),
+					PieceType::rook);
+				nb.move(_move);
+				const auto _newPiece = nb.get(File::c, Rank::r8);
+				SCREEPFISH_CHECK(_newPiece == Piece::white_rook);
 			};
 		};
 
@@ -485,7 +553,7 @@ namespace sch
 			SCREEPFISH_CHECK(_board);
 
 			auto _moves = get_moves(*_board, _board->get_toplay());
-			SCREEPFISH_CHECK(false && "finish me please");
+			//SCREEPFISH_CHECK(false && "finish me please");
 		};
 
 		std::cout << '\n' << str::rep('=', 80) << "\n\n";

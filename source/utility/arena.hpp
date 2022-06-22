@@ -200,8 +200,15 @@ namespace sch
 		NullTerminatedArena() :
 			data_(nullptr)
 		{};
-		NullTerminatedArena(const NullTerminatedArena& other) = delete;
-
+		NullTerminatedArena(const NullTerminatedArena& other) :
+			NullTerminatedArena()
+		{
+			if (other.data())
+			{
+				this->raw_set_mem(other.size());
+				std::copy(other.begin(), other.end(), this->begin());
+			};
+		};
 		NullTerminatedArena& operator=(const NullTerminatedArena& other)
 		{
 			this->clear();

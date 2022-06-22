@@ -135,6 +135,12 @@ namespace str
 		size_t _currentMatchLength = 0;
 		for (auto hIt = _str.begin(); hIt != _str.end(); ++hIt)
 		{
+			if (sIt == _substr.end())
+			{
+				// longest possible match found
+				break;
+			};
+
 			if (*hIt == *sIt)
 			{
 				// start or continuation of match

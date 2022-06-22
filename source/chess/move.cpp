@@ -17,7 +17,7 @@ namespace chess
 		constexpr auto PAWN_PUSH_RATING = 0.001f;
 		constexpr auto CASTLE_ABILITY_RATING = 0.001f;
 		constexpr auto DEVELOPMENT_RATING = 0.005f;
-		constexpr auto KING_MOVE_RATING = -0.01f;
+		constexpr auto KING_MOVE_RATING = 0.0f;
 		constexpr auto STALEMATE_RATING = 0.0f;
 
 		// Disincentivize repeating moves
@@ -451,7 +451,7 @@ namespace chess
 	bool is_neighboring_position(Position _pos, Position _pos2)
 	{
 		auto& nb = neighbors_v[static_cast<size_t>(_pos)];
-		const auto _end = nb.neighbors.end();
+		const auto _end = nb.neighbors.begin() + nb.count;
 		return std::find(nb.neighbors.begin(), _end, _pos2) != _end;
 	};
 	
@@ -975,6 +975,7 @@ namespace chess
 				case Piece::king:
 					if (is_neighboring_position(_pos, _found))
 					{
+						const auto q = is_neighboring_position(_pos, _found);
 						return true;
 					};
 					break;
@@ -1243,6 +1244,7 @@ namespace chess
 		// Exit early if at end of board
 		if (_rank == Rank::r1 || _rank == Rank::r8)
 		{
+			SCREEPFISH_ASSERT(false);
 			return;
 		};
 
@@ -1601,7 +1603,7 @@ namespace chess
 				{
 					auto _futureBoard = _board;
 					_futureBoard.move(*p);
-					if (!is_check(_futureBoard, _board.get_toplay()))
+					if (!is_check(_futureBoard, _player))
 					{
 						return true;
 					};

@@ -72,7 +72,6 @@ namespace chess
 		// Aliasing parts to keep compatability
 		const auto _fromPos = _move.from();
 		const auto _toPos = _move.to();
-		const auto _promotion = _move.promotion();
 
 		const auto _oldEnpassantTarget = this->enpassant_target_;
 		this->enpassant_target_.reset();
@@ -111,9 +110,19 @@ namespace chess
 					};
 				};
 			}
-			// Enpassant handling
+			// Pawn promotion + enpassant handling
 			else if (_from.type() == PieceType::pawn)
 			{
+				// Pawn promotion
+				if (_toPos.rank() == Rank::r1 || _toPos.rank() == Rank::r8)
+				{
+					const auto _promotion = (_move.promotion() == PieceType::none) ?
+						PieceType::queen : _move.promotion();
+					this->pieces_by_pos_.at(toindex(_fromPos)) = _promotion;
+					*this->pfind(_fromPos) = _promotion;
+				};
+
+				// Enpassant
 				if (_from.color() == Color::white)
 				{
 					if (_fromPos.rank() == Rank::r2 &&
@@ -212,12 +221,6 @@ namespace chess
 
 		auto it = this->find(_fromPos);
 		SCREEPFISH_ASSERT(it != this->end());
-
-		if (_promotion != PieceType::none && *it == PieceType::pawn)
-		{
-			this->pieces_by_pos_.at(toindex(_fromPos)) = _promotion;
-			*this->pfind(_fromPos) = _promotion;
-		};
 
 		if (_oldEnpassantTarget && *_oldEnpassantTarget == _toPos &&
 			it->type() == Piece::pawn)

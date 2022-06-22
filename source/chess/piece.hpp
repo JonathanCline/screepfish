@@ -254,6 +254,8 @@ namespace chess
 		};
 
 	private:
+		using PieceMove::PieceMove;
+
 		PieceType promotion_;
 	};
 

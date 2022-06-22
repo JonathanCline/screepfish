@@ -1,5 +1,9 @@
 #include "move_tree.hpp"
 
+#include "fen.hpp"
+
+#include "utility/logging.hpp"
+
 #include <iostream>
 
 #include <jclib/type.h>
@@ -36,6 +40,21 @@ namespace chess
 		std::ranges::sort(this->responses_,
 			[](const MoveTreeNode& lhs, const MoveTreeNode& rhs)
 			{
+				if (lhs.is_pruned())
+				{
+					if (!rhs.is_pruned())
+					{
+						return false;
+					};
+				}
+				else
+				{
+					if (rhs.is_pruned())
+					{
+						return true;
+					};
+				};
+
 				const auto lr = lhs.player_rating();
 				const auto rr = rhs.player_rating();
 				if (lr != rr)
@@ -345,13 +364,103 @@ namespace chess
 
 	
 
+	template <typename T>
+	using opt = std::optional<T>;
+	using std::nullopt;
+
+
+
+	/**
+	 * @brief 
+	 * @param _node 
+	 * @param _forPlayer Player who may be check-mated.
+	 * @return 
+	*/
+	inline opt<int> get_forced_mate_move_count(const MoveTreeNode& _node, Color _forPlayer)
+	{
+		if (_node.empty())
+		{
+			// Check if the player would be check mated
+			if (_node.rating().player(_forPlayer) == AbsoluteRating::min().raw())
+			{
+				return 1;
+			}
+			else
+			{
+				return nullopt;
+			};
+		}
+		else
+		{
+			if (_node.played_by() != _forPlayer)
+			{
+				// All lines must be forced mate
+				opt<int> _bestCount = nullopt;
+				for (auto& _move : _node)
+				{
+					const auto _count = get_forced_mate_move_count(_move, _forPlayer);
+					if (!_count)
+					{
+						return nullopt;
+					};
+					
+					if (!_bestCount)
+					{
+						_bestCount = _count;
+					}
+					else
+					{
+						_bestCount = std::min(*_bestCount, *_count);
+					};
+				};
+
+				if (_bestCount)
+				{
+					return *_bestCount + 1;
+				}
+				else
+				{
+					return nullopt;
+				};
+			}
+			else
+			{
+				// Any may must be forced mate
+				opt<int> _bestCount = nullopt;
+				for (auto& _move : _node)
+				{
+					const auto _count = get_forced_mate_move_count(_move, _forPlayer);
+					if (_count)
+					{
+						if (_bestCount)
+						{
+							_bestCount = std::min(*_bestCount, *_count);
+						}
+						else
+						{
+							_bestCount = _count;
+						};
+					};
+				};
+
+				if (_bestCount)
+				{
+					return *_bestCount + 1;
+				}
+				else
+				{
+					return nullopt;
+				};
+			};
+		};
+	};
 
 
 
 	inline Rating minimax(const Board& _board, MoveTreeNode& _node,
 		bool _isMaximizingPlayer)
 	{
-		if (_node.empty())
+		if (_node.empty() || !_node.was_evaluated())
 		{
 			// Leaf, return node rating.
 			return _node.player_rating();
@@ -373,6 +482,7 @@ namespace chess
 
 			_node.resort_children();
 
+
 			// Assign the rating to the node
 			auto _absValue = AbsoluteRating(_value, !_node.played_by());
 			_node.set_rating(_absValue);
@@ -382,8 +492,14 @@ namespace chess
 
 	inline AbsoluteRating minimax(const Board& _board, MoveTreeNode& _node)
 	{
+		// Check for forced mate
+		//is_forced_mate(_node, _node.played_by());
+			
 		// Calculate the deep rating
 		const auto _deepRating = AbsoluteRating(minimax(_board, _node, true), _node.played_by());
+
+
+
 		return _deepRating;
 	};
 
@@ -418,9 +534,28 @@ namespace chess
 			_profile.follow_checks_ = false;
 		};
 
+		//if (_node.was_evaluated())
+		//{
+		//	if (std::isfinite(_node.quick_rating()))
+		//	{
+		//		// STALEMATE
+		//		_node.set_rating(AbsoluteRating(0));
+		//	}
+		//	//else
+		//	//{
+		//		// CHECKMATE
+		//	//};
+		//};
+
 		// Sort children by quick evaluation rating
 		_node.resort_children_by_quick_rating();
 	};
+
+#ifdef SCREEPFISH_DEBUG_ALPHABETA
+#define IF_SCREEPFISH_DEBUG_ALPHABETA(...) __VA_ARGS__
+#else
+#define IF_SCREEPFISH_DEBUG_ALPHABETA(...) 
+#endif
 
 	/**
 	 * @brief Fills a move tree using alpha-beta pruning.
@@ -438,79 +573,152 @@ namespace chess
 	*/
 	inline Rating alpha_beta(const Board& _board,
 		MoveTreeNode& _node, MoveTreeProfile _profile, MoveTreeSearchData _searchData,
-		MoveTreeAlphaBeta _alphaBeta, Color _maximizingPlayer)
+		MoveTreeAlphaBeta _alphaBeta, bool _isMaximizingPlayer = true
+		IF_SCREEPFISH_DEBUG_ALPHABETA(, std::vector<impl::PrunedNode>* _prunedNodes = nullptr)
+	)
 	{
-		const bool _isMaximizingPlayer = (_maximizingPlayer == _board.get_toplay());
-
 		if (!_searchData.can_go_deeper() /* or node is a terminal node */)
 		{
-			return (_isMaximizingPlayer) ?
-				_node.quick_rating() :
-				-_node.quick_rating();
+			return (_isMaximizingPlayer)?
+				_node.player_rating() : -_node.player_rating();
 		};
 
 		SCREEPFISH_ASSERT(_board.get_last_move() == _node.move_);
 		alpha_beta_eval(_node, _board, _profile, _searchData);
 		
-		auto _newBoard = _board;
 		if (_isMaximizingPlayer)
 		{
-			auto _value =
-				-Rating(std::numeric_limits<Rating>::infinity());
+			auto _value = -Rating(std::numeric_limits<Rating>::infinity());// _alphaBeta.alpha;
 
-			for (auto& _move : _node)
+			auto it = _node.begin();
+			const auto _end = _node.end();
+
+			for (; it != _end; ++it)
 			{
+				auto& _move = *it;
+
+				auto _newBoard = _board;
 				_newBoard.move(_move.move_);
+
+				const auto _moveAB = alpha_beta(_newBoard, _move, _profile,
+					_searchData.with_next_depth(),
+					_alphaBeta, false
+					IF_SCREEPFISH_DEBUG_ALPHABETA(, _prunedNodes)
+				);
 
 				_value = std::max
 				(
 					_value,
-					alpha_beta(_newBoard, _move, _profile,
-						_searchData.with_next_depth(),
-						_alphaBeta, !_maximizingPlayer
-					)
+					_moveAB
 				);
 
-				if (_value >= _alphaBeta.beta)
+				if (std::isfinite(_moveAB))
 				{
-					break; // (*β cutoff*)
-				};
+					if (_value > _alphaBeta.beta)
+					{
+#ifdef SCREEPFISH_DEBUG_ALPHABETA
+						sch::log_info(str::concat_to_string("AB Pruning (Beta) : ",
+							_move.move_, " (fen) \"", get_fen(_board), "\""));
 
-				_alphaBeta.alpha = std::max(
-					_alphaBeta.alpha,
-					_value
-				);
+
+
+						if (_prunedNodes)
+						{
+							bool _found = false;
+							for (auto& v : _node)
+							{
+								if (!_found)
+								{
+									if (static_cast<Move&>(v.move_) == static_cast<Move&>(_move.move_))
+									{
+										_found = true;
+									};
+								}
+								else
+								{
+									_prunedNodes->push_back(impl::PrunedNode{ _board, v });
+								};
+							};
+						};
+#endif
+						break; // (*β cutoff*)
+					};
+					_alphaBeta.alpha = std::max(
+						_alphaBeta.alpha,
+						_value
+					);
+				};
+			};
+			for (; it != _end; ++it)
+			{
+				it->set_pruned();
 			};
 
 			return _value;
 		}
 		else
 		{
-			auto _value =
-				-Rating(std::numeric_limits<Rating>::infinity());
+			auto _value = Rating(std::numeric_limits<Rating>::infinity());//_alphaBeta.beta;
 
-			for (auto& _move : _node)
+			auto it = _node.begin();
+			const auto _end = _node.end();
+
+			for (; it != _end; ++it)
 			{
+				auto& _move = *it;
+
+				auto _newBoard = _board;
 				_newBoard.move(_move.move_);
+
+				const auto _moveAB = alpha_beta(_newBoard, _move, _profile,
+					_searchData.with_next_depth(),
+					_alphaBeta, true
+					IF_SCREEPFISH_DEBUG_ALPHABETA(, _prunedNodes)
+				);
 
 				_value = std::min
 				(
 					_value,
-					alpha_beta(_newBoard, _move, _profile,
-						_searchData.with_next_depth(),
-						_alphaBeta, !_maximizingPlayer
-					)
+					_moveAB
 				);
 
-				if (_value <= _alphaBeta.alpha)
+				if (std::isfinite(_moveAB))
 				{
-					break; // (*α cutoff*)
+					if (_value < _alphaBeta.alpha)
+					{
+#ifdef SCREEPFISH_DEBUG_ALPHABETA
+						sch::log_info(str::concat_to_string("AB Pruning (Alpha) : ",
+							_move.move_, " (fen) \"", get_fen(_board), "\""));
+						if (_prunedNodes)
+						{
+							bool _found = false;
+							for (auto& v : _node)
+							{
+								if (!_found)
+								{
+									if (static_cast<Move&>(v.move_) == static_cast<Move&>(_move.move_))
+									{
+										_found = true;
+									};
+								}
+								else
+								{
+									_prunedNodes->push_back(impl::PrunedNode{ _board, v });
+								};
+							};
+						};
+#endif
+						break; // (*α cutoff*)
+					};
+					_alphaBeta.beta = std::min(
+						_alphaBeta.beta,
+						_value
+					);
 				};
-
-				_alphaBeta.beta = std::min(
-					_alphaBeta.beta,
-					_value
-				);
+			};
+			for (; it != _end; ++it)
+			{
+				it->set_pruned();
 			};
 
 			return _value;
@@ -519,16 +727,20 @@ namespace chess
 	};
 
 	inline Rating alpha_beta(MoveTree& _tree,
-		MoveTreeProfile _profile, MoveTreeSearchData _searchData)
+		MoveTreeProfile _profile, MoveTreeSearchData _searchData
+		IF_SCREEPFISH_DEBUG_ALPHABETA(, std::vector<impl::PrunedNode>* _prunedNodes = nullptr)
+	)
 	{
 		auto _alphaBeta = MoveTreeAlphaBeta();
 		_alphaBeta.alpha = -std::numeric_limits<Rating>::infinity();
 		_alphaBeta.beta = std::numeric_limits<Rating>::infinity();
 		return alpha_beta(_tree.initial_board(), _tree.root(),
-			_profile, _searchData, _alphaBeta,
-			_tree.initial_board().get_toplay());
+			_profile, _searchData, _alphaBeta, true
+#ifdef SCREEPFISH_DEBUG_ALPHABETA
+			, _prunedNodes
+#endif
+		);
 	};
-
 
 
 
@@ -661,6 +873,32 @@ namespace chess
 	void MoveTree::resort_children(std::mt19937* _rnd)
 	{
 		auto& _root = this->root();
+		
+		std::pair<int, MoveTreeNode*> _bestForcedMate{};
+		for (auto& _move : _root)
+		{
+			const auto _count = get_forced_mate_move_count(_move, !_move.played_by());
+			if (_count)
+			{
+				if (!_bestForcedMate.second)
+				{
+					_bestForcedMate = { *_count, &_move };
+				}
+				else if (*_count < _bestForcedMate.first)
+				{
+					_bestForcedMate = { *_count, &_move };
+				};
+			};
+		};
+
+		if (_bestForcedMate.second)
+		{
+			// Forced mate, take it.
+			_root.at(0) = *_bestForcedMate.second;
+			_root.soft_resize(1);
+			return;
+		};
+
 		_root.resort_children();
 	};
 

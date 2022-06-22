@@ -14,6 +14,8 @@
 #include <random>
 #include <unordered_set>
 
+//#define SCREEPFISH_DEBUG_ALPHABETA
+
 namespace chess
 {
 
@@ -42,14 +44,13 @@ namespace chess
 	};
 
 
-
-
 	struct MoveTreeAlphaBeta
 	{
 		Rating alpha;
 		Rating beta;
 
 		MoveTreeAlphaBeta() = default;
+
 	};
 
 
@@ -110,6 +111,7 @@ namespace chess
 
 		NodeEvalResult() = default;
 	};
+
 
 	struct MoveTreeNode
 	{
@@ -288,6 +290,8 @@ namespace chess
 
 
 
+		bool is_pruned() const noexcept { return this->pruned_; };
+		void set_pruned() noexcept { this->pruned_ = true; };
 
 
 		MoveTreeNode()
@@ -308,10 +312,9 @@ namespace chess
 		*/
 		Color player_{};
 		uint8_t depth_ = 0;
+		bool pruned_ = false;
 	};
 	
-
-
 
 	template <jc::cx_invocable<const Board&> T>
 	inline void foreach_final_position(const Board& _board, const MoveTreeNode& _node, const T& _op)
@@ -506,7 +509,16 @@ namespace chess
 		foreach_final_move(_board, _node, _op);
 		return o;
 	};
+	
 
+	namespace impl
+	{
+		struct PrunedNode
+		{
+			Board previous_board;
+			MoveTreeNode node;
+		};
+	};
 
 	struct MoveTree
 	{
@@ -618,6 +630,11 @@ namespace chess
 		 * @brief Probably not needed.
 		*/
 		size_t depth_counter_ = 0;
+
+#ifdef SCREEPFISH_DEBUG_ALPHABETA
+		std::vector<impl::PrunedNode> ab_pruned_nodes_{};
+#endif
+
 	};
 
 
